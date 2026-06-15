@@ -92,6 +92,20 @@ function resolveGroupSlot(part: string, groupName?: string): { name: string; fla
   };
 }
 
+function getMatchScore(matchNo: number, homeName: string, awayName: string) {
+  // Deterministic scores based on match number and team names
+  const hash = (matchNo * 31 + (homeName?.charCodeAt(0) || 0) + (awayName?.charCodeAt(0) || 0)) % 100;
+  const homeGoals = hash % 3; // 0, 1, 2
+  const awayGoals = (hash + 5) % 3; // 0, 1, 2
+  return { homeGoals, awayGoals };
+}
+
+function getLiveMinutes(matchNo: number) {
+  // Deterministic live minutes for the 4 matches on June 15, 2026
+  const minutes = [78, 44, 61, 19];
+  return minutes[matchNo % minutes.length];
+}
+
 function getTeamLabel(teamStr: string, groupName?: string) {
   const parts = teamStr.split(" vs ");
   return parts.map((part) => resolveGroupSlot(part, groupName));
@@ -102,12 +116,22 @@ export function FixturesExplorer() {
   const [selectedGroup, setSelectedGroup] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
 
   const groups = ["ALL", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
 
   // Flatten and prepare fixtures data
   const processedFixtures = useMemo(() => {
     const list: any[] = [];
+    const today = "2026-06-15"; // active tournament date context
+
+    const getStatus = (dateStr: string) => {
+      if (!dateStr) return "UPCOMING";
+      if (dateStr === today) return "LIVE";
+      if (dateStr < today) return "COMPLETED";
+      return "UPCOMING";
+    };
     
     if (activeStage === "group") {
       fixturesData.schedule.group_stage.fixtures.forEach((f: any) => {
@@ -115,32 +139,33 @@ export function FixturesExplorer() {
           ...f,
           stageName: "Group Stage",
           isKnockout: false,
+          status: getStatus(f.date),
         });
       });
     } else {
       // Round of 32
       fixturesData.schedule.round_of_32.fixtures.forEach((f: any) => {
-        list.push({ ...f, stageName: "Round of 32", isKnockout: true });
+        list.push({ ...f, stageName: "Round of 32", isKnockout: true, status: getStatus(f.date) });
       });
       // Round of 16
       fixturesData.schedule.round_of_16.fixtures.forEach((f: any) => {
-        list.push({ ...f, stageName: "Round of 16", isKnockout: true });
+        list.push({ ...f, stageName: "Round of 16", isKnockout: true, status: getStatus(f.date) });
       });
       // Quarter Finals
       fixturesData.schedule.quarter_finals.fixtures.forEach((f: any) => {
-        list.push({ ...f, stageName: "Quarter-Finals", isKnockout: true });
+        list.push({ ...f, stageName: "Quarter-Finals", isKnockout: true, status: getStatus(f.date) });
       });
       // Semi Finals
       fixturesData.schedule.semi_finals.fixtures.forEach((f: any) => {
-        list.push({ ...f, stageName: "Semi-Finals", isKnockout: true });
+        list.push({ ...f, stageName: "Semi-Finals", isKnockout: true, status: getStatus(f.date) });
       });
       // Third Place
       fixturesData.schedule.third_place_playoff.fixtures.forEach((f: any) => {
-        list.push({ ...f, stageName: "Third Place Playoff", isKnockout: true });
+        list.push({ ...f, stageName: "Third Place Playoff", isKnockout: true, status: getStatus(f.date) });
       });
       // Final
       fixturesData.schedule.final.fixtures.forEach((f: any) => {
-        list.push({ ...f, stageName: "Final", isKnockout: true });
+        list.push({ ...f, stageName: "Final", isKnockout: true, status: getStatus(f.date) });
       });
     }
     return list;
@@ -159,6 +184,16 @@ export function FixturesExplorer() {
         return false;
       }
 
+      // Status Filter
+      if (selectedStatus !== "ALL" && f.status !== selectedStatus) {
+        return false;
+      }
+
+      // Location Filter
+      if (selectedLocation && f.city !== selectedLocation) {
+        return false;
+      }
+
       // Search Filter (resolved teams, venue, city)
       if (search) {
         const query = search.toLowerCase();
@@ -173,7 +208,7 @@ export function FixturesExplorer() {
       
       return true;
     });
-  }, [processedFixtures, selectedGroup, selectedDate, search, activeStage]);
+  }, [processedFixtures, selectedGroup, selectedDate, selectedStatus, selectedLocation, search, activeStage]);
 
   // Format Dates List for filter dropdown
   const uniqueDates = useMemo(() => {
@@ -182,6 +217,15 @@ export function FixturesExplorer() {
       if (f.date) dates.add(f.date);
     });
     return Array.from(dates).sort();
+  }, [processedFixtures]);
+
+  // Format Cities List for filter dropdown
+  const uniqueLocations = useMemo(() => {
+    const locations = new Set<string>();
+    processedFixtures.forEach((f) => {
+      if (f.city) locations.add(f.city);
+    });
+    return Array.from(locations).sort();
   }, [processedFixtures]);
 
   const formatDateLabel = (dateStr: string) => {
@@ -193,6 +237,14 @@ export function FixturesExplorer() {
       weekday: "short",
       timeZone: "UTC",
     });
+  };
+
+  const handleReset = () => {
+    setSearch("");
+    setSelectedGroup("ALL");
+    setSelectedDate("");
+    setSelectedStatus("ALL");
+    setSelectedLocation("");
   };
 
   return (
@@ -213,6 +265,8 @@ export function FixturesExplorer() {
               setActiveStage("group");
               setSelectedGroup("ALL");
               setSelectedDate("");
+              setSelectedStatus("ALL");
+              setSelectedLocation("");
             }}
             className={`px-4 py-2 text-xs font-semibold rounded-lg transition duration-200 ${
               activeStage === "group" ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"
@@ -224,6 +278,8 @@ export function FixturesExplorer() {
             onClick={() => {
               setActiveStage("knockout");
               setSelectedDate("");
+              setSelectedStatus("ALL");
+              setSelectedLocation("");
             }}
             className={`px-4 py-2 text-xs font-semibold rounded-lg transition duration-200 ${
               activeStage === "knockout" ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"
@@ -235,7 +291,7 @@ export function FixturesExplorer() {
       </div>
 
       {/* Filter panel */}
-      <div className="glass-strong rounded-2xl p-4 mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-4 items-center">
+      <div className="glass-strong rounded-2xl p-4 mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-center">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-4.5 w-4.5 text-muted-foreground/60" />
@@ -246,6 +302,20 @@ export function FixturesExplorer() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-white/10 bg-white/5 text-foreground placeholder-muted-foreground outline-none transition focus:border-neon focus:bg-white/10 focus:ring-1 focus:ring-neon"
           />
+        </div>
+
+        {/* Status Filter */}
+        <div className="relative">
+          <select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            className="w-full px-3 py-2 text-sm rounded-xl border border-white/10 bg-[#0f172a] text-foreground outline-none transition focus:border-neon"
+          >
+            <option value="ALL" className="bg-popover">All Statuses</option>
+            <option value="LIVE" className="bg-popover">Live Now</option>
+            <option value="COMPLETED" className="bg-popover">Completed</option>
+            <option value="UPCOMING" className="bg-popover">Upcoming</option>
+          </select>
         </div>
 
         {/* Group Filter (Only on group stage) */}
@@ -266,9 +336,25 @@ export function FixturesExplorer() {
         ) : (
           <div className="text-xs text-muted-foreground/60 flex items-center gap-1.5 px-3">
             <Trophy className="h-4 w-4 text-neon" />
-            <span>Knockout placement placeholders</span>
+            <span>Knockout placeholders</span>
           </div>
         )}
+
+        {/* Location Filter */}
+        <div className="relative">
+          <select
+            value={selectedLocation}
+            onChange={(e) => setSelectedLocation(e.target.value)}
+            className="w-full px-3 py-2 text-sm rounded-xl border border-white/10 bg-[#0f172a] text-foreground outline-none transition focus:border-neon"
+          >
+            <option value="" className="bg-popover">All Locations</option>
+            {uniqueLocations.map((loc) => (
+              <option key={loc} value={loc} className="bg-popover">
+                {loc}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* Date Filter */}
         <div className="relative">
@@ -288,12 +374,8 @@ export function FixturesExplorer() {
 
         {/* Reset Buttons */}
         <button
-          onClick={() => {
-            setSearch("");
-            setSelectedGroup("ALL");
-            setSelectedDate("");
-          }}
-          className="text-xs font-semibold text-neon hover:text-neon-2 transition py-2 text-center"
+          onClick={handleReset}
+          className="text-xs font-semibold text-neon hover:text-neon-2 transition py-2 text-center cursor-pointer"
         >
           Reset Filters
         </button>
@@ -314,10 +396,15 @@ export function FixturesExplorer() {
           <tbody>
             {filteredFixtures.map((f, i) => {
               const teamMatchup = getTeamLabel(f.teams, f.group);
+              const isLive = f.status === "LIVE";
+              const score = getMatchScore(f.match_no, teamMatchup[0].name, teamMatchup[1]?.name || "");
+
               return (
                 <tr
                   key={`${f.stageName}-${f.match_no || i}`}
-                  className="border-b border-white/5 hover:bg-white/5 transition duration-200"
+                  className={`border-b border-white/5 hover:bg-white/5 transition duration-200 ${
+                    isLive ? "bg-red-500/[0.02] border-l-2 border-l-red-500" : ""
+                  }`}
                 >
                   <td className="px-5 py-4 text-center font-mono text-xs text-muted-foreground">
                     #{f.match_no || i + 1}
@@ -341,7 +428,34 @@ export function FixturesExplorer() {
                         <span className="truncate text-sm font-semibold text-foreground">{teamMatchup[0].name}</span>
                         <span className="text-xl leading-none">{teamMatchup[0].flag}</span>
                       </div>
-                      <span className="text-xs uppercase font-extrabold text-muted-foreground/50 px-1.5 py-0.5 rounded bg-white/5">VS</span>
+                      
+                      {/* Score / Status Display */}
+                      {isLive ? (
+                        <div className="flex flex-col items-center shrink-0 min-w-[80px]">
+                          <span className="text-sm font-black font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)] animate-pulse">
+                            {score.homeGoals} - {score.awayGoals}
+                          </span>
+                          <span className="text-[9px] uppercase tracking-wider font-extrabold text-red-500 mt-1 flex items-center gap-1">
+                            <span className="h-1 w-1 rounded-full bg-red-500 animate-ping" />
+                            LIVE {getLiveMinutes(f.match_no)}'
+                          </span>
+                        </div>
+                      ) : f.status === "COMPLETED" ? (
+                        <div className="flex flex-col items-center shrink-0 min-w-[80px]">
+                          <span className="text-sm font-mono font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-muted-foreground">
+                            {score.homeGoals} - {score.awayGoals}
+                          </span>
+                          <span className="text-[8px] uppercase font-bold text-muted-foreground/60 mt-1">FT</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center shrink-0 min-w-[80px]">
+                          <span className="text-xs uppercase font-extrabold text-muted-foreground/50 px-1.5 py-0.5 rounded bg-white/5 border border-white/5">
+                            VS
+                          </span>
+                          <span className="text-[8px] uppercase font-bold text-muted-foreground/40 mt-1">Upcoming</span>
+                        </div>
+                      )}
+
                       <div className="flex-1 flex items-center justify-start gap-2 min-w-0">
                         <span className="text-xl leading-none">{teamMatchup[1]?.flag || "🏳️"}</span>
                         <span className="truncate text-sm font-semibold text-foreground">{teamMatchup[1]?.name || "TBD"}</span>
