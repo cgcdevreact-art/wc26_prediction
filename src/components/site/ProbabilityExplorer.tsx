@@ -1,0 +1,383 @@
+"use client";
+
+import { useMemo, useState, useEffect } from "react";
+import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { AuthModal } from "./AuthModal";
+
+const PATH_TO_FINAL = [
+  { stage: "Group Stage", opp: "Switzerland", winPct: 78 },
+  { stage: "Round of 32", opp: "Senegal", winPct: 70 },
+  { stage: "Round of 16", opp: "Mexico", winPct: 66 },
+  { stage: "Quarter Final", opp: "England", winPct: 54 },
+  { stage: "Semi Final", opp: "France", winPct: 47 },
+  { stage: "Final", opp: "Argentina", winPct: 44 },
+];
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
+import { ChevronRight, Trophy, Sparkles } from "lucide-react";
+
+const stages = [
+  { key: "qualify", label: "Group Stage", icon: "G" },
+  { key: "r32", label: "Round of 32", icon: "32" },
+  { key: "r16", label: "Round of 16", icon: "16" },
+  { key: "qf", label: "Quarter Final", icon: "QF" },
+  { key: "sf", label: "Semi Final", icon: "SF" },
+  { key: "final", label: "Final", icon: "F" },
+  { key: "champion", label: "Champion", icon: "🏆" },
+] as const;
+
+export function ProbabilityExplorer() {
+  const teams = useTeams();
+  const groupsConfig = useGroupsConfig();
+  const { data: session } = useSession();
+  const router = useRouter();
+  const [code, setCode] = useState("BRA");
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [players, setPlayers] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch("/players.json")
+      .then((res) => res.json())
+      .then((data) => setPlayers(data))
+      .catch((err) => console.error("Error loading players.json:", err));
+  }, []);
+
+  const team = teams.find((t) => t.code === code) || teams[0];
+
+  const getTopPlayer = (teamCode: string) => {
+    if (!players || players.length === 0) return "Loading...";
+    const teamPlayers = players
+      .filter((p) => p["Team Code"] === teamCode)
+      .sort((a, b) => {
+        const ratingA = parseInt(a["Overall Rating"]?.replace("%", "") || "0", 10);
+        const ratingB = parseInt(b["Overall Rating"]?.replace("%", "") || "0", 10);
+        return ratingB - ratingA;
+      });
+    const topPlayer = teamPlayers[0];
+    const name = topPlayer ? (topPlayer["Name on Shirt"] || topPlayer["Player Name"]) : "";
+    const rating = topPlayer ? (topPlayer["Overall Rating"] || "") : "";
+    return name ? `${name} (${rating})` : "N/A";
+  };
+
+  const sortedTeams = useMemo(() => {
+    return [...teams].sort((a, b) => b.elo - a.elo);
+  }, [teams]);
+
+  const radar = useMemo(() => ([
+    { axis: "Attack", v: team.attack > 10 ? team.attack : Math.round(team.attack * 80) },
+    { axis: "Defense", v: team.defense > 10 ? team.defense : Math.round(team.defense * 80) },
+    { axis: "Power", v: team.power || 70 },
+    { axis: "Form", v: Math.min(99, (team.power || 70) + 4) },
+    { axis: "Squad", v: Math.min(99, 50 + (team.squadValueM || 500) / 15) },
+    { axis: "Elo", v: Math.round(((team.elo || 1500) - 1300) / 6) },
+  ]), [team]);
+
+  const trend = useMemo(() => ([
+    { m: "Jan", v: Math.max(2, team.prob.champion - 5) },
+    { m: "Feb", v: Math.max(2, team.prob.champion - 4) },
+    { m: "Mar", v: Math.max(2, team.prob.champion - 2.5) },
+    { m: "Apr", v: Math.max(2, team.prob.champion - 1) },
+    { m: "May", v: team.prob.champion + 0.5 },
+    { m: "Now", v: team.prob.champion },
+  ]), [team]);
+
+  const handleSimulationClick = () => {
+    if (session) {
+      router.push("/predictions/country");
+    } else {
+      setAuthModalOpen(true);
+    }
+  };
+
+  return (
+    <section id="predict" className="mx-auto max-w-7xl px-4 py-16 md:px-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-white/5 pb-6">
+        <SectionHeader
+          eyebrow="Team Probability Explorer"
+          title="Pick a country. See every chance."
+          sub="From group qualification to lifting the trophy — explore the full probability journey for any nation."
+        />
+        <button
+          onClick={handleSimulationClick}
+          className="shrink-0 bg-gradient-to-r from-neon to-neon-2 text-background px-6 py-3 rounded-xl font-bold transition hover:opacity-95 active:scale-95 flex items-center gap-2 self-start sm:self-auto shadow-lg shadow-neon/20 hover:shadow-neon/30"
+        >
+          <Sparkles className="w-4 h-4 fill-current" />
+          <span>Run Simulation</span>
+        </button>
+      </div>
+
+      <div className="mt-8 grid gap-5 lg:grid-cols-[280px_1fr] min-w-0">
+        {/* Team list */}
+        <div className="glass rounded-2xl p-2 lg:max-h-[680px] lg:overflow-y-auto scrollbar-custom">
+          <div className="grid grid-cols-3 gap-1 lg:grid-cols-1">
+            {sortedTeams.map((t) => {
+              const active = t.code === code;
+              return (
+                <button
+                  key={t.code}
+                  onClick={() => setCode(t.code)}
+                  className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${
+                    active
+                      ? "bg-gradient-to-r from-neon/10 to-neon-2/10 border-neon/30 text-white font-bold"
+                      : "border-transparent bg-transparent hover:bg-white/5 text-muted-foreground hover:text-white"
+                  }`}
+                >
+                  {active && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-neon to-neon-2" />
+                  )}
+                  <span className="flex items-center gap-2 truncate z-10">
+                    <span className="text-lg shrink-0 select-none group-hover:scale-110 transition-transform duration-300">{t.flag}</span>
+                    <span className="hidden truncate lg:inline tracking-wide">{t.name}</span>
+                    <span className="lg:hidden">{t.code}</span>
+                  </span>
+                  <span className="text-xs font-mono font-bold text-neon-2 text-right z-10">{t.prob.champion.toFixed(1)}%</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Main */}
+        <div className="space-y-5 min-w-0">
+          <div className="glass-strong rounded-3xl p-6 relative overflow-hidden border border-white/10 shadow-xl">
+            <div className="absolute -right-16 -top-16 w-56 h-56 bg-neon/10 rounded-full filter blur-3xl pointer-events-none" />
+            <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-neon-2/10 rounded-full filter blur-3xl pointer-events-none" />
+            <div className="flex flex-col lg:flex-row justify-between items-stretch gap-6 border-b border-white/5 pb-6 mb-6">
+              {/* Team Profile Basic Details */}
+              <div className="flex flex-col justify-between flex-grow gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                  <div className="flex items-center gap-5">
+                    <div className="text-7xl drop-shadow-lg leading-none select-none filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:scale-105 transition-transform duration-300">
+                      {team.flag}
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-extrabold flex items-center gap-1.5">
+                        <span>FIFA Rank #{team.rank}</span>
+                        <span className="text-white/20">&bull;</span>
+                        <span className="text-neon-2">Group {Object.entries(groupsConfig).find(([_, list]) => list.includes(team.code))?.[0] || "-"}</span>
+                      </div>
+                      <h2 className="text-4xl font-extrabold font-display text-foreground mt-1 tracking-tight">
+                        {team.name}
+                      </h2>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Core Attributes Mini Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">FIFA Elo Rating</span>
+                    <span className="text-xl font-bold font-mono text-foreground mt-1 block">{Math.round(team.elo)}</span>
+                  </div>
+                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Power Index</span>
+                    <span className="text-xl font-bold font-mono text-foreground mt-1 block">{team.power || 70}</span>
+                  </div>
+                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Squad Value</span>
+                    <span className="text-xl font-bold font-mono text-foreground mt-1 block">
+                      {team.squadValueM ? `€${team.squadValueM}M` : "N/A"}
+                    </span>
+                  </div>
+                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Top Player</span>
+                    <span className="text-xs font-bold text-neon mt-1.5 block truncate" title={getTopPlayer(team.code)}>
+                      {getTopPlayer(team.code)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Circular Gauge for Champion Probability */}
+              <div className="flex flex-col items-center justify-center bg-white/[0.02] border border-white/10 rounded-2xl p-6 min-w-[200px] text-center shadow-glass relative group overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-neon/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-extrabold relative z-10">
+                  Championship Prob
+                </span>
+                
+                <div className="relative flex items-center justify-center my-4 z-10">
+                  <svg className="w-28 h-28 transform -rotate-90">
+                    <circle
+                      cx="56"
+                      cy="56"
+                      r="46"
+                      stroke="rgba(255,255,255,0.04)"
+                      strokeWidth="8"
+                      fill="transparent"
+                    />
+                    <circle
+                      cx="56"
+                      cy="56"
+                      r="46"
+                      stroke="url(#neonGradient)"
+                      strokeWidth="8"
+                      fill="transparent"
+                      strokeDasharray="289"
+                      strokeDashoffset={289 - (289 * (team.prob.champion / 100))}
+                      className="transition-all duration-1000 ease-out"
+                      strokeLinecap="round"
+                    />
+                    <defs>
+                      <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="var(--color-neon)" />
+                        <stop offset="100%" stopColor="var(--color-neon-2)" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute text-center">
+                    <div className="text-2xl font-black font-mono text-foreground leading-none">
+                      {team.prob.champion.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+                
+                <span className="text-[11px] font-bold text-neon relative z-10 uppercase tracking-wider">
+                  {team.prob.champion > 12 ? "Contender" : 
+                   team.prob.champion > 4 ? "Dark Horse" : "Underdog"}
+                </span>
+              </div>
+            </div>
+
+            {/* Stages Progression Matrix */}
+            <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+              {stages.map((s) => {
+                const pct = (team.prob as any)[s.key] as number;
+                const active = pct > 0;
+                return (
+                  <div 
+                    key={s.key} 
+                    className={`border rounded-2xl p-3.5 transition-all duration-300 relative overflow-hidden group ${
+                      active 
+                        ? "bg-white/[0.02] border-white/10 hover:border-neon/30 hover:bg-white/[0.04]" 
+                        : "bg-black/[0.1] border-white/5 opacity-30"
+                    }`}
+                  >
+                    <div className="absolute top-0 right-0 w-8 h-8 -mr-2 -mt-2 bg-gradient-to-br from-neon/10 to-transparent rounded-full filter blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+                    
+                    <div className="flex justify-between items-start gap-1">
+                      <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold leading-tight">
+                        {s.label}
+                      </span>
+                      {s.icon === "🏆" ? (
+                        <Trophy className={`w-3.5 h-3.5 ${active ? "text-yellow-400" : "text-muted-foreground"}`} />
+                      ) : (
+                        <span className="text-[10px] font-mono font-bold text-foreground/20">{s.icon}</span>
+                      )}
+                    </div>
+                    <div className={`mt-2 text-xl font-black font-mono tabular-nums leading-none ${active ? "text-foreground" : "text-muted-foreground"}`}>
+                      {pct.toFixed(1)}%
+                    </div>
+                    
+                    <div className="mt-3 h-1 bg-white/5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-1000 ease-out"
+                        style={{ 
+                          width: `${pct}%`,
+                          background: s.key === "champion" 
+                            ? "linear-gradient(90deg, var(--color-gold), #fbbf24)" 
+                            : "linear-gradient(90deg, var(--color-neon), var(--color-neon-2))"
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2 min-w-0">
+            <div className="glass rounded-2xl p-5 min-w-0 overflow-hidden">
+              <div className="flex items-center justify-between">
+                <div className="font-display text-lg font-semibold">Strengths Radar</div>
+                <div className="text-xs text-muted-foreground">vs Tournament Avg</div>
+              </div>
+              <div className="h-60">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                  <RadarChart data={radar} outerRadius={75}>
+                    <PolarGrid stroke="rgba(255,255,255,0.1)" />
+                    <PolarAngleAxis dataKey="axis" tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }} />
+                    <Radar dataKey="v" stroke="var(--color-neon)" fill="var(--color-neon)" fillOpacity={0.35} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="glass rounded-2xl p-5 min-w-0 overflow-hidden">
+              <div className="flex items-center justify-between">
+                <div className="font-display text-lg font-semibold">Probability Trend</div>
+                <div className="text-xs text-muted-foreground">Last 6 months</div>
+              </div>
+              <div className="h-60">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                  <AreaChart data={trend}>
+                    <defs>
+                      <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--color-neon)" stopOpacity={0.6} />
+                        <stop offset="100%" stopColor="var(--color-neon)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="m" tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis hide />
+                    <Tooltip contentStyle={{ background: "var(--color-popover)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12 }} formatter={(v: any) => [`${Number(v).toFixed(1)}%`, "Champion %"]} />
+                    <Area dataKey="v" stroke="var(--color-neon)" strokeWidth={2} fill="url(#trendFill)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass rounded-2xl p-5">
+            <div className="flex items-center justify-between">
+              <div className="font-display text-lg font-semibold">Most Likely Route to the Final</div>
+              <div className="text-xs text-muted-foreground">Win % per stage</div>
+            </div>
+            <div className="mt-4 overflow-x-auto">
+              <div className="flex items-stretch gap-2 min-w-max">
+                <PathNode flag={team.flag} label={team.name} highlight />
+                {PATH_TO_FINAL.map((p, i) => (
+                  <PathStep key={i} stage={p.stage} opp={p.opp} winPct={p.winPct} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+    </section>
+  );
+}
+
+export function SectionHeader({ eyebrow, title, sub }: { eyebrow: string; title: string; sub?: string }) {
+  return (
+    <div className="max-w-3xl">
+      <div className="text-xs uppercase tracking-[0.25em] text-neon">{eyebrow}</div>
+      <h2 className="mt-2 font-display text-3xl font-bold sm:text-4xl">{title}</h2>
+      {sub && <p className="mt-3 text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+function PathNode({ flag, label, highlight }: { flag: string; label: string; highlight?: boolean }) {
+  return (
+    <div className={`flex min-w-[140px] flex-col items-center justify-center gap-1 rounded-xl px-4 py-3 ${highlight ? "bg-gradient-to-br from-neon/25 to-neon-2/15 neon-border" : "bg-white/5"}`}>
+      <span className="text-2xl">{flag}</span>
+      <span className="text-xs font-semibold">{label}</span>
+    </div>
+  );
+}
+
+function PathStep({ stage, opp, winPct }: { stage: string; opp: string; winPct: number }) {
+  return (
+    <div className="flex items-center">
+      <ChevronRight className="mx-1 h-5 w-5 text-muted-foreground" />
+      <div className="min-w-[150px] rounded-xl bg-white/5 p-3 text-center">
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{stage}</div>
+        <div className="mt-0.5 text-sm font-semibold">vs {opp}</div>
+        <div className="mt-1 text-xs">
+          <span className="text-neon font-semibold">{winPct}%</span>
+          <span className="text-muted-foreground"> win</span>
+        </div>
+      </div>
+    </div>
+  );
+}

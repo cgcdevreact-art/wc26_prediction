@@ -1,0 +1,318 @@
+"use client";
+
+import Link from "next/link";
+import { Trophy, Menu, LogOut, Sun, Moon, ChevronDown, Check, Sparkles, Brain, Cpu } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { useSession, signIn, signOut } from "next-auth/react";
+import { useTheme } from "@/components/ThemeProvider";
+import { useSimulationStore } from "@/lib/store/simulationStore";
+import { UpgradeModal } from "./UpgradeModal";
+
+const NAV = [
+  { to: "/", label: "Home" },
+  { to: "/simulator", label: "Simulator" },
+  { to: "/predictions/country", label: "Country Predict" },
+  { to: "/teams", label: "Teams" },
+  { to: "/bracket", label: "Bracket" },
+  { to: "/predictions", label: "My Predictions" },
+  { to: "/subscription", label: "Pricing" },
+];
+
+export function Header() {
+  const [open, setOpen] = useState(false);
+  const { data: session } = useSession();
+  const { theme, setTheme } = useTheme();
+  const { selectedModel, setSelectedModel } = useSimulationStore();
+  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalReason, setModalReason] = useState<"plus" | "pro" | "credits" | "guest">("plus");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleModelChange = (model: "base" | "advanced" | "pro") => {
+    if (model === "base") {
+      setSelectedModel("base");
+      return;
+    }
+
+    const tier = session?.user?.subscriptionTier || "free";
+
+    if (model === "advanced") {
+      if (tier === "free") {
+        setModalReason("plus");
+        setModalOpen(true);
+        return;
+      }
+      setSelectedModel("advanced");
+    }
+
+    if (model === "pro") {
+      if (tier === "free" || tier === "plus") {
+        setModalReason("pro");
+        setModalOpen(true);
+        return;
+      }
+      setSelectedModel("pro");
+    }
+  };
+
+  return (
+    <header className="sticky top-0 z-40 glass">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6">
+        <Link href="/" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-neon to-neon-2 text-background">
+            <Trophy className="h-5 w-5" strokeWidth={2.4} />
+          </span>
+          <div className="leading-tight">
+            <div className="text-sm font-semibold tracking-wide">WC26 <span className="text-gradient">PREDICT</span></div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Probability · Picks · Glory</div>
+          </div>
+        </Link>
+        
+        <nav className="hidden items-center gap-1.5 xl:flex shrink-0 whitespace-nowrap">
+          {NAV.map((n) => (
+            <Link
+              key={n.to}
+              href={n.to}
+              className="rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm text-muted-foreground transition hover:text-foreground data-[status=active]:bg-white/5 data-[status=active]:text-foreground whitespace-nowrap"
+            >
+              {n.label}
+            </Link>
+          ))}
+          
+          {/* Custom Redesigned Model Selector */}
+          <div className="relative ml-2 mr-1" ref={dropdownRef}>
+            <button
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="flex items-center gap-1.5 bg-white/5 border border-white/10 hover:bg-white/10 text-[11px] font-medium rounded-lg px-2.5 py-1.5 text-foreground transition duration-200 select-none outline-none"
+            >
+              {selectedModel === "pro" && <Sparkles className="h-3.5 w-3.5 text-purple-400 shrink-0" />}
+              {selectedModel === "advanced" && <Brain className="h-3.5 w-3.5 text-blue-400 shrink-0" />}
+              {selectedModel === "base" && <Cpu className="h-3.5 w-3.5 text-neon shrink-0" />}
+              <span>
+                {selectedModel === "pro" && "Pro Model"}
+                {selectedModel === "advanced" && "Advanced Model"}
+                {selectedModel === "base" && "Base Model"}
+              </span>
+              <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-56 rounded-xl border border-white/10 bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
+                <button
+                  onClick={() => {
+                    handleModelChange("base");
+                    setDropdownOpen(false);
+                  }}
+                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-white/5 ${
+                    selectedModel === "base" ? "text-neon font-semibold bg-white/[0.02]" : "text-muted-foreground"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Cpu className="h-3.5 w-3.5 text-neon shrink-0" />
+                    <div>
+                      <div className="text-foreground font-semibold">Base Model</div>
+                      <div className="text-[10px] text-muted-foreground">Elo / Att / Def stats</div>
+                    </div>
+                  </div>
+                  {selectedModel === "base" && <Check className="h-3.5 w-3.5" />}
+                </button>
+                
+                <button
+                  onClick={() => {
+                    handleModelChange("advanced");
+                    setDropdownOpen(false);
+                  }}
+                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-white/5 ${
+                    selectedModel === "advanced" ? "text-blue-400 font-semibold bg-white/[0.02]" : "text-muted-foreground"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                    <div>
+                      <div className="text-foreground font-semibold">Advanced Model</div>
+                      <div className="text-[10px] text-muted-foreground">+Squad value & stats</div>
+                    </div>
+                  </div>
+                  {selectedModel === "advanced" && <Check className="h-3.5 w-3.5" />}
+                </button>
+
+                <button
+                  onClick={() => {
+                    handleModelChange("pro");
+                    setDropdownOpen(false);
+                  }}
+                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-white/5 ${
+                    selectedModel === "pro" ? "text-purple-400 font-semibold bg-white/[0.02]" : "text-muted-foreground"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                    <div>
+                      <div className="text-foreground font-semibold">Pro Model</div>
+                      <div className="text-[10px] text-muted-foreground">+Player aspects & form</div>
+                    </div>
+                  </div>
+                  {selectedModel === "pro" && <Check className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <button
+            onClick={toggleTheme}
+            className="ml-1 rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition duration-200"
+            aria-label="Toggle theme"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <Sun className="h-4.5 w-4.5 text-amber-400" /> : <Moon className="h-4.5 w-4.5 text-indigo-600" />}
+          </button>
+
+          {session ? (
+            <div className="flex items-center gap-3 ml-4 pl-4 border-l border-white/10 dark:border-white/10 animate-fade-in shrink-0">
+              <div className="flex items-center gap-2">
+                {session.user?.image ? (
+                  <img src={session.user.image} alt="" className="w-6 h-6 rounded-full border border-neon/50" />
+                ) : (
+                  <div className="grid h-6 w-6 place-items-center rounded-full bg-neon/10 border border-neon/30 text-[10px] font-bold text-neon uppercase">
+                    {session.user?.name?.charAt(0) || "?"}
+                  </div>
+                )}
+                <div className="flex flex-col items-start leading-none">
+                  <span className="text-xs font-semibold text-muted-foreground max-w-[100px] truncate">
+                    {session.user?.name}
+                  </span>
+                  {session.user.subscriptionTier && session.user.subscriptionTier !== "free" && (
+                    <span className={`text-[8px] font-extrabold uppercase tracking-wider mt-0.5 px-1 py-0.2 rounded ${
+                      session.user.subscriptionTier === "pro"
+                        ? "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+                        : "bg-blue-500/10 border border-blue-500/20 text-blue-400"
+                    }`}>
+                      {session.user.subscriptionTier}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => signOut()}
+                className="rounded-md hover:bg-white/5 p-2 text-muted-foreground hover:text-destructive transition"
+                title="Sign Out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => signIn()}
+              className="ml-4 rounded-md bg-gradient-to-r from-neon to-neon-2 px-4 py-2 text-sm font-semibold text-background neon-border transition hover:opacity-90 animate-fade-in whitespace-nowrap"
+            >
+              Sign In
+            </button>
+          )}
+        </nav>
+        
+        <button onClick={() => setOpen((o) => !o)} className="xl:hidden rounded-md p-2 text-muted-foreground hover:text-foreground" aria-label="menu">
+          <Menu className="h-5 w-5" />
+        </button>
+      </div>
+      
+      {open && (
+        <div className="xl:hidden border-t border-white/5 dark:border-white/5 px-4 py-3 flex flex-col gap-2">
+          {NAV.map((n) => (
+            <Link key={n.to} href={n.to} onClick={() => setOpen(false)} className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-white/5 hover:text-foreground">{n.label}</Link>
+          ))}
+          
+          <button
+            onClick={() => {
+              toggleTheme();
+              setOpen(false);
+            }}
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground transition duration-200 w-full text-left"
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? (
+              <>
+                <Sun className="h-4.5 w-4.5 text-amber-400" />
+                <span>Light Mode</span>
+              </>
+            ) : (
+              <>
+                <Moon className="h-4.5 w-4.5 text-indigo-600" />
+                <span>Dark Mode</span>
+              </>
+            )}
+          </button>
+
+          {/* Redesigned Mobile Segmented Model Switcher */}
+          <div className="border-t border-white/5 dark:border-white/5 pt-3 mt-2 px-3">
+            <div className="text-xs text-muted-foreground mb-2">Model Tier:</div>
+            <div className="grid grid-cols-3 gap-1 bg-white/5 p-1 rounded-lg">
+              {(["base", "advanced", "pro"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => handleModelChange(m)}
+                  className={`py-1 text-[10px] font-bold uppercase rounded-md transition ${
+                    selectedModel === m
+                      ? m === "pro"
+                        ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                        : m === "advanced"
+                          ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                          : "bg-neon/20 text-neon border border-neon/30"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {m === "base" && "Base"}
+                  {m === "advanced" && "Adv"}
+                  {m === "pro" && "Pro"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {session ? (
+            <div className="flex items-center justify-between border-t border-white/5 dark:border-white/5 pt-3 mt-1 px-3">
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-muted-foreground truncate">{session.user?.name}</span>
+                {session.user.subscriptionTier && session.user.subscriptionTier !== "free" && (
+                  <span className={`text-[8px] font-extrabold uppercase tracking-wider self-start mt-0.5 px-1 py-0.2 rounded ${
+                    session.user.subscriptionTier === "pro"
+                      ? "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+                      : "bg-blue-500/10 border border-blue-500/20 text-blue-400"
+                  }`}>
+                    {session.user.subscriptionTier}
+                  </span>
+                )}
+              </div>
+              <button onClick={() => { signOut(); setOpen(false); }} className="flex items-center gap-2 text-xs text-destructive hover:opacity-80">
+                <LogOut className="h-3.5 w-3.5" /> Sign Out
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { signIn(); setOpen(false); }}
+              className="mt-2 w-full rounded-md bg-gradient-to-r from-neon to-neon-2 py-2 text-center text-sm font-semibold text-background neon-border"
+            >
+              Sign In
+            </button>
+          )}
+        </div>
+      )}
+      <UpgradeModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        reason={modalReason}
+      />
+    </header>
+  );
+}

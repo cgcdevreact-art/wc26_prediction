@@ -1,0 +1,407 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth Models
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  password      String?
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+
+  predictions       Prediction[]
+  predictionPoints  PredictionPoint[]
+  userAchievements  UserAchievement[]
+  leaderboard       Leaderboard?
+  teamOverrides     UserTeamOverride[]
+  playerOverrides   UserPlayerOverride[]
+
+  stripeCustomerId       String?   @unique
+  stripeSubscriptionId  String?   @unique
+  stripePriceId         String?
+  stripeCurrentPeriodEnd DateTime?
+  subscriptionTier      String    @default("free")
+  freeModelUsageCount   Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Football Data Models
+model Competition {
+  id          Int      @id // From API
+  name        String
+  code        String   @unique
+  type        String?
+  emblem      String?
+  
+  matches     Match[]
+  standings   Standing[]
+  teams       TeamCompetition[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Team {
+  id          Int      @id // From API
+  name        String
+  shortName   String?
+  tla         String?  // Three letter acronym
+  crest       String?
+  
+  homeMatches Match[] @relation("HomeTeam")
+  awayMatches Match[] @relation("AwayTeam")
+  standings   Standing[]
+  competitions TeamCompetition[]
+  players     Player[]
+  teamStrength TeamStrength?
+  countryProb  CountryProbability?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TeamCompetition {
+  teamId        Int
+  competitionId Int
+
+  team        Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, competitionId])
+}
+
+model Match {
+  id            Int      @id // From API
+  competitionId Int
+  homeTeamId    Int?
+  awayTeamId    Int?
+  utcDate       DateTime
+  status        String   // SCHEDULED, TIMED, IN_PLAY, PAUSED, FINISHED, SUSPENDED, POSTPONED, CANCELLED, AWARDED
+  matchday      Int?
+  stage         String?
+  group         String?
+  lastUpdated   DateTime
+
+  scoreHomeFullTime Int?
+  scoreAwayFullTime Int?
+  scoreHomeHalfTime Int?
+  scoreAwayHalfTime Int?
+  scoreHomeRegular  Int?
+  scoreAwayRegular  Int?
+  scoreHomePenalties Int?
+  scoreAwayPenalties Int?
+
+  winner        String?  // HOME_TEAM, AWAY_TEAM, DRAW
+
+  competition   Competition @relation(fields: [competitionId], references: [id])
+  homeTeam      Team?       @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam      Team?       @relation("AwayTeam", fields: [awayTeamId], references: [id])
+
+  predictions   Prediction[]
+  probabilities MatchProbability?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([competitionId])
+  @@index([utcDate])
+  @@index([status])
+}
+
+model Standing {
+  id            String   @id @default(cuid())
+  competitionId Int
+  teamId        Int
+  stage         String
+  type          String
+  group         String?
+  position      Int
+  playedGames   Int
+  form          String?
+  won           Int
+  draw          Int
+  lost          Int
+  points        Int
+  goalsFor      Int
+  goalsAgainst  Int
+  goalDifference Int
+
+  competition   Competition @relation(fields: [competitionId], references: [id])
+  team          Team        @relation(fields: [teamId], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([competitionId, teamId, stage, type])
+  @@index([competitionId, group])
+}
+
+model Player {
+  id          Int      @id // From API
+  name        String
+  firstName   String?
+  lastName    String?
+  dateOfBirth DateTime?
+  nationality String?
+  position    String?
+  shirtNumber Int?
+  
+  teamId      Int?
+  team        Team?    @relation(fields: [teamId], references: [id])
+  
+  goals       Int      @default(0)
+  assists     Int      @default(0)
+  penalties   Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([teamId])
+}
+
+// Prediction Models
+model Prediction {
+  id          String   @id @default(cuid())
+  userId      String
+  matchId     Int?     // Nullable for non-match predictions like Tournament Champion
+  
+  type        String   // MATCH_SCORE, TOURNAMENT_CHAMPION, GROUP_WINNER, etc.
+  
+  predictedHomeScore Int?
+  predictedAwayScore Int?
+  predictedWinner    String? // HOME_TEAM, AWAY_TEAM, DRAW
+  
+  predictedTeamId    Int? // For champion or group winner predictions
+  
+  points      PredictionPoint?
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match       Match?   @relation(fields: [matchId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, matchId, type]) // One prediction per match per type
+  @@index([userId])
+  @@index([matchId])
+}
+
+model PredictionPoint {
+  id            String   @id @default(cuid())
+  userId        String
+  predictionId  String   @unique
+  points        Int      // 3 for winner, 5 for exact score, 25 for champion, etc.
+  breakdown     String?  // JSON string explaining points
+
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prediction    Prediction @relation(fields: [predictionId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([userId])
+}
+
+// Simulation & Probabilities
+model TournamentSimulation {
+  id            String   @id @default(cuid())
+  iterations    Int
+  completedAt   DateTime
+  
+  results       SimulationResult[]
+
+  createdAt     DateTime @default(now())
+}
+
+model SimulationResult {
+  id            String   @id @default(cuid())
+  simulationId  String
+  teamId        Int
+  
+  championProb    Float
+  finalProb       Float
+  semiFinalProb   Float
+  quarterFinalProb Float
+  roundOf16Prob   Float
+  groupExitProb   Float
+  
+  mostLikelyPath  String? // JSON string representing path
+  
+  simulation    TournamentSimulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+
+  @@unique([simulationId, teamId])
+  @@index([simulationId])
+}
+
+model TeamStrength {
+  teamId        Int      @id
+  attackRating  Float
+  defenseRating Float
+  formRating    Float
+  overallRating Float
+
+  team          Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  updatedAt     DateTime @updatedAt
+}
+
+model MatchProbability {
+  matchId       Int      @id
+  homeWin       Float
+  draw          Float
+  awayWin       Float
+
+  match         Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  updatedAt     DateTime @updatedAt
+}
+
+model CountryProbability {
+  teamId        Int      @id
+  groupStage    Float
+  round32       Float?
+  round16       Float
+  quarterFinal  Float
+  semiFinal     Float
+  final         Float
+  champion      Float
+  
+  mostLikelyPath String? // JSON string
+
+  team          Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  updatedAt     DateTime @updatedAt
+}
+
+// Leaderboard & Achievements
+model Leaderboard {
+  userId        String   @id
+  totalPoints   Int      @default(0)
+  globalRank    Int?
+  countryRank   Int?
+  country       String?
+  weeklyPoints  Int      @default(0)
+  
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  updatedAt     DateTime @updatedAt
+  
+  @@index([totalPoints(sort: Desc)])
+  @@index([weeklyPoints(sort: Desc)])
+  @@index([country, totalPoints(sort: Desc)])
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  icon        String?
+  pointsReward Int     @default(0)
+
+  users       UserAchievement[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserAchievement {
+  userId        String
+  achievementId String
+  awardedAt     DateTime @default(now())
+
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@id([userId, achievementId])
+  @@index([userId])
+}
+
+model UserTeamOverride {
+  id        String   @id @default(cuid())
+  userId    String
+  teamCode  String   // E.g., "ESP"
+  elo       Float
+  attack    Float
+  defense   Float
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, teamCode])
+  @@index([userId])
+}
+
+model UserPlayerOverride {
+  id                  String   @id @default(cuid())
+  userId              String
+  playerKey           String   // E.g., "ESP-MERINO Mikel"
+  overallRating       String
+  baseQuality         String
+  recentForm          String
+  intlExperience      String
+  attackingImpact     String
+  defensiveImpact     String
+  passingCreativity   String
+  fitnessAvailability String
+  disciplineRisk      String
+  matchImportance     String
+  ratingTier          String
+  imageUrl            String?
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([userId, playerKey])
+  @@index([userId])
+}
+
