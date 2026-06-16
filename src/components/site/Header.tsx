@@ -95,7 +95,7 @@ export function Header() {
           <div className="relative ml-2 mr-1" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-1.5 bg-white/5 border border-white/10 hover:bg-white/10 text-[11px] font-medium rounded-lg px-2.5 py-1.5 text-foreground transition duration-200 select-none outline-none"
+              className="flex items-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-[11px] font-medium rounded-lg px-2.5 py-1.5 text-foreground transition duration-200 select-none outline-none"
             >
               {selectedModel === "pro" && <Sparkles className="h-3.5 w-3.5 text-purple-400 shrink-0" />}
               {selectedModel === "advanced" && <Brain className="h-3.5 w-3.5 text-blue-400 shrink-0" />}
@@ -109,14 +109,14 @@ export function Header() {
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl border border-white/10 bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
+              <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border dark:border-white/10 bg-white/95 dark:bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
                 <button
                   onClick={() => {
                     handleModelChange("base");
                     setDropdownOpen(false);
                   }}
-                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-white/5 ${
-                    selectedModel === "base" ? "text-neon font-semibold bg-white/[0.02]" : "text-muted-foreground"
+                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${
+                    selectedModel === "base" ? "text-emerald-600 dark:text-neon font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -134,8 +134,8 @@ export function Header() {
                     handleModelChange("advanced");
                     setDropdownOpen(false);
                   }}
-                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-white/5 ${
-                    selectedModel === "advanced" ? "text-blue-400 font-semibold bg-white/[0.02]" : "text-muted-foreground"
+                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${
+                    selectedModel === "advanced" ? "text-blue-600 dark:text-blue-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -153,8 +153,8 @@ export function Header() {
                     handleModelChange("pro");
                     setDropdownOpen(false);
                   }}
-                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-white/5 ${
-                    selectedModel === "pro" ? "text-purple-400 font-semibold bg-white/[0.02]" : "text-muted-foreground"
+                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${
+                    selectedModel === "pro" ? "text-purple-600 dark:text-purple-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -255,9 +255,9 @@ export function Header() {
           </button>
 
           {/* Redesigned Mobile Segmented Model Switcher */}
-          <div className="border-t border-white/5 dark:border-white/5 pt-3 mt-2 px-3">
+          <div className="border-t border-border dark:border-white/5 pt-3 mt-2 px-3">
             <div className="text-xs text-muted-foreground mb-2">Model Tier:</div>
-            <div className="grid grid-cols-3 gap-1 bg-white/5 p-1 rounded-lg">
+            <div className="grid grid-cols-3 gap-1 bg-black/5 dark:bg-white/5 p-1 rounded-lg">
               {(["base", "advanced", "pro"] as const).map((m) => (
                 <button
                   key={m}
@@ -265,10 +265,10 @@ export function Header() {
                   className={`py-1 text-[10px] font-bold uppercase rounded-md transition ${
                     selectedModel === m
                       ? m === "pro"
-                        ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                        ? "bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30"
                         : m === "advanced"
-                          ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                          : "bg-neon/20 text-neon border border-neon/30"
+                          ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30"
+                          : "bg-emerald-100 dark:bg-neon/20 text-emerald-600 dark:text-neon border border-emerald-200 dark:border-neon/30"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >

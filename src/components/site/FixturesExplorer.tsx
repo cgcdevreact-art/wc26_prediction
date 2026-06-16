@@ -252,14 +252,14 @@ export function FixturesExplorer() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
         <div>
           <div className="text-xs uppercase tracking-[0.25em] text-neon">Tournament Schedule</div>
-          <h2 className="mt-2 font-display text-3xl font-bold sm:text-4xl text-white">Matches & Fixtures</h2>
+          <h2 className="mt-2 font-display text-3xl font-bold sm:text-4xl text-foreground dark:text-white">Matches & Fixtures</h2>
           <p className="mt-2 text-muted-foreground text-sm max-w-xl">
             Browse full schedules for all 104 matches of the FIFA World Cup 2026™. Filter by stage, date, or search by venue.
           </p>
         </div>
 
         {/* Stage Selector tabs */}
-        <div className="flex bg-white/5 border border-white/10 p-1 rounded-xl shrink-0">
+        <div className="flex bg-muted dark:bg-white/5 border border-border dark:border-white/10 p-1 rounded-xl shrink-0">
           <button
             onClick={() => {
               setActiveStage("group");
@@ -269,7 +269,7 @@ export function FixturesExplorer() {
               setSelectedLocation("");
             }}
             className={`px-4 py-2 text-xs font-semibold rounded-lg transition duration-200 ${
-              activeStage === "group" ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"
+              activeStage === "group" ? "bg-card dark:bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Group Stage
@@ -282,7 +282,7 @@ export function FixturesExplorer() {
               setSelectedLocation("");
             }}
             className={`px-4 py-2 text-xs font-semibold rounded-lg transition duration-200 ${
-              activeStage === "knockout" ? "bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"
+              activeStage === "knockout" ? "bg-card dark:bg-white/10 text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Knockout Rounds
@@ -300,7 +300,7 @@ export function FixturesExplorer() {
             placeholder="Search teams or venues..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-white/10 bg-white/5 text-foreground placeholder-muted-foreground outline-none transition focus:border-neon focus:bg-white/10 focus:ring-1 focus:ring-neon"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-border dark:border-white/10 bg-background dark:bg-white/5 text-foreground placeholder-muted-foreground outline-none transition focus:border-neon focus:bg-card dark:focus:bg-white/10 focus:ring-1 focus:ring-neon"
           />
         </div>
 
@@ -309,12 +309,12 @@ export function FixturesExplorer() {
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-xl border border-white/10 bg-[#0f172a] text-foreground outline-none transition focus:border-neon"
+            className="w-full px-3 py-2 text-sm rounded-xl border border-border dark:border-white/10 bg-background dark:bg-[#0f172a] text-foreground outline-none transition focus:border-neon"
           >
-            <option value="ALL" className="bg-popover">All Statuses</option>
-            <option value="LIVE" className="bg-popover">Live Now</option>
-            <option value="COMPLETED" className="bg-popover">Completed</option>
-            <option value="UPCOMING" className="bg-popover">Upcoming</option>
+            <option value="ALL" className="bg-popover text-foreground">All Statuses</option>
+            <option value="LIVE" className="bg-popover text-foreground">Live Now</option>
+            <option value="COMPLETED" className="bg-popover text-foreground">Completed</option>
+            <option value="UPCOMING" className="bg-popover text-foreground">Upcoming</option>
           </select>
         </div>
 
@@ -324,10 +324,10 @@ export function FixturesExplorer() {
             <select
               value={selectedGroup}
               onChange={(e) => setSelectedGroup(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-white/10 bg-[#0f172a] text-foreground outline-none transition focus:border-neon"
+              className="w-full px-3 py-2 text-sm rounded-xl border border-border dark:border-white/10 bg-background dark:bg-[#0f172a] text-foreground outline-none transition focus:border-neon"
             >
               {groups.map((g) => (
-                <option key={g} value={g} className="bg-popover">
+                <option key={g} value={g} className="bg-popover text-foreground">
                   {g === "ALL" ? "All Groups" : `Group ${g}`}
                 </option>
               ))}
@@ -345,11 +345,11 @@ export function FixturesExplorer() {
           <select
             value={selectedLocation}
             onChange={(e) => setSelectedLocation(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-xl border border-white/10 bg-[#0f172a] text-foreground outline-none transition focus:border-neon"
+            className="w-full px-3 py-2 text-sm rounded-xl border border-border dark:border-white/10 bg-background dark:bg-[#0f172a] text-foreground outline-none transition focus:border-neon"
           >
-            <option value="" className="bg-popover">All Locations</option>
+            <option value="" className="bg-popover text-foreground">All Locations</option>
             {uniqueLocations.map((loc) => (
-              <option key={loc} value={loc} className="bg-popover">
+              <option key={loc} value={loc} className="bg-popover text-foreground">
                 {loc}
               </option>
             ))}
@@ -361,11 +361,11 @@ export function FixturesExplorer() {
           <select
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-xl border border-white/10 bg-[#0f172a] text-foreground outline-none transition focus:border-neon"
+            className="w-full px-3 py-2 text-sm rounded-xl border border-border dark:border-white/10 bg-background dark:bg-[#0f172a] text-foreground outline-none transition focus:border-neon"
           >
-            <option value="">All Dates</option>
+            <option value="" className="bg-popover text-foreground">All Dates</option>
             {uniqueDates.map((d) => (
-              <option key={d} value={d} className="bg-popover">
+              <option key={d} value={d} className="bg-popover text-foreground">
                 {formatDateLabel(d)}
               </option>
             ))}
@@ -382,9 +382,9 @@ export function FixturesExplorer() {
       </div>
 
       {/* Fixtures display list / table */}
-      <div className="glass overflow-x-auto rounded-2xl border border-white/10 shadow-xl max-h-[600px] overflow-y-auto scrollbar-custom">
+      <div className="glass overflow-x-auto rounded-2xl border border-border dark:border-white/10 shadow-xl max-h-[600px] overflow-y-auto scrollbar-custom">
         <table className="w-full text-sm text-left border-collapse whitespace-nowrap">
-          <thead className="sticky top-0 z-10 text-[10px] uppercase tracking-wider bg-[#090e1c] border-b border-white/10 text-muted-foreground">
+          <thead className="sticky top-0 z-10 text-[10px] uppercase tracking-wider bg-muted dark:bg-[#090e1c] border-b border-border dark:border-white/10 text-muted-foreground">
             <tr>
               <th className="px-5 py-3.5 font-medium w-16 text-center">Match</th>
               <th className="px-5 py-3.5 font-medium w-36">Date</th>
@@ -402,7 +402,7 @@ export function FixturesExplorer() {
               return (
                 <tr
                   key={`${f.stageName}-${f.match_no || i}`}
-                  className={`border-b border-white/5 hover:bg-white/5 transition duration-200 ${
+                  className={`border-b border-border dark:border-white/5 hover:bg-muted/50 dark:hover:bg-white/5 transition duration-200 ${
                     isLive ? "bg-red-500/[0.02] border-l-2 border-l-red-500" : ""
                   }`}
                 >
@@ -417,7 +417,7 @@ export function FixturesExplorer() {
                   </td>
                   {activeStage === "group" && (
                     <td className="px-5 py-4 text-center">
-                      <span className="bg-white/5 border border-white/10 rounded-lg px-2 py-0.5 text-xs text-neon font-semibold">
+                      <span className="bg-muted dark:bg-white/5 border border-border dark:border-white/10 rounded-lg px-2 py-0.5 text-xs text-neon font-semibold">
                         {f.group}
                       </span>
                     </td>
@@ -442,14 +442,14 @@ export function FixturesExplorer() {
                         </div>
                       ) : f.status === "COMPLETED" ? (
                         <div className="flex flex-col items-center shrink-0 min-w-[80px]">
-                          <span className="text-sm font-mono font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-muted-foreground">
+                          <span className="text-sm font-mono font-bold px-2 py-0.5 rounded bg-muted dark:bg-white/5 border border-border dark:border-white/10 text-muted-foreground">
                             {score.homeGoals} - {score.awayGoals}
                           </span>
                           <span className="text-[8px] uppercase font-bold text-muted-foreground/60 mt-1">FT</span>
                         </div>
                       ) : (
                         <div className="flex flex-col items-center shrink-0 min-w-[80px]">
-                          <span className="text-xs uppercase font-extrabold text-muted-foreground/50 px-1.5 py-0.5 rounded bg-white/5 border border-white/5">
+                          <span className="text-xs uppercase font-extrabold text-muted-foreground/50 px-1.5 py-0.5 rounded bg-muted dark:bg-white/5 border border-border dark:border-white/5">
                             VS
                           </span>
                           <span className="text-[8px] uppercase font-bold text-muted-foreground/40 mt-1">Upcoming</span>

@@ -65,7 +65,7 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
       />
 
       {/* Content Card */}
-      <div className="relative my-auto w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-[#0f172a]/95 p-6 shadow-2xl md:p-8 animate-fade-in text-foreground">
+      <div className="relative my-auto w-full max-w-lg overflow-hidden rounded-3xl border border-border dark:border-white/10 bg-card/95 dark:bg-[#0f172a]/95 p-6 shadow-2xl md:p-8 animate-fade-in text-foreground">
         
         {/* Glow Effects */}
         <div className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-neon/15 blur-2xl" />
@@ -74,7 +74,7 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground hover:bg-white/5 hover:text-foreground transition"
+          className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground hover:bg-muted dark:hover:bg-white/5 hover:text-foreground transition"
           aria-label="Close"
         >
           <X className="h-5 w-5" />
@@ -82,12 +82,12 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
 
         <div className="flex flex-col items-center text-center">
           {/* Header Icon */}
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 border border-white/10 shadow-inner">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted dark:bg-white/5 border border-border dark:border-white/10 shadow-inner">
             {details.icon}
           </div>
 
           {/* Title */}
-          <h2 className="font-display text-2xl font-bold tracking-tight text-white mb-2">
+          <h2 className="font-display text-2xl font-bold tracking-tight text-foreground dark:text-white mb-2">
             {details.title}
           </h2>
 
@@ -98,22 +98,22 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
 
           {/* Pricing Quick Summary */}
           <div className="w-full grid grid-cols-3 gap-2.5 mb-8 text-left text-xs">
-            <div className="rounded-xl bg-white/5 border border-white/5 p-3">
-              <div className="font-semibold text-white mb-1">Free</div>
+            <div className="rounded-xl bg-muted dark:bg-white/5 border border-border dark:border-white/5 p-3">
+              <div className="font-semibold text-foreground dark:text-white mb-1">Free</div>
               <div className="text-muted-foreground">Base Model</div>
               <div className="text-[10px] text-neon/80 font-bold mt-1.5">5 Simulations</div>
             </div>
             <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 relative overflow-hidden">
               <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-              <div className="font-semibold text-blue-400 mb-1">Plus</div>
+              <div className="font-semibold text-blue-600 dark:text-blue-400 mb-1">Plus</div>
               <div className="text-muted-foreground">Advanced Model</div>
-              <div className="text-[10px] text-blue-400 font-bold mt-1.5">Unlimited</div>
+              <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mt-1.5">Unlimited</div>
             </div>
             <div className="rounded-xl bg-purple-500/10 border border-purple-500/20 p-3 relative overflow-hidden">
               <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-              <div className="font-semibold text-purple-400 mb-1">Pro</div>
+              <div className="font-semibold text-purple-600 dark:text-purple-400 mb-1">Pro</div>
               <div className="text-muted-foreground">All Models</div>
-              <div className="text-[10px] text-purple-400 font-bold mt-1.5">Unlimited</div>
+              <div className="text-[10px] text-purple-600 dark:text-purple-400 font-bold mt-1.5">Unlimited</div>
             </div>
           </div>
 
@@ -139,7 +139,7 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
             
             <button
               onClick={onClose}
-              className="w-full rounded-xl bg-white/5 hover:bg-white/10 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition duration-200"
+              className="w-full rounded-xl bg-muted hover:bg-muted/80 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition duration-200"
             >
               Maybe Later
             </button>
