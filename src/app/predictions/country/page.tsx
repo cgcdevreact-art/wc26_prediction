@@ -2,7 +2,7 @@ import { getStaticTeamsFromCup, getPlayers } from "@/lib/data";
 import fs from "fs";
 import path from "path";
 import CountryPredictionsClient from "./CountryPredictionsClient";
-import { TeamStats, PlayerStats } from "@/lib/store/simulationStore";
+import { TeamStats } from "@/lib/store/simulationStore";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 
@@ -33,7 +33,7 @@ export default async function CountryPredictionsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-hero text-foreground flex flex-col">
+    <div className="min-h-screen bg-[#edf1f5] text-foreground dark:bg-[#0f172a] flex flex-col">
       <Header />
       <main className="flex-grow">
         <CountryPredictionsClient 

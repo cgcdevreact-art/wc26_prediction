@@ -23,7 +23,15 @@ export function Countdown() {
     <div className="grid grid-cols-4 gap-2 sm:gap-3">
       {items.map(([label, v]) => (
         <div key={label} className="glass rounded-xl px-3 py-3 text-center">
-          <div suppressHydrationWarning className="font-display text-2xl sm:text-3xl font-bold tabular-nums text-gradient">{String(v).padStart(2, "0")}</div>
+          <div
+            suppressHydrationWarning
+            className="font-display text-2xl sm:text-3xl font-black tabular-nums leading-none text-foreground"
+            style={{
+              textShadow: "0 0 16px rgba(255,255,255,0.15), 0 2px 6px rgba(0,0,0,0.2)",
+            }}
+          >
+            {String(v).padStart(2, "0")}
+          </div>
           <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
         </div>
       ))}

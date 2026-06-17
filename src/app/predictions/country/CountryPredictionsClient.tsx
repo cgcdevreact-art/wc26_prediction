@@ -560,21 +560,52 @@ export default function CountryPredictionsClient({
     });
   }, [simResults]);
 
+  const selectedGroup = Object.entries(GROUPS_CONFIG).find(([_, list]) => list.includes(selectedCode))?.[0] || "-";
+  const championProbability = simResults ? (simResults.stages.champion / 1000) * 100 : 0;
+  const stageCards = [
+    { key: "group", label: "Group Stage", icon: "G" },
+    { key: "r32", label: "Round of 32", icon: "32" },
+    { key: "r16", label: "Round of 16", icon: "16" },
+    { key: "qf", label: "Quarter Final", icon: "QF" },
+    { key: "sf", label: "Semi Final", icon: "SF" },
+    { key: "final", label: "Final", icon: "F" },
+    { key: "champion", label: "Champion", icon: "🏆" }
+  ] as const;
+
+  const getBracketRowClasses = (teamCode: string, isWinner: boolean, accent: "blue" | "gold" = "blue") => {
+    const isSelected = teamCode === selectedCode;
+    if (isSelected) {
+      return "bg-gradient-to-r from-amber-100 to-yellow-50 border border-amber-300 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.12)] dark:from-amber-500/25 dark:to-yellow-400/10 dark:border-amber-400/40";
+    }
+    if (isWinner && accent === "gold") {
+      return "bg-gradient-to-r from-amber-100/90 to-yellow-50 border border-amber-300/80 dark:from-amber-500/18 dark:to-yellow-400/10 dark:border-amber-400/35";
+    }
+    if (isWinner) {
+      return "bg-gradient-to-r from-sky-100/90 to-blue-50 border border-sky-300/80 dark:from-sky-500/18 dark:to-blue-500/10 dark:border-sky-400/35";
+    }
+    return "bg-slate-100/80 border border-transparent opacity-70 dark:bg-white/[0.03]";
+  };
+
+  const getBracketScoreClasses = (teamCode: string) =>
+    teamCode === selectedCode
+      ? "bg-amber-50 text-amber-900 dark:bg-amber-300/15 dark:text-amber-100"
+      : "bg-white/75 text-slate-700 dark:bg-black/50 dark:text-white";
+
   if (!mounted) return null;
 
   return (
     <div className="mx-auto max-w-[1600px] w-full px-4 py-8 md:px-8 animate-in fade-in duration-700">
       {/* Premium Dashboard Header */}
-      <div className="relative mb-10 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.02] p-8 backdrop-blur-md shadow-glass">
-        <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-neon/10 blur-3xl pointer-events-none" />
-        <div className="absolute -left-20 -bottom-20 h-60 w-60 rounded-full bg-neon-2/10 blur-3xl pointer-events-none" />
+      <div className="relative mb-10 overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900">
+        <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-emerald-100/70 blur-3xl pointer-events-none dark:bg-neon/10" />
+        <div className="absolute -left-20 -bottom-20 h-60 w-60 rounded-full bg-fuchsia-100/70 blur-3xl pointer-events-none dark:bg-neon-2/10" />
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <div className="text-xs uppercase tracking-[0.25em] text-neon flex items-center gap-2 font-bold mb-2">
-              <Sparkles className="w-4 h-4 text-neon animate-pulse" />
+            <div className="text-xs uppercase tracking-[0.25em] text-cyan-600 dark:text-neon flex items-center gap-2 font-bold mb-2">
+              <Sparkles className="w-4 h-4 text-cyan-600 dark:text-neon animate-pulse" />
               Predictive Intelligence Platform
             </div>
-            <h1 className="font-display text-4xl font-black sm:text-5xl text-gradient tracking-tight">
+            <h1 className="font-display text-4xl font-black sm:text-5xl text-slate-950 dark:text-gradient tracking-tight">
               Path to Glory Explorer
             </h1>
             <p className="mt-2 text-muted-foreground text-sm max-w-2xl leading-relaxed">
@@ -582,9 +613,9 @@ export default function CountryPredictionsClient({
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
-            <div className="flex flex-col items-end bg-black/40 border border-white/10 rounded-2xl px-5 py-3 shadow-glass">
+            <div className="flex flex-col items-end rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 shadow-sm dark:border-white/10 dark:bg-slate-950/60">
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Simulation Engine</span>
-              <span className="text-lg font-bold font-display text-neon mt-0.5">{selectedModel}</span>
+              <span className="text-lg font-bold font-display text-cyan-700 dark:text-neon mt-0.5">{selectedModel}</span>
             </div>
           </div>
         </div>
@@ -592,8 +623,8 @@ export default function CountryPredictionsClient({
 
       <div className="grid gap-6 lg:grid-cols-[320px_1fr] mb-6">
         {/* Left list of countries: Futuristic Sidebar Control */}
-        <div className="glass-strong rounded-3xl p-5 flex flex-col h-[750px] border border-white/10 shadow-2xl relative overflow-hidden">
-          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent pointer-events-none z-10" />
+        <div className="rounded-[2rem] bg-white p-5 flex flex-col h-[750px] border border-slate-200 shadow-[0_18px_50px_rgba(15,23,42,0.08)] relative overflow-hidden dark:border-white/10 dark:bg-slate-900">
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent pointer-events-none z-10 dark:from-slate-900" />
           
           <div className="relative mb-5 group">
             <Search className="absolute inset-y-0 left-3.5 h-4 w-4 my-auto text-muted-foreground group-focus-within:text-neon transition-colors" />
@@ -601,7 +632,7 @@ export default function CountryPredictionsClient({
               placeholder="Search country..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-11 bg-white/5 border-white/10 text-foreground text-sm focus-visible:ring-neon focus-visible:border-neon focus-visible:bg-white/[0.08] rounded-xl h-11 transition-all"
+              className="pl-11 border-slate-200 bg-slate-50 text-foreground text-sm focus-visible:ring-cyan-500 focus-visible:border-cyan-500 rounded-xl h-11 transition-all dark:border-white/10 dark:bg-white/5 dark:focus-visible:ring-neon dark:focus-visible:border-neon dark:focus-visible:bg-white/[0.08]"
             />
           </div>
 
@@ -614,12 +645,12 @@ export default function CountryPredictionsClient({
                   onClick={() => setSelectedCode(t.code)}
                   className={`w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${
                     active
-                      ? "bg-gradient-to-r from-neon/10 to-neon-2/10 border-neon/30 text-white shadow-[0_0_15px_rgba(6,182,212,0.1)] font-bold"
-                      : "border-white/5 bg-white/[0.01] hover:bg-white/5 text-muted-foreground hover:text-white"
+                      ? "bg-gradient-to-r from-cyan-50 to-fuchsia-50 border-cyan-300 text-slate-950 shadow-[0_12px_30px_rgba(14,165,233,0.12)] font-bold dark:from-neon/10 dark:to-neon-2/10 dark:border-neon/30 dark:text-white dark:shadow-[0_0_15px_rgba(6,182,212,0.1)]"
+                      : "border-slate-200 bg-slate-50 text-muted-foreground hover:bg-slate-100 hover:text-slate-950 dark:border-white/5 dark:bg-white/[0.01] dark:hover:bg-white/5 dark:hover:text-white"
                   }`}
                 >
                   {active && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-neon to-neon-2" />
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-cyan-500 to-fuchsia-500 dark:from-neon dark:to-neon-2" />
                   )}
                   <div className="flex items-center gap-3 min-w-0 z-10">
                     <span className="text-2xl shrink-0 drop-shadow-md group-hover:scale-110 transition-transform duration-300 select-none">
@@ -627,7 +658,7 @@ export default function CountryPredictionsClient({
                     </span>
                     <span className="truncate tracking-wide">{t.name}</span>
                   </div>
-                  <div className="text-xs font-mono font-bold text-neon-2 text-right z-10 opacity-90">
+                  <div className="text-xs font-mono font-bold text-fuchsia-600 text-right z-10 opacity-90 dark:text-neon-2">
                     {Math.round(t.elo)}
                   </div>
                 </button>
@@ -635,7 +666,7 @@ export default function CountryPredictionsClient({
             })}
             {filteredTeams.length === 0 && (
               <div className="text-center py-12 text-xs text-muted-foreground">
-                No country matches "{searchQuery}"
+                No country matches &quot;{searchQuery}&quot;
               </div>
             )}
           </div>
@@ -644,24 +675,24 @@ export default function CountryPredictionsClient({
         {/* Right main analysis panel */}
         <div className="space-y-6 min-w-0">
           {/* Header Team info & progression stats: Premium glass card */}
-          <div className="glass-strong rounded-3xl p-6 relative overflow-hidden border border-white/10 shadow-xl">
-            <div className="absolute -right-16 -top-16 w-56 h-56 bg-neon/10 rounded-full filter blur-3xl pointer-events-none" />
-            <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-neon-2/10 rounded-full filter blur-3xl pointer-events-none" />
-            <div className="flex flex-col lg:flex-row justify-between items-stretch gap-6 border-b border-white/5 pb-6 mb-6">
+          <div className="rounded-[2.25rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] relative overflow-hidden dark:border-white/10 dark:bg-slate-900">
+            <div className="absolute -right-16 -top-16 w-56 h-56 bg-emerald-100/70 rounded-full filter blur-3xl pointer-events-none dark:bg-neon/10" />
+            <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-fuchsia-100/70 rounded-full filter blur-3xl pointer-events-none dark:bg-neon-2/10" />
+            <div className="flex flex-col lg:flex-row justify-between items-stretch gap-6 border-b border-slate-200 pb-6 mb-6 dark:border-white/5">
               {/* Team Profile Basic Details */}
               <div className="flex flex-col justify-between flex-grow gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
                   <div className="flex items-center gap-5">
-                    <div className="text-7xl drop-shadow-lg leading-none select-none filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:scale-105 transition-transform duration-300">
+                    <div className="text-7xl drop-shadow-lg leading-none select-none filter hover:scale-105 transition-transform duration-300">
                       {selectedTeam.flag}
                     </div>
                     <div>
-                      <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-extrabold flex items-center gap-1.5">
+                      <div className="text-[10px] uppercase tracking-[0.25em] text-slate-600 dark:text-muted-foreground font-extrabold flex items-center gap-1.5">
                         <span>FIFA Rank #{selectedTeam.rank}</span>
-                        <span className="text-white/20">&bull;</span>
-                        <span className="text-neon-2">Group {Object.entries(GROUPS_CONFIG).find(([_, list]) => list.includes(selectedCode))?.[0] || "-"}</span>
+                        <span className="text-slate-300 dark:text-white/20">&bull;</span>
+                        <span className="text-fuchsia-600 dark:text-neon-2">Group {selectedGroup}</span>
                       </div>
-                      <h2 className="text-4xl font-extrabold font-display text-foreground mt-1 tracking-tight">
+                      <h2 className="text-4xl font-extrabold font-display text-slate-950 dark:text-foreground mt-1 tracking-tight">
                         {selectedTeam.name}
                       </h2>
                     </div>
@@ -676,13 +707,13 @@ export default function CountryPredictionsClient({
                           disabled={isSaving || isSimulating}
                           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                             saveSuccess
-                              ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-400"
-                              : "bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/25 text-white active:scale-95 disabled:opacity-50"
+                              ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
+                              : "bg-slate-100 border border-slate-200 hover:bg-slate-200 hover:border-slate-300 text-slate-900 active:scale-95 disabled:opacity-50 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 dark:hover:border-white/25 dark:text-white"
                           }`}
                         >
                           {isSaving ? (
                             <>
-                              <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                            <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin dark:border-white/20 dark:border-t-white" />
                               <span>Saving...</span>
                             </>
                           ) : saveSuccess ? (
@@ -700,7 +731,7 @@ export default function CountryPredictionsClient({
                       ) : (
                         <button
                           onClick={() => signIn()}
-                          className="flex items-center gap-2 bg-gradient-to-r from-neon/20 to-neon-2/20 border border-neon/30 hover:from-neon/30 hover:to-neon-2/30 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95"
+                          className="flex items-center gap-2 bg-gradient-to-r from-cyan-50 to-fuchsia-50 border border-cyan-300 hover:from-cyan-100 hover:to-fuchsia-100 text-slate-900 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 dark:from-neon/20 dark:to-neon-2/20 dark:border-neon/30 dark:hover:from-neon/30 dark:hover:to-neon-2/30 dark:text-white"
                         >
                           <User className="w-3.5 h-3.5 text-neon-2" />
                           <span>Sign In to Save</span>
@@ -712,23 +743,23 @@ export default function CountryPredictionsClient({
 
                 {/* Core Attributes Mini Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">FIFA Elo Rating</span>
-                    <span className="text-xl font-bold font-mono text-foreground mt-1 block">{Math.round(selectedTeam.elo)}</span>
+                    <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{Math.round(selectedTeam.elo)}</span>
                   </div>
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Power Index</span>
-                    <span className="text-xl font-bold font-mono text-foreground mt-1 block">{selectedTeam.power || 70}</span>
+                    <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{selectedTeam.power || 70}</span>
                   </div>
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Squad Value</span>
-                    <span className="text-xl font-bold font-mono text-foreground mt-1 block">
+                    <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">
                       {selectedTeam.squadValueM ? `€${selectedTeam.squadValueM}M` : "N/A"}
                     </span>
                   </div>
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Top Player</span>
-                    <span className="text-xs font-bold text-neon mt-1.5 block truncate" title={getTopPlayer(selectedTeam.code)}>
+                    <span className="text-xs font-bold text-emerald-700 mt-1.5 block truncate dark:text-neon" title={getTopPlayer(selectedTeam.code)}>
                       {getTopPlayer(selectedTeam.code)}
                     </span>
                   </div>
@@ -736,9 +767,9 @@ export default function CountryPredictionsClient({
               </div>
 
               {/* Circular Gauge for Champion Probability */}
-              <div className="flex flex-col items-center justify-center bg-white/[0.02] border border-white/10 rounded-2xl p-6 min-w-[200px] text-center shadow-glass relative group overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-neon/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-extrabold relative z-10">
+              <div className="flex flex-col items-center justify-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 min-w-[200px] text-center shadow-sm relative group overflow-hidden dark:border-white/10 dark:bg-white/[0.02] dark:shadow-glass">
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-cyan-100/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 dark:to-neon/5" />
+                <span className="text-[10px] uppercase tracking-wider text-slate-700 dark:text-muted-foreground font-extrabold relative z-10">
                   Championship Prob
                 </span>
                 
@@ -748,7 +779,7 @@ export default function CountryPredictionsClient({
                       cx="56"
                       cy="56"
                       r="46"
-                      stroke="rgba(255,255,255,0.04)"
+                      stroke={activeTheme === "light" ? "rgba(15,23,42,0.12)" : "rgba(255,255,255,0.04)"}
                       strokeWidth="8"
                       fill="transparent"
                     />
@@ -772,16 +803,16 @@ export default function CountryPredictionsClient({
                     </defs>
                   </svg>
                   <div className="absolute text-center">
-                    <div className="text-2xl font-black font-mono text-foreground leading-none">
-                      {simResults ? ((simResults.stages.champion / 1000) * 100).toFixed(1) : "0.0"}%
+                    <div className="text-2xl font-black font-mono text-slate-950 dark:text-foreground leading-none">
+                      {championProbability.toFixed(1)}%
                     </div>
                   </div>
                 </div>
                 
-                <span className="text-[11px] font-bold text-neon relative z-10 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-emerald-700 relative z-10 uppercase tracking-wider dark:text-neon">
                   {simResults ? (
-                    ((simResults.stages.champion / 1000) * 100) > 12 ? "Contender" : 
-                    ((simResults.stages.champion / 1000) * 100) > 4 ? "Dark Horse" : "Underdog"
+                    championProbability > 12 ? "Contender" : 
+                    championProbability > 4 ? "Dark Horse" : "Underdog"
                   ) : "No Data"}
                 </span>
               </div>
@@ -789,51 +820,43 @@ export default function CountryPredictionsClient({
 
             {/* Stages Progression Matrix */}
             <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
-              {[
-                { key: "group", label: "Group Stage", icon: "G" },
-                { key: "r32", label: "Round of 32", icon: "32" },
-                { key: "r16", label: "Round of 16", icon: "16" },
-                { key: "qf", label: "Quarter Final", icon: "QF" },
-                { key: "sf", label: "Semi Final", icon: "SF" },
-                { key: "final", label: "Final", icon: "F" },
-                { key: "champion", label: "Champion", icon: "🏆" }
-              ].map((s) => {
+              {stageCards.map((s) => {
                 const count = simResults?.stages[s.key] || 0;
                 const pct = (count / 1000) * 100;
                 const active = pct > 0;
                 return (
                   <div 
                     key={s.key} 
-                    className={`border rounded-2xl p-3.5 transition-all duration-300 relative overflow-hidden group ${
+                    className={`border rounded-[1.75rem] p-3.5 transition-all duration-300 relative overflow-hidden group ${
                       active 
-                        ? "bg-white/[0.02] border-white/10 hover:border-neon/30 hover:bg-white/[0.04]" 
-                        : "bg-black/[0.1] border-white/5 opacity-30"
+                        ? "bg-slate-50 border-slate-200 hover:border-cyan-300 hover:bg-white dark:bg-white/[0.02] dark:border-white/10 dark:hover:border-neon/30 dark:hover:bg-white/[0.04]" 
+                        : "bg-slate-100 border-slate-200 opacity-50 dark:bg-black/[0.1] dark:border-white/5 dark:opacity-30"
                     }`}
                   >
-                    <div className="absolute top-0 right-0 w-8 h-8 -mr-2 -mt-2 bg-gradient-to-br from-neon/10 to-transparent rounded-full filter blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute top-0 right-0 w-8 h-8 -mr-2 -mt-2 bg-gradient-to-br from-cyan-200/80 to-transparent rounded-full filter blur-md opacity-0 group-hover:opacity-100 transition-opacity dark:from-neon/10" />
                     
                     <div className="flex justify-between items-start gap-1">
-                      <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold leading-tight">
+                      <span className="text-[9px] uppercase tracking-wider text-slate-700 dark:text-muted-foreground font-bold leading-tight">
                         {s.label}
                       </span>
                       {s.icon === "🏆" ? (
                         <Trophy className={`w-3.5 h-3.5 ${active ? "text-yellow-400" : "text-muted-foreground"}`} />
                       ) : (
-                        <span className="text-[10px] font-mono font-bold text-foreground/20">{s.icon}</span>
+                        <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-foreground/20">{s.icon}</span>
                       )}
                     </div>
-                    <div className={`mt-2 text-xl font-black font-mono tabular-nums leading-none ${active ? "text-foreground" : "text-muted-foreground"}`}>
+                    <div className={`mt-2 text-xl font-black font-mono tabular-nums leading-none ${active ? "text-slate-950 dark:text-foreground" : "text-muted-foreground"}`}>
                       {pct.toFixed(1)}%
                     </div>
                     
-                    <div className="mt-3 h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div className="mt-3 h-1 bg-slate-200 rounded-full overflow-hidden dark:bg-white/5">
                       <div
                         className="h-full rounded-full transition-all duration-1000 ease-out"
                         style={{ 
                           width: `${pct}%`,
                           background: s.key === "champion" 
-                            ? "linear-gradient(90deg, var(--color-gold), #fbbf24)" 
-                            : "linear-gradient(90deg, var(--color-neon), var(--color-neon-2))"
+                            ? "linear-gradient(90deg, #d4a109, #f4c430)" 
+                            : "linear-gradient(90deg, #0f8a4b, #b239d2)"
                         }}
                       />
                     </div>
@@ -846,14 +869,14 @@ export default function CountryPredictionsClient({
           {/* Dual Charts Row */}
           <div className="grid gap-6 md:grid-cols-2">
             {/* Radar Attributes Card */}
-            <div className="glass-strong rounded-3xl p-6 relative overflow-hidden border border-white/10 shadow-lg flex flex-col justify-between">
+            <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative overflow-hidden flex flex-col justify-between dark:border-white/10 dark:bg-slate-900">
               <div>
                 <div className="flex justify-between items-center mb-6">
                   <div>
                     <h3 className="font-display font-bold text-lg text-foreground">Performance Attributes</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</p>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-neon bg-neon/10 border border-neon/30 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30">
                     Attributes
                   </span>
                 </div>
@@ -870,21 +893,21 @@ export default function CountryPredictionsClient({
             </div>
 
             {/* Squad Quality Tiers Card */}
-            <div className="glass-strong rounded-3xl p-6 relative overflow-hidden border border-white/10 shadow-lg flex flex-col justify-between">
+            <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative overflow-hidden flex flex-col justify-between dark:border-white/10 dark:bg-slate-900">
               <div>
                 <div className="flex justify-between items-center mb-6">
                   <div>
                     <h3 className="font-display font-bold text-lg text-foreground">Squad Quality Tiers</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</p>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-neon-2 bg-neon-2/10 border border-neon-2/30 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200 px-2 py-0.5 rounded-full dark:text-neon-2 dark:bg-neon-2/10 dark:border-neon-2/30">
                     Squad Profile
                   </span>
                 </div>
                 
                 <div className="grid grid-cols-[100px_1fr] gap-6 items-center mt-4 h-52">
                   {/* Large circular stat */}
-                  <div className="flex flex-col items-center justify-center bg-white/[0.02] border border-white/5 rounded-2xl py-6 px-3 text-center h-full">
+                  <div className="flex flex-col items-center justify-center bg-slate-50 border border-slate-200 rounded-[1.75rem] py-6 px-3 text-center h-full dark:bg-white/[0.02] dark:border-white/5">
                     <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">Avg Rating</span>
                     <span className="text-3xl font-black text-foreground mt-2 font-mono">{squadStats.avgRating}%</span>
                     <span className="text-[9px] text-neon mt-2 font-bold">{squadStats.total} Players</span>
@@ -920,18 +943,18 @@ export default function CountryPredictionsClient({
             </div>
           </div>
 
-          <div className="glass-strong rounded-3xl p-6 border border-white/10 shadow-lg relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-white/5 pb-5 mb-6">
+          <div className="rounded-[2rem] bg-white p-6 border border-slate-200 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative overflow-hidden dark:border-white/10 dark:bg-slate-900">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-slate-200 pb-5 mb-6 dark:border-white/5">
               <div>
                 <h3 className="font-display font-bold text-xl text-foreground flex items-center gap-2">
-                  <TrendingUp className="text-neon" />
+                  <TrendingUp className="text-cyan-600 dark:text-neon" />
                   Expected Path to Glory
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Calculated dynamically from the most common matchups and scores across all simulations.
                 </p>
               </div>
-              <div className="text-[10px] uppercase bg-neon/10 border border-neon/30 text-neon px-3.5 py-1.5 rounded-full font-bold self-start sm:self-auto shadow-sm">
+              <div className="text-[10px] uppercase bg-cyan-50 border border-cyan-200 text-cyan-700 px-3.5 py-1.5 rounded-full font-bold self-start sm:self-auto shadow-sm dark:bg-neon/10 dark:border-neon/30 dark:text-neon">
                 Model: {selectedModel}
               </div>
             </div>
@@ -950,12 +973,12 @@ export default function CountryPredictionsClient({
               <div className="overflow-x-auto pb-4 scrollbar-custom">
                 <div className="flex items-stretch gap-4 min-w-max py-2 px-1">
                   {/* Start Node */}
-                  <div className="flex flex-col justify-center items-center bg-gradient-to-br from-neon/20 to-neon-2/10 border border-neon/40 rounded-2xl px-5 py-4 min-w-[140px] shadow-glass relative overflow-hidden group">
+                  <div className="flex flex-col justify-center items-center bg-gradient-to-br from-cyan-50 to-fuchsia-50 border border-cyan-200 rounded-[1.75rem] px-5 py-4 min-w-[140px] shadow-sm relative overflow-hidden group dark:from-neon/20 dark:to-neon-2/10 dark:border-neon/40 dark:shadow-glass">
                     <span className="text-4xl leading-none filter drop-shadow-md select-none transform group-hover:scale-110 transition-transform duration-300">
                       {selectedTeam.flag}
                     </span>
                     <span className="text-sm font-extrabold mt-2 text-foreground">{selectedTeam.name}</span>
-                    <span className="text-[9px] uppercase tracking-[0.2em] font-extrabold text-neon mt-1">Start</span>
+                    <span className="text-[9px] uppercase tracking-[0.2em] font-extrabold text-cyan-700 mt-1 dark:text-neon">Start</span>
                   </div>
 
                   {/* Path Nodes */}
@@ -972,10 +995,10 @@ export default function CountryPredictionsClient({
 
                     return (
                       <div key={idx} className="flex items-center gap-4">
-                        <ChevronRight className="w-5 h-5 text-white/20 shrink-0" />
+                        <ChevronRight className="w-5 h-5 text-slate-300 shrink-0 dark:text-white/20" />
                         
-                        <div className="flex flex-col justify-between bg-white/[0.02] border border-white/5 p-4 rounded-2xl min-w-[195px] hover:border-white/20 hover:bg-white/[0.04] transition-all duration-300 relative group shadow-sm">
-                          <div className="absolute -top-1 right-3 text-[30px] font-black text-white/[0.02] select-none font-mono">
+                        <div className="flex flex-col justify-between bg-slate-50 border border-slate-200 p-4 rounded-[1.75rem] min-w-[195px] hover:border-slate-300 hover:bg-white transition-all duration-300 relative group shadow-sm dark:bg-white/[0.02] dark:border-white/5 dark:hover:border-white/20 dark:hover:bg-white/[0.04]">
+                          <div className="absolute -top-1 right-3 text-[30px] font-black text-slate-200 select-none font-mono dark:text-white/[0.02]">
                             0{idx + 1}
                           </div>
                           <span className="text-[9px] uppercase font-extrabold text-muted-foreground tracking-wider leading-none mb-2.5">
@@ -990,7 +1013,7 @@ export default function CountryPredictionsClient({
                             </div>
                           </div>
                           
-                          <div className="flex justify-between items-center pt-2.5 border-t border-white/5 mt-1">
+                          <div className="flex justify-between items-center pt-2.5 border-t border-slate-200 mt-1 dark:border-white/5">
                             <div className="text-[10px] text-muted-foreground font-medium">
                               Proj: <span className="font-mono font-bold text-foreground">{p.expectedScore}</span>
                             </div>
@@ -1010,17 +1033,16 @@ export default function CountryPredictionsClient({
       </div>
 
       {/* Redesigned Full Mock Tournament Bracket */}
-      <div className="w-full bg-card dark:bg-[#070b1e] border border-border dark:border-white/10 rounded-3xl p-6 md:p-8 overflow-hidden relative shadow-sm dark:shadow-[0_0_50px_rgba(0,198,255,0.06)] mt-8">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.05)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
-        <div className="absolute right-0 top-0 w-96 h-96 bg-[#00c6ff]/5 rounded-full filter blur-3xl pointer-events-none" />
+      <div className="w-full bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 md:p-8 overflow-hidden relative shadow-[0_18px_50px_rgba(15,23,42,0.08)] mt-8">
+        <div className="absolute right-0 top-0 w-96 h-96 bg-cyan-100/60 dark:bg-[#00c6ff]/5 rounded-full filter blur-3xl pointer-events-none" />
         
         <div className="border-b border-border dark:border-white/10 pb-5 mb-8 relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h3 className="font-display font-extrabold text-2xl text-foreground dark:text-white tracking-tight">
-              Full Simulated Tournament Bracket
+              Path to Glory
             </h3>
             <p className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">
-              Best-Case Path to Glory Scenario for {selectedTeam.name}
+              Most likely path to lifting the trophy for {selectedTeam.name}
             </p>
           </div>
         </div>
@@ -1036,8 +1058,8 @@ export default function CountryPredictionsClient({
                     const away = getTeam(m.away);
                     const isHomeWinner = m.winner === m.home;
                     const isAwayWinner = m.winner === m.away;
-                    const homeBg = isHomeWinner ? "bg-gradient-to-r from-blue-500/10 to-blue-500/25 border border-blue-500/35" : "bg-black/[0.02] dark:bg-white/[0.02] border border-transparent opacity-60";
-                    const awayBg = isAwayWinner ? "bg-gradient-to-r from-blue-500/10 to-blue-500/25 border border-blue-500/35" : "bg-black/[0.02] dark:bg-white/[0.02] border border-transparent opacity-60";
+                    const homeBg = getBracketRowClasses(m.home, isHomeWinner);
+                    const awayBg = getBracketRowClasses(m.away, isAwayWinner);
 
                     return (
                       <div key={i} className="relative group/match">
@@ -1052,7 +1074,7 @@ export default function CountryPredictionsClient({
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
-                                  <span className="text-xs font-mono font-bold text-foreground dark:text-white bg-black/5 dark:bg-black/60 px-2 py-0.5 rounded">{m.hs}</span>
+                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
                                </div>
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
@@ -1060,7 +1082,7 @@ export default function CountryPredictionsClient({
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
-                                  <span className="text-xs font-mono font-bold text-foreground dark:text-white bg-black/5 dark:bg-black/60 px-2 py-0.5 rounded">{m.as}</span>
+                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
                                </div>
                             </div>
                          </div>
@@ -1083,8 +1105,8 @@ export default function CountryPredictionsClient({
                     const away = getTeam(m.away);
                     const isHomeWinner = m.winner === m.home;
                     const isAwayWinner = m.winner === m.away;
-                    const homeBg = isHomeWinner ? "bg-gradient-to-r from-blue-500/10 to-blue-500/25 border border-blue-500/35" : "bg-black/[0.02] dark:bg-white/[0.02] border border-transparent opacity-60";
-                    const awayBg = isAwayWinner ? "bg-gradient-to-r from-blue-500/10 to-blue-500/25 border border-blue-500/35" : "bg-black/[0.02] dark:bg-white/[0.02] border border-transparent opacity-60";
+                    const homeBg = getBracketRowClasses(m.home, isHomeWinner);
+                    const awayBg = getBracketRowClasses(m.away, isAwayWinner);
 
                     return (
                       <div key={i} className="relative group/match">
@@ -1100,7 +1122,7 @@ export default function CountryPredictionsClient({
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
-                                  <span className="text-xs font-mono font-bold text-foreground dark:text-white bg-black/5 dark:bg-black/60 px-2 py-0.5 rounded">{m.hs}</span>
+                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
                                </div>
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
@@ -1108,7 +1130,7 @@ export default function CountryPredictionsClient({
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
-                                  <span className="text-xs font-mono font-bold text-foreground dark:text-white bg-black/5 dark:bg-black/60 px-2 py-0.5 rounded">{m.as}</span>
+                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
                                </div>
                             </div>
                          </div>
@@ -1131,8 +1153,8 @@ export default function CountryPredictionsClient({
                     const away = getTeam(m.away);
                     const isHomeWinner = m.winner === m.home;
                     const isAwayWinner = m.winner === m.away;
-                    const homeBg = isHomeWinner ? "bg-gradient-to-r from-blue-500/10 to-blue-500/25 border border-blue-500/35" : "bg-black/[0.02] dark:bg-white/[0.02] border border-transparent opacity-60";
-                    const awayBg = isAwayWinner ? "bg-gradient-to-r from-blue-500/10 to-blue-500/25 border border-blue-500/35" : "bg-black/[0.02] dark:bg-white/[0.02] border border-transparent opacity-60";
+                    const homeBg = getBracketRowClasses(m.home, isHomeWinner);
+                    const awayBg = getBracketRowClasses(m.away, isAwayWinner);
 
                     return (
                       <div key={i} className="relative group/match">
@@ -1148,7 +1170,7 @@ export default function CountryPredictionsClient({
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
-                                  <span className="text-xs font-mono font-bold text-foreground dark:text-white bg-black/5 dark:bg-black/60 px-2 py-0.5 rounded">{m.hs}</span>
+                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
                                </div>
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
@@ -1156,7 +1178,7 @@ export default function CountryPredictionsClient({
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
-                                  <span className="text-xs font-mono font-bold text-foreground dark:text-white bg-black/5 dark:bg-black/60 px-2 py-0.5 rounded">{m.as}</span>
+                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
                                </div>
                             </div>
                          </div>
@@ -1179,8 +1201,8 @@ export default function CountryPredictionsClient({
                     const away = getTeam(m.away);
                     const isHomeWinner = m.winner === m.home;
                     const isAwayWinner = m.winner === m.away;
-                    const homeBg = isHomeWinner ? "bg-gradient-to-r from-blue-500/10 to-blue-500/25 border border-blue-500/35" : "bg-black/[0.02] dark:bg-white/[0.02] border border-transparent opacity-60";
-                    const awayBg = isAwayWinner ? "bg-gradient-to-r from-blue-500/10 to-blue-500/25 border border-blue-500/35" : "bg-black/[0.02] dark:bg-white/[0.02] border border-transparent opacity-60";
+                    const homeBg = getBracketRowClasses(m.home, isHomeWinner);
+                    const awayBg = getBracketRowClasses(m.away, isAwayWinner);
 
                     return (
                       <div key={i} className="relative group/match">
@@ -1196,7 +1218,7 @@ export default function CountryPredictionsClient({
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
-                                  <span className="text-xs font-mono font-bold text-foreground dark:text-white bg-black/5 dark:bg-black/60 px-2 py-0.5 rounded">{m.hs}</span>
+                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
                                </div>
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
@@ -1204,7 +1226,7 @@ export default function CountryPredictionsClient({
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
-                                  <span className="text-xs font-mono font-bold text-foreground dark:text-white bg-black/5 dark:bg-black/60 px-2 py-0.5 rounded">{m.as}</span>
+                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
                                </div>
                             </div>
                          </div>
@@ -1243,21 +1265,21 @@ export default function CountryPredictionsClient({
                            <span>FINAL</span>
                         </div>
                         <div className="flex flex-col p-1 gap-1">
-                           <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${simResults.mockTournament.final.winner === simResults.mockTournament.final.home ? "bg-gradient-to-r from-yellow-500/10 to-yellow-500/25 border border-yellow-500/40" : "bg-black/[0.02] dark:bg-white/[0.02] border border-transparent opacity-60"}`}>
+                           <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.home, simResults.mockTournament.final.winner === simResults.mockTournament.final.home, "gold")}`}>
                               <div className="flex items-center gap-2 overflow-hidden">
                                  <span className="text-sm drop-shadow-md select-none">{getTeam(simResults.mockTournament.final.home).flag}</span>
                                  <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.home).name}</span>
                                  {simResults.mockTournament.final.winner === simResults.mockTournament.final.home && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
                               </div>
-                              <span className="text-xs font-mono font-bold text-foreground dark:text-white bg-black/5 dark:bg-black/60 px-2 py-0.5 rounded">{simResults.mockTournament.final.hs}</span>
+                              <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(simResults.mockTournament.final.home)}`}>{simResults.mockTournament.final.hs}</span>
                            </div>
-                           <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${simResults.mockTournament.final.winner === simResults.mockTournament.final.away ? "bg-gradient-to-r from-yellow-500/10 to-yellow-500/25 border border-yellow-500/40" : "bg-black/[0.02] dark:bg-white/[0.02] border border-transparent opacity-60"}`}>
+                           <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.away, simResults.mockTournament.final.winner === simResults.mockTournament.final.away, "gold")}`}>
                               <div className="flex items-center gap-2 overflow-hidden">
                                  <span className="text-sm drop-shadow-md select-none">{getTeam(simResults.mockTournament.final.away).flag}</span>
                                  <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.away).name}</span>
                                  {simResults.mockTournament.final.winner === simResults.mockTournament.final.away && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
                               </div>
-                              <span className="text-xs font-mono font-bold text-foreground dark:text-white bg-black/5 dark:bg-black/60 px-2 py-0.5 rounded">{simResults.mockTournament.final.as}</span>
+                              <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(simResults.mockTournament.final.away)}`}>{simResults.mockTournament.final.as}</span>
                            </div>
                         </div>
                      </div>
@@ -1272,47 +1294,48 @@ export default function CountryPredictionsClient({
       <Dialog open={showConfirmPopup} onOpenChange={(open) => {
         if (!isSimulating) setShowConfirmPopup(open);
       }}>
-        <DialogContent className="glass-strong border-white/10 text-foreground max-w-md rounded-3xl shadow-2xl overflow-hidden p-0">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-neon/10 rounded-full filter blur-xl pointer-events-none" />
-          <div className="p-6 relative z-10">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-display font-extrabold flex items-center gap-3 text-white">
-                {isSimulating ? (
-                   <Sparkles className="w-6 h-6 text-neon animate-pulse" />
-                ) : (
-                   <AlertCircle className="w-6 h-6 text-neon" />
-                )}
-                <span>{isSimulating ? "Running Simulation..." : "Confirm Simulation Setup"}</span>
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
+        <DialogContent className={`${isSimulating ? "max-w-md border-none bg-transparent shadow-none p-0 [&>button]:hidden" : "max-w-2xl rounded-[2rem] border border-slate-200 bg-white text-foreground shadow-[0_24px_80px_rgba(15,23,42,0.22)] overflow-hidden p-0 dark:border-white/10 dark:bg-slate-900"} `}>
+          {!isSimulating && <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-100/80 rounded-full filter blur-xl pointer-events-none dark:bg-neon/10" />}
+          <div className={`relative z-10 ${isSimulating ? "" : "p-6"}`}>
+            {!isSimulating && (
+              <DialogHeader>
+                <DialogTitle className="text-xl font-display font-extrabold flex items-center gap-3 text-slate-950 dark:text-white">
+                  <AlertCircle className="w-6 h-6 text-emerald-600 dark:text-neon" />
+                  <span>Ready to run the simulation?</span>
+                </DialogTitle>
+              </DialogHeader>
+            )}
+            <div className={`space-y-4 ${isSimulating ? "" : "pt-4"}`}>
               {isSimulating ? (
-                <div className="flex flex-col gap-4 py-4">
-                  <div className="flex justify-between items-end">
-                    <span className="text-sm font-bold text-white">Processing paths for {selectedTeam.name}</span>
-                    <span className="text-xl font-mono text-neon font-bold">{simProgress}%</span>
+                <div className="flex w-full flex-col items-center justify-center gap-4 py-2">
+                  <img
+                    src="/lottie/World Cup!.svg"
+                    alt="Simulation loading"
+                    className="h-80 w-80 object-contain"
+                  />
+                  <div className="w-full max-w-xs rounded-full bg-transparent p-2 shadow-none backdrop-blur-0 dark:bg-transparent">
+                    <div className="mb-2 text-center text-2xl font-mono font-black text-cyan-700 dark:text-neon">
+                      {simProgress}%
+                    </div>
+                    <Progress value={simProgress} className="h-2.5 bg-slate-200/90 dark:bg-white/10" />
                   </div>
-                  <Progress value={simProgress} className="h-3" />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Running Monte Carlo engine ({simProgress * 10} / 1000 iterations)...
-                  </p>
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    You are about to launch <span className="font-extrabold text-white">{selectedTeam.name}'s</span> path to glory projection metrics.
+                  <p className="text-sm text-slate-700 dark:text-muted-foreground leading-relaxed">
+                    We&rsquo;re about to simulate <span className="font-extrabold text-slate-950 dark:text-white">{selectedTeam.name}&rsquo;s</span> most likely path to lifting the trophy.
                   </p>
-                  <div className="flex gap-3 items-start text-xs text-yellow-500/90 bg-yellow-500/5 p-4.5 rounded-2xl border border-yellow-500/15">
-                    <Sparkles className="w-5 h-5 shrink-0 text-yellow-500 mt-0.5 animate-pulse" />
+                  <div className="flex gap-3 items-start text-xs text-amber-700 bg-amber-50 p-4.5 rounded-[1.75rem] border border-amber-200 dark:text-yellow-500/90 dark:bg-yellow-500/5 dark:border-yellow-500/15">
+                    <Sparkles className="w-5 h-5 shrink-0 text-amber-500 mt-0.5 animate-pulse dark:text-yellow-500" />
                     <div>
-                      <span className="font-bold block text-yellow-400 mb-0.5">Computational Processing Required</span>
-                      This runs 1,000 complete tournament paths based on model settings to yield exact statistical outcomes.
+                      <span className="font-bold block text-amber-600 mb-0.5 dark:text-yellow-400">Path to glory simulation</span>
+                      We&rsquo;ll run 1,000 tournament paths to estimate {selectedTeam.name}&rsquo;s chances of going all the way and lifting the trophy.
                     </div>
                   </div>
-                  <div className="flex justify-end gap-3 pt-5 border-t border-white/5 mt-6">
+                  <div className="flex justify-end gap-3 pt-5 border-t border-slate-200 mt-6 dark:border-white/5">
                     <button 
                       onClick={() => setShowConfirmPopup(false)}
-                      className="px-5 py-2.5 rounded-xl text-sm font-bold border border-white/10 hover:bg-white/5 hover:border-white/20 transition-all text-white"
+                      className="px-5 py-2.5 rounded-xl text-sm font-bold border border-sky-500 text-sky-600 hover:bg-sky-50 transition-all dark:border-white/10 dark:hover:bg-white/5 dark:hover:border-white/20 dark:text-white"
                       disabled={isSimulating}
                     >
                       Cancel
@@ -1322,7 +1345,7 @@ export default function CountryPredictionsClient({
                         runSimulations();
                       }}
                       disabled={isSimulating}
-                      className="px-5 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-neon to-neon-2 text-black hover:scale-[1.02] active:scale-95 transition-all shadow-md disabled:opacity-50"
+                      className="px-5 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] text-slate-950 hover:scale-[1.02] active:scale-95 transition-all shadow-md disabled:opacity-50"
                     >
                       Run Simulation
                     </button>

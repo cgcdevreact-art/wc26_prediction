@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
-import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X } from "lucide-react";
+import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus } from "lucide-react";
 import { useSession, signIn } from "next-auth/react";
 import { StaminaBar, AlignmentGauge, TemperatureSlider } from "@/components/ui/SciFiControls";
 import { useSimulationStore } from "@/lib/store/simulationStore";
@@ -11,7 +11,7 @@ import { getMatchExpectedGoals } from "@/lib/simulation/model";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { UpgradeModal } from "./UpgradeModal";
 import { usePathname } from "next/navigation";
-import fixturesData from "../../../public/fixtures.json";
+
 interface PredictorMatch {
   id: string; // group-X-index
   group: string;
@@ -82,9 +82,15 @@ function intToTeamCode(val: number): string {
 }
 
 // Helper: Get group match details like date, time, match number and venue
-function getGroupMatchDetails(group: string, suffix: number) {
+// Accepts live games & stadiums arrays fetched from worldcup26.ir
+function getGroupMatchDetails(
+  group: string,
+  suffix: number,
+  allGames: any[],
+  allStadiums: any[]
+) {
   const groupOffset = group.charCodeAt(0) - 65; // A=0, B=1, ... L=11
-  
+
   let time = "12:00 PM";
   if (suffix === 1) time = groupOffset % 2 === 0 ? "12:30 AM" : "03:30 PM";
   else if (suffix === 2) time = groupOffset % 2 === 0 ? "07:30 AM" : "08:30 PM";
@@ -93,22 +99,62 @@ function getGroupMatchDetails(group: string, suffix: number) {
   else if (suffix === 5) time = "06:30 AM";
   else if (suffix === 6) time = "06:30 AM";
 
-  const groupFixtures = (fixturesData.schedule.group_stage.fixtures as any[]).filter(f => f.group === group);
-  const sortedFixtures = [...groupFixtures].sort((a, b) => a.match_no - b.match_no);
-  const fixture = sortedFixtures[suffix - 1];
+  // Filter games by group from the live API data
+  const groupGames = allGames.filter((g: any) => g.group === group);
+  // Sort them by game id (match number)
+  const sortedGames = [...groupGames].sort((a: any, b: any) => parseInt(a.id) - parseInt(b.id));
 
-  if (!fixture) {
+  // Suffix-to-sorted-index mapping:
+  // suffix 1 → index 0 (t1 vs t2)
+  // suffix 2 → index 1 (t3 vs t4)
+  // suffix 3 → index 3 (t1 vs t3)
+  // suffix 4 → index 4 (t2 vs t4)
+  // suffix 5 → index 5 (t4 vs t1)
+  // suffix 6 → index 2 (t2 vs t3)
+  const suffixToSortedIndex: Record<number, number> = {
+    1: 0,
+    2: 1,
+    3: 3,
+    4: 4,
+    5: 5,
+    6: 2
+  };
+  const sortedIndex = suffixToSortedIndex[suffix] ?? (suffix - 1);
+  const game = sortedGames[sortedIndex];
+
+  if (!game) {
     return { date: "TBD", time, matchNumber: 0, venue: "TBD" };
   }
 
-  const dateObj = new Date(fixture.date);
-  const formattedDate = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  // Parse local_date: e.g. "06/13/2026 21:00"
+  let formattedDate = "TBD";
+  try {
+    if (game.local_date) {
+      const datePart = game.local_date.split(" ")[0];
+      const dateObj = new Date(datePart);
+      formattedDate = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+      // Extract time from local_date if available
+      const timePart = game.local_date.split(" ")[1];
+      if (timePart) {
+        time = timePart;
+      }
+    }
+  } catch (err) {
+    console.error("Error parsing game date:", game.local_date, err);
+  }
+
+  // Lookup stadium name from the live stadiums data
+  const stadiumObj = allStadiums.find((s: any) => String(s.id) === String(game.stadium_id));
+  const venueLabel = stadiumObj
+    ? `${stadiumObj.name_en}, ${stadiumObj.city_en.split('(')[0].trim()}`
+    : "TBD";
 
   return {
     date: formattedDate,
     time,
-    matchNumber: fixture.match_no,
-    venue: `${fixture.venue}, ${fixture.city.split(',')[0].trim()}`
+    matchNumber: parseInt(game.id),
+    venue: venueLabel
   };
 }
 
@@ -218,7 +264,49 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const { players, isInitialized, initializeData, selectedModel } = useSimulationStore();
   const pathname = usePathname();
 
+  // ─── Live data from worldcup26.ir ───
+  const [liveGames, setLiveGames] = useState<any[]>([]);
+  const [liveStadiums, setLiveStadiums] = useState<any[]>([]);
 
+  useEffect(() => {
+    // Fetch games + stadiums from worldcup26.ir live API.
+    // Falls back to locally cached snapshot files if the live API is unreachable.
+    async function fetchLiveData() {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+
+        const [gamesRes, stadiumsRes] = await Promise.all([
+          fetch("https://worldcup26.ir/get/games", { signal: controller.signal, cache: "no-store" }),
+          fetch("https://worldcup26.ir/get/stadiums", { signal: controller.signal, cache: "no-store" }),
+        ]);
+
+        clearTimeout(timeout);
+
+        if (!gamesRes.ok || !stadiumsRes.ok) throw new Error("API response not OK");
+
+        const gData = await gamesRes.json();
+        const sData = await stadiumsRes.json();
+
+        setLiveGames(gData.games || []);
+        setLiveStadiums(sData.stadiums || []);
+      } catch {
+        // Fallback: load cached snapshot files from /public
+        try {
+          const [gFallback, sFallback] = await Promise.all([
+            fetch("/games_live.json").then(r => r.json()),
+            fetch("/stadiums_live.json").then(r => r.json()),
+          ]);
+          setLiveGames(gFallback.games || []);
+          setLiveStadiums(sFallback.stadiums || []);
+        } catch (e2) {
+          console.error("Failed to load games/stadiums from both API and fallback", e2);
+        }
+      }
+    }
+
+    fetchLiveData();
+  }, []);
 
   useEffect(() => {
     if (!isInitialized) {
@@ -247,6 +335,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   // Selection state for groups batch operations
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+
+  const [zoomScale, setZoomScale] = useState(85);
 
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [upgradeModalReason, setUpgradeModalReason] = useState<"plus" | "pro" | "credits" | "guest">("plus");
@@ -1952,7 +2042,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       const tAway = getTeam(m.awayCode);
 
                       const matchSuffix = parseInt(m.id.split("-")[1]);
-                      const details = getGroupMatchDetails(groupName, matchSuffix);
+                      const details = getGroupMatchDetails(groupName, matchSuffix, liveGames, liveStadiums);
 
                       return (
                         <div key={m.id} className="flex items-center justify-between text-xs py-2 border-b border-border last:border-0 hover:bg-black/5 dark:hover:bg-white/5 px-2 rounded-xl transition duration-200 gap-2">
@@ -2160,7 +2250,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
                 return (
                   <>
-                    <div className="flex justify-center">
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                       <button
                         onClick={handleAiPredictKnockoutsWithCredits}
                         className="flex items-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-6 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-neon shadow-neon"
@@ -2168,13 +2258,43 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                         <Sparkles className="h-4 w-4" />
                         Simulate Remaining Bracket
                       </button>
+
+                      {/* Zoom Controls */}
+                      <div className="flex items-center gap-2 bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 rounded-xl p-1 shrink-0">
+                        <button
+                          onClick={() => setZoomScale(prev => Math.max(50, prev - 10))}
+                          className="p-1.5 rounded-lg hover:bg-card dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                          title="Zoom Out"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <span className="text-xs font-mono font-bold w-12 text-center text-foreground">
+                          {zoomScale}%
+                        </span>
+                        <button
+                          onClick={() => setZoomScale(prev => Math.min(150, prev + 10))}
+                          className="p-1.5 rounded-lg hover:bg-card dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                          title="Zoom In"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setZoomScale(85)}
+                          className="text-[10px] font-bold px-2 py-1 rounded-md hover:bg-card dark:hover:bg-white/10 text-neon transition cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                      </div>
                     </div>
 
 
 
                     {/* Horizontal Scrollable Bracket Tree */}
                     <div className="w-full select-none border border-border dark:border-white/5 rounded-3xl bg-muted/40 dark:bg-black/20 p-2 md:p-4">
-                      <div className="flex gap-4 items-stretch w-full px-2 lg:px-4 py-4 overflow-x-auto scrollbar-custom min-h-[760px] lg:min-h-[820px]">
+                      <div 
+                        className="flex gap-4 items-stretch w-full px-2 lg:px-4 py-4 overflow-x-auto scrollbar-custom min-h-[760px] lg:min-h-[820px]"
+                        style={{ zoom: zoomScale / 100 }}
+                      >
 
                         {/* Far Left Column: Groups A-F */}
                         <div className="flex flex-col w-56 min-w-[224px] shrink-0 justify-between py-2 gap-2">

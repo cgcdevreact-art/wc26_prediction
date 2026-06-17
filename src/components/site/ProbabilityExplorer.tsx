@@ -109,7 +109,7 @@ export function ProbabilityExplorer() {
 
       <div className="mt-8 grid gap-5 lg:grid-cols-[280px_1fr] min-w-0">
         {/* Team list */}
-        <div className="glass rounded-2xl p-2 lg:max-h-[680px] lg:overflow-y-auto scrollbar-custom">
+        <div className="glass rounded-2xl p-2 lg:max-h-[920px] lg:overflow-y-auto scrollbar-custom">
           <div className="grid grid-cols-3 gap-1 lg:grid-cols-1">
             {sortedTeams.map((t) => {
               const active = t.code === code;
@@ -166,21 +166,21 @@ export function ProbabilityExplorer() {
 
                 {/* Core Attributes Mini Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                  <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">FIFA Elo Rating</span>
                     <span className="text-xl font-bold font-mono text-foreground mt-1 block">{Math.round(team.elo)}</span>
                   </div>
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                  <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Power Index</span>
                     <span className="text-xl font-bold font-mono text-foreground mt-1 block">{team.power || 70}</span>
                   </div>
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                  <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Squad Value</span>
                     <span className="text-xl font-bold font-mono text-foreground mt-1 block">
                       {team.squadValueM ? `€${team.squadValueM}M` : "N/A"}
                     </span>
                   </div>
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 hover:border-white/10 transition-colors">
+                  <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Top Player</span>
                     <span className="text-xs font-bold text-neon mt-1.5 block truncate" title={getTopPlayer(team.code)}>
                       {getTopPlayer(team.code)}
@@ -190,7 +190,7 @@ export function ProbabilityExplorer() {
               </div>
 
               {/* Circular Gauge for Champion Probability */}
-              <div className="flex flex-col items-center justify-center bg-white/[0.02] border border-white/10 rounded-2xl p-6 min-w-[200px] text-center shadow-glass relative group overflow-hidden">
+              <div className="flex flex-col items-center justify-center bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/10 rounded-2xl p-6 min-w-[200px] text-center shadow-glass relative group overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent to-neon/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-extrabold relative z-10">
                   Championship Prob
@@ -202,7 +202,7 @@ export function ProbabilityExplorer() {
                       cx="56"
                       cy="56"
                       r="46"
-                      stroke="rgba(255,255,255,0.04)"
+                      stroke="var(--color-border)"
                       strokeWidth="8"
                       fill="transparent"
                     />
@@ -249,8 +249,8 @@ export function ProbabilityExplorer() {
                     key={s.key} 
                     className={`border rounded-2xl p-3.5 transition-all duration-300 relative overflow-hidden group ${
                       active 
-                        ? "bg-white/[0.02] border-white/10 hover:border-neon/30 hover:bg-white/[0.04]" 
-                        : "bg-black/[0.1] border-white/5 opacity-30"
+                        ? "bg-muted/60 dark:bg-white/[0.04] border-border dark:border-white/10 hover:border-neon/30 hover:bg-muted dark:hover:bg-white/[0.06]" 
+                        : "bg-muted/30 dark:bg-black/[0.1] border-border/50 dark:border-white/5 opacity-40"
                     }`}
                   >
                     <div className="absolute top-0 right-0 w-8 h-8 -mr-2 -mt-2 bg-gradient-to-br from-neon/10 to-transparent rounded-full filter blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -269,7 +269,7 @@ export function ProbabilityExplorer() {
                       {pct.toFixed(1)}%
                     </div>
                     
-                    <div className="mt-3 h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div className="mt-3 h-1 bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-1000 ease-out"
                         style={{ 

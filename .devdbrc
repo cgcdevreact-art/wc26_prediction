@@ -1,0 +1,6 @@
+[
+  {
+    "type": "sqlite",
+    "path": "/Users/bosana/fifa-prediction/next-app/prisma/dev.db"
+  }
+]
