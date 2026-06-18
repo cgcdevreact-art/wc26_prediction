@@ -1,0 +1,10 @@
+{
+  "build": {
+    "env": {
+      "DATABASE_URL": "mysql://root:password@localhost:3306/placeholder"
+    }
+  },
+  "env": {
+    "DATABASE_URL": "mysql://root:password@localhost:3306/placeholder"
+  }
+}
