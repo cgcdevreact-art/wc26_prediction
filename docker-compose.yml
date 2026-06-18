@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: wc26_prediction_app
+    container_name: wc26_prediction_staging_app
     restart: unless-stopped
     ports:
       - "4000:3000"

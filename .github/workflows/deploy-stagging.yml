@@ -32,8 +32,14 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            mkdir -p /home/ubuntu/wc26_prediction/main
+            mkdir -p /home/ubuntu/wc26_prediction/staging
+            mkdir -p /home/ubuntu/wc26_prediction/staging/prisma
             mkdir -p /home/ubuntu/wc26_prediction/backups
+
+            if [ ! -f /home/ubuntu/wc26_prediction/staging/.env ] && [ -f /home/ubuntu/wc26_prediction/main/.env ]; then
+              cp /home/ubuntu/wc26_prediction/main/.env /home/ubuntu/wc26_prediction/staging/.env
+              echo "Copied existing .env from main to staging."
+            fi
 
       - name: Backup server database before file sync
         uses: appleboy/ssh-action@v1.0.3
@@ -44,7 +50,7 @@ jobs:
           script: |
             set -e
 
-            cd /home/ubuntu/wc26_prediction/main
+            cd /home/ubuntu/wc26_prediction/staging
 
             if [ -f prisma/dev.db ]; then
               backup="/home/ubuntu/wc26_prediction/backups/dev-before-sync-$(date +%Y%m%d-%H%M%S).db"
@@ -61,7 +67,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: "."
-          target: "/home/ubuntu/wc26_prediction/main"
+          target: "/home/ubuntu/wc26_prediction/staging"
           overwrite: true
 
       - name: Deploy application
@@ -75,7 +81,7 @@ jobs:
           script: |
             set -e
 
-            cd /home/ubuntu/wc26_prediction/main
+            cd /home/ubuntu/wc26_prediction/staging
 
             echo "================================="
             echo "Current directory:"
@@ -83,7 +89,7 @@ jobs:
             echo "================================="
 
             if [ ! -f .env ]; then
-              echo "ERROR: .env file is missing at /home/ubuntu/wc26_prediction/main/.env"
+              echo "ERROR: .env file is missing at /home/ubuntu/wc26_prediction/staging/.env"
               echo "Create it on the server before deploying."
               exit 1
             fi
@@ -96,11 +102,25 @@ jobs:
 
             echo ""
             echo "Docker compose configuration:"
-            docker compose -p main config
+            docker compose -p wc26-staging config
+
+            echo ""
+            echo "Stopping legacy manually-created staging container if it exists..."
+            docker stop wc26_prediction_app || true
+
+            echo ""
+            echo "Migrating existing SQLite DB from old main path on first staging deploy..."
+            mkdir -p prisma
+            if [ ! -f prisma/dev.db ] && [ -f /home/ubuntu/wc26_prediction/main/prisma/dev.db ]; then
+              cp /home/ubuntu/wc26_prediction/main/prisma/dev.db prisma/dev.db
+              echo "Copied existing SQLite DB from main to staging after stopping legacy container."
+            else
+              echo "Staging DB already exists, or no legacy DB exists. No DB migration needed."
+            fi
 
             echo ""
             echo "Stopping only wc26 staging containers..."
-            docker compose -p main stop app || true
+            docker compose -p wc26-staging stop app || true
 
             echo ""
             echo "Backing up SQLite DB after app stop..."
@@ -115,11 +135,15 @@ jobs:
 
             echo ""
             echo "Removing only wc26 staging containers..."
-            docker compose -p main down --remove-orphans || true
+            docker compose -p wc26-staging down --remove-orphans || true
+
+            echo ""
+            echo "Removing legacy manually-created staging container if it exists..."
+            docker rm -f wc26_prediction_app || true
 
             echo ""
             echo "Removing stopped wc26 staging containers..."
-            docker compose -p main rm -f || true
+            docker compose -p wc26-staging rm -f || true
 
             echo ""
             echo "Cleaning unused Docker resources and build cache..."
@@ -127,11 +151,11 @@ jobs:
 
             echo ""
             echo "Building Docker image..."
-            DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain docker compose -p main build --pull --progress=plain
+            DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain docker compose -p wc26-staging build --pull --progress=plain
 
             echo ""
             echo "Starting fresh wc26 staging containers..."
-            docker compose -p main up -d --force-recreate --remove-orphans
+            docker compose -p wc26-staging up -d --force-recreate --remove-orphans
 
             echo ""
             echo "Waiting for startup..."
@@ -139,11 +163,11 @@ jobs:
 
             echo ""
             echo "Compose status:"
-            docker compose -p main ps
+            docker compose -p wc26-staging ps
 
             echo ""
             echo "Recent container logs:"
-            docker compose -p main logs --tail=80
+            docker compose -p wc26-staging logs --tail=80
 
             echo ""
             echo "Running containers:"

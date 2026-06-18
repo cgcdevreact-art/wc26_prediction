@@ -50,7 +50,7 @@ That creates the SQLite tables from `prisma/schema.prisma`.
 Place `.env` in the project root, next to `docker-compose.yml`:
 
 ```txt
-/home/ubuntu/wc26_prediction/main/.env
+/home/ubuntu/wc26_prediction/staging/.env
 ```
 
 Expected variables from the developer:
@@ -101,20 +101,34 @@ The SQLite database file is:
 
 Because `./prisma` is bind-mounted, this file is part of the server directory and can be backed up or synced with your normal deployment/backup process.
 
-For staging CI/CD, the workflow preserves the server-side `.env` and SQLite DB. It removes any repository `prisma/dev.db` from the deploy payload before copying files, then stores DB backups under:
+For staging CI/CD, the workflow deploys to:
+
+```txt
+/home/ubuntu/wc26_prediction/staging
+```
+
+It uses this Docker Compose project name:
+
+```txt
+wc26-staging
+```
+
+The workflow preserves the server-side `.env` and SQLite DB. It removes any repository `prisma/dev.db` from the deploy payload before copying files, then stores DB backups under:
 
 ```txt
 /home/ubuntu/wc26_prediction/backups
 ```
 
-Normal rebuilds should not delete data because the DB file lives on the server at `./prisma/dev.db`, outside the rebuilt image.
+Normal rebuilds should not delete data because the DB file lives on the server at `/home/ubuntu/wc26_prediction/staging/prisma/dev.db`, outside the rebuilt image.
+
+For the first staging CI/CD run, if `/home/ubuntu/wc26_prediction/staging/.env` or `/home/ubuntu/wc26_prediction/staging/prisma/dev.db` do not exist yet, the workflow copies them from the old manual path under `/home/ubuntu/wc26_prediction/main` when available.
 
 ## Fresh Database Setup
 
 If you do not want to use any existing SQLite database, remove `prisma/dev.db` before starting the container:
 
 ```bash
-cd /home/ubuntu/wc26_prediction/main
+cd /home/ubuntu/wc26_prediction/staging
 rm -f prisma/dev.db
 docker compose up -d --build
 ```
