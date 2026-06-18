@@ -6,6 +6,15 @@ on:
       - staging
 
   workflow_dispatch:
+    inputs:
+      reset_database:
+        description: "Reset staging SQLite DB before deploy"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
   stagging_deploy:
@@ -17,9 +26,9 @@ jobs:
       SERVER_USER: ${{ secrets.SERVER_USER }}
       SERVER_SSH_KEY_stagging: ${{ secrets.SERVER_SSH_KEY_stagging }}
       SERVER_DIR: /home/ubuntu/wc26_prediction/staging
-      LEGACY_DIR: /home/ubuntu/wc26_prediction/main
       BACKUP_DIR: /home/ubuntu/wc26_prediction/backups
       COMPOSE_PROJECT: wc26-staging
+      RESET_DATABASE: ${{ github.event.inputs.reset_database || 'false' }}
 
     steps:
       - name: Checkout repository
@@ -85,11 +94,6 @@ jobs:
             mkdir -p '$SERVER_DIR'
             mkdir -p '$SERVER_DIR/prisma'
             mkdir -p '$BACKUP_DIR'
-
-            if [ ! -f '$SERVER_DIR/.env' ] && [ -f '$LEGACY_DIR/.env' ]; then
-              cp '$LEGACY_DIR/.env' '$SERVER_DIR/.env'
-              echo 'Copied existing .env from legacy main path to staging.'
-            fi
           "
 
       - name: Backup server database before file sync
@@ -153,18 +157,12 @@ jobs:
             docker compose -p '$COMPOSE_PROJECT' config
 
             echo ''
-            echo 'Stopping legacy manually-created staging container if it exists...'
-            docker stop wc26_prediction_app || true
+            echo 'Removing old manually-created staging container if it exists...'
+            docker rm -f wc26_prediction_app || true
 
             echo ''
-            echo 'Migrating existing SQLite DB from old main path on first staging deploy...'
+            echo 'Preparing staging SQLite DB...'
             mkdir -p prisma
-            if [ ! -f prisma/dev.db ] && [ -f '$LEGACY_DIR/prisma/dev.db' ]; then
-              cp '$LEGACY_DIR/prisma/dev.db' prisma/dev.db
-              echo 'Copied existing SQLite DB from legacy main path to staging after stopping legacy container.'
-            else
-              echo 'Staging DB already exists, or no legacy DB exists. No DB migration needed.'
-            fi
 
             echo ''
             echo 'Stopping only wc26 staging containers...'
@@ -181,13 +179,18 @@ jobs:
               echo 'No existing prisma/dev.db found after app stop. Fresh DB will be created on startup.'
             fi
 
+            if [ '$RESET_DATABASE' = 'true' ]; then
+              echo ''
+              echo 'RESET_DATABASE=true; removing staging SQLite DB so Prisma creates a fresh one.'
+              rm -f prisma/dev.db prisma/dev.db-journal prisma/dev.db-wal prisma/dev.db-shm
+            else
+              echo ''
+              echo 'RESET_DATABASE=false; preserving existing staging SQLite DB.'
+            fi
+
             echo ''
             echo 'Removing only wc26 staging containers...'
             docker compose -p '$COMPOSE_PROJECT' down --remove-orphans || true
-
-            echo ''
-            echo 'Removing legacy manually-created staging container if it exists...'
-            docker rm -f wc26_prediction_app || true
 
             echo ''
             echo 'Removing stopped wc26 staging containers...'

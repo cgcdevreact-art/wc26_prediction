@@ -93,6 +93,8 @@ Optional features need these only if you use them:
 
 Note: the Docker build stage sets a dummy `STRIPE_SECRET_KEY` only so Next.js can compile API routes that import Stripe. At runtime, the real value still comes from `.env`.
 
+The final runtime image also runs `npx prisma generate` after copying `prisma/schema.prisma`. This is required because production dependencies are installed before the schema is copied, and `@prisma/client` must be generated inside the final image.
+
 ## Database Notes
 
 The SQLite database file is:
@@ -123,7 +125,9 @@ The workflow preserves the server-side `.env` and SQLite DB. It removes any repo
 
 Normal rebuilds should not delete data because the DB file lives on the server at `/home/ubuntu/wc26_prediction/staging/prisma/dev.db`, outside the rebuilt image.
 
-For the first staging CI/CD run, if `/home/ubuntu/wc26_prediction/staging/.env` or `/home/ubuntu/wc26_prediction/staging/prisma/dev.db` do not exist yet, the workflow copies them from the old manual path under `/home/ubuntu/wc26_prediction/main` when available.
+For a new staging setup, create `/home/ubuntu/wc26_prediction/staging/.env` on the server before deploying. If `/home/ubuntu/wc26_prediction/staging/prisma/dev.db` does not exist, the container creates a fresh SQLite DB on startup.
+
+The manual GitHub Actions dispatch includes a `reset_database` option. Keep it `false` for normal deploys. Set it to `true` only when you intentionally want to delete the staging SQLite DB and recreate it from the current Prisma schema.
 
 Do not use `prisma db push --accept-data-loss` on the live DB unless you have intentionally decided to drop the warned tables/columns and have a verified backup.
 
