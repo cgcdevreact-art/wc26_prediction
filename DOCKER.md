@@ -101,6 +101,14 @@ The SQLite database file is:
 
 Because `./prisma` is bind-mounted, this file is part of the server directory and can be backed up or synced with your normal deployment/backup process.
 
+For staging CI/CD, the workflow preserves the server-side `.env` and SQLite DB. It removes any repository `prisma/dev.db` from the deploy payload before copying files, then stores DB backups under:
+
+```txt
+/home/ubuntu/wc26_prediction/backups
+```
+
+Normal rebuilds should not delete data because the DB file lives on the server at `./prisma/dev.db`, outside the rebuilt image.
+
 ## Fresh Database Setup
 
 If you do not want to use any existing SQLite database, remove `prisma/dev.db` before starting the container:

@@ -33,6 +33,26 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             mkdir -p /home/ubuntu/wc26_prediction/main
+            mkdir -p /home/ubuntu/wc26_prediction/backups
+
+      - name: Backup server database before file sync
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+
+            cd /home/ubuntu/wc26_prediction/main
+
+            if [ -f prisma/dev.db ]; then
+              backup="/home/ubuntu/wc26_prediction/backups/dev-before-sync-$(date +%Y%m%d-%H%M%S).db"
+              cp prisma/dev.db "$backup"
+              echo "SQLite DB backup created before sync: $backup"
+            else
+              echo "No existing prisma/dev.db found before sync. Fresh DB will be created on startup."
+            fi
 
       - name: Copy repository to server
         uses: appleboy/scp-action@v0.1.7
@@ -80,6 +100,21 @@ jobs:
 
             echo ""
             echo "Stopping only wc26 staging containers..."
+            docker compose -p main stop app || true
+
+            echo ""
+            echo "Backing up SQLite DB after app stop..."
+            mkdir -p /home/ubuntu/wc26_prediction/backups
+            if [ -f prisma/dev.db ]; then
+              backup="/home/ubuntu/wc26_prediction/backups/dev-after-stop-$(date +%Y%m%d-%H%M%S).db"
+              cp prisma/dev.db "$backup"
+              echo "SQLite DB backup created after app stop: $backup"
+            else
+              echo "No existing prisma/dev.db found after app stop. Fresh DB will be created on startup."
+            fi
+
+            echo ""
+            echo "Removing only wc26 staging containers..."
             docker compose -p main down --remove-orphans || true
 
             echo ""
