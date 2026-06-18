@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { Trophy, Menu, LogOut, Sun, Moon, ChevronDown, Check, Sparkles, Brain, Cpu, LayoutGrid, FolderKanban } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSimulationStore } from "@/lib/store/simulationStore";
 import { UpgradeModal } from "./UpgradeModal";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { buildAuthModalHref } from "@/lib/auth-modal";
 
 const NAV = [
   // { to: "/", label: "Home" },
@@ -23,6 +25,9 @@ const SIMULATOR_NAV = [
 export function Header() {
   const [open, setOpen] = useState(false);
   const { data: session } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   const { selectedModel, setSelectedModel } = useSimulationStore();
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
@@ -52,6 +57,23 @@ export function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const tier = session?.user?.subscriptionTier;
+    if (!tier) return;
+
+    if (tier === "pro") {
+      setSelectedModel("pro");
+      return;
+    }
+
+    if (tier === "plus") {
+      setSelectedModel("advanced");
+      return;
+    }
+
+    setSelectedModel("base");
+  }, [session?.user?.subscriptionTier, setSelectedModel]);
+
   const handleModelChange = (model: "base" | "advanced" | "pro") => {
     if (model === "base") {
       setSelectedModel("base");
@@ -77,6 +99,15 @@ export function Header() {
       }
       setSelectedModel("pro");
     }
+  };
+
+  const openAuthModal = (mode: "signin" | "signup" = "signin") => {
+    router.push(buildAuthModalHref({
+      pathname,
+      search: searchParams.toString(),
+      mode,
+      callbackUrl: pathname,
+    }));
   };
 
   return (
@@ -276,7 +307,7 @@ export function Header() {
             </div>
           ) : (
             <button
-              onClick={() => signIn()}
+              onClick={() => openAuthModal("signin")}
               className="ml-4 rounded-md bg-gradient-to-r from-neon to-neon-2 px-4 py-2 text-sm font-semibold text-background neon-border transition hover:opacity-90 animate-fade-in whitespace-nowrap"
             >
               Sign In
@@ -387,7 +418,10 @@ export function Header() {
             </div>
           ) : (
             <button
-              onClick={() => { signIn(); setOpen(false); }}
+              onClick={() => {
+                openAuthModal("signin");
+                setOpen(false);
+              }}
               className="mt-2 w-full rounded-md bg-gradient-to-r from-neon to-neon-2 py-2 text-center text-sm font-semibold text-background neon-border"
             >
               Sign In

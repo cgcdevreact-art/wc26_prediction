@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, Shield, Sparkles, Trophy, Lock } from "lucide-react";
+import { buildAuthModalHref } from "@/lib/auth-modal";
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -12,14 +14,12 @@ interface UpgradeModalProps {
 }
 
 export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   if (!isOpen) return null;
-  if (!mounted) return null;
+  if (typeof document === "undefined") return null;
 
   const getModalDetails = () => {
     switch (reason) {
@@ -55,6 +55,15 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
   };
 
   const details = getModalDetails();
+  const openAuthModal = () => {
+    onClose();
+    router.push(buildAuthModalHref({
+      pathname,
+      search: searchParams.toString(),
+      mode: "signup",
+      callbackUrl: pathname,
+    }));
+  };
 
   return createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto flex justify-center p-4">
@@ -120,13 +129,12 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
           {/* Action Buttons */}
           <div className="w-full flex flex-col gap-2.5">
             {reason === "guest" ? (
-              <Link
-                href="/signup"
-                onClick={onClose}
+              <button
+                onClick={openAuthModal}
                 className="w-full rounded-xl bg-gradient-to-r from-neon to-neon-2 py-3 text-sm font-bold text-background text-center shadow-lg transition duration-200 hover:opacity-90 active:scale-95 border border-neon/30"
               >
                 Create Free Account
-              </Link>
+              </button>
             ) : (
               <Link
                 href="/subscription"

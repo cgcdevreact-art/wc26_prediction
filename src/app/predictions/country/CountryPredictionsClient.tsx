@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useTheme } from "@/components/ThemeProvider";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { useSimulationStore, PlayerStats, TeamStats } from "@/lib/store/simulationStore";
 import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
@@ -11,7 +11,10 @@ import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, 
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { buildAuthModalHref } from "@/lib/auth-modal";
 
 // Poisson score generator
 function getPoisson(lambda: number) {
@@ -39,6 +42,9 @@ export default function CountryPredictionsClient({
   const GROUPS_CONFIG = useGroupsConfig();
   const { theme } = useTheme();
   const { data: session } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -59,6 +65,16 @@ export default function CountryPredictionsClient({
   const [isSimulating, setIsSimulating] = useState(false);
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
+  const formattedModelName = selectedModel ? selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1) : "";
+
+  const openAuthModal = (mode: "signin" | "signup" = "signin") => {
+    router.push(buildAuthModalHref({
+      pathname,
+      search: searchParams.toString(),
+      mode,
+      callbackUrl: pathname,
+    }));
+  };
 
   // Simulation results state
   const [simResults, setSimResults] = useState<{
@@ -445,13 +461,23 @@ export default function CountryPredictionsClient({
     }
   };
 
-  // Trigger confirmation popup whenever the selected country or the prediction model changes
+  const handleRunSimulationClick = () => {
+    if (!session) {
+      toast.error("Please sign in first to run a simulation.");
+      openAuthModal("signin");
+      return;
+    }
+
+    setShowConfirmPopup(true);
+    setSaveSuccess(false);
+  };
+
+  // Reset saved state whenever the selected country or prediction model changes
   useEffect(() => {
-    if (mounted && isInitialized) {
-      setShowConfirmPopup(true);
+    if (mounted) {
       setSaveSuccess(false);
     }
-  }, [selectedCode, selectedModel, mounted, isInitialized]);
+  }, [selectedCode, selectedModel, mounted]);
 
   // Sort and filter teams list in sidebar
   const sortedTeams = useMemo(() => {
@@ -516,49 +542,67 @@ export default function CountryPredictionsClient({
     };
   }, [selectedCode, players, selectedTeam]);
 
+  const squadTiers = useMemo(() => ([
+    { label: "Elite", count: squadStats.elite, color: "from-amber-400 via-yellow-400 to-lime-300" },
+    { label: "Very Strong", count: squadStats.veryStrong, color: "from-neon to-neon-2" },
+    { label: "Strong", count: squadStats.strong, color: "from-sky-500 to-cyan-400" },
+    { label: "Good/Average", count: squadStats.average + squadStats.weak, color: "from-slate-500 to-slate-400" },
+  ].map((tier) => ({
+    ...tier,
+    pct: squadStats.total > 0 ? Math.round((tier.count / squadStats.total) * 100) : 0,
+  }))), [squadStats]);
 
-  // Extract most likely path to success (most common opponent at each stage)
+  // Keep the compact path cards aligned with the showcased mock bracket.
   const pathStepInfo = useMemo(() => {
-    if (!simResults) return [];
+    if (!simResults?.mockTournament) return [];
+
     const stagesOrdered = [
-      { key: "group", label: "Group Stage" },
       { key: "r32", label: "Round of 32" },
       { key: "r16", label: "Round of 16" },
       { key: "qf", label: "Quarter Final" },
       { key: "sf", label: "Semi Final" },
       { key: "final", label: "Final" }
-    ];
+    ] as const;
 
-    return stagesOrdered.map((stage) => {
-      const opps = simResults.opponents[stage.key];
-      const items = Object.entries(opps).sort((a, b) => b[1].count - a[1].count);
-      const topOppEntry = items[0];
+    let currentCode = selectedCode;
 
-      if (!topOppEntry) {
-        return {
-          stage: stage.label,
-          opponent: null,
-          winPct: 0,
-          expectedScore: "-:-"
-        };
-      }
+    return stagesOrdered.flatMap((stage) => {
+      const stageMatches =
+        stage.key === "final"
+          ? simResults.mockTournament.final
+            ? [simResults.mockTournament.final]
+            : []
+          : simResults.mockTournament[stage.key] || [];
 
-      const oppCode = topOppEntry[0];
-      const stats = topOppEntry[1];
-      const opp = getTeam(oppCode);
+      const match = stageMatches.find(
+        (m: any) => m.home === currentCode || m.away === currentCode,
+      );
 
-      const winPct = Math.round((stats.wins / stats.count) * 100);
-      const avgGf = (stats.gfSum / stats.count).toFixed(1);
-      const avgGa = (stats.gaSum / stats.count).toFixed(1);
+      if (!match) return [];
 
-      return {
+      const isHome = match.home === currentCode;
+      const opponentCode = isHome ? match.away : match.home;
+      const opponent = getTeam(opponentCode);
+      const gf = isHome ? match.hs : match.as;
+      const ga = isHome ? match.as : match.hs;
+      const aggregateStats = simResults.opponents[stage.key]?.[opponentCode];
+      const winPct = aggregateStats
+        ? Math.round((aggregateStats.wins / aggregateStats.count) * 100)
+        : match.winner === currentCode
+          ? 100
+          : 0;
+
+      const step = {
         stage: stage.label,
-        opponent: opp,
+        opponent,
         winPct,
-        expectedScore: `${avgGf} - ${avgGa}`
+        expectedScore: `${gf} - ${ga}`,
       };
+
+      currentCode = match.winner;
+      return [step];
     });
-  }, [simResults]);
+  }, [selectedCode, simResults]);
 
   const selectedGroup = Object.entries(GROUPS_CONFIG).find(([_, list]) => list.includes(selectedCode))?.[0] || "-";
   const championProbability = simResults ? (simResults.stages.champion / 1000) * 100 : 0;
@@ -615,67 +659,102 @@ export default function CountryPredictionsClient({
           <div className="flex gap-3 shrink-0">
             <div className="flex flex-col items-end rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 shadow-sm dark:border-white/10 dark:bg-slate-950/60">
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Simulation Engine</span>
-              <span className="text-lg font-bold font-display text-cyan-700 dark:text-neon mt-0.5">{selectedModel}</span>
+              <span className="text-lg font-bold font-display text-cyan-700 dark:text-neon mt-0.5">{formattedModelName}</span>
             </div>
+            <button
+              onClick={handleRunSimulationClick}
+              disabled={isSimulating || !isInitialized}
+              className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 via-emerald-500 to-fuchsia-500 px-5 py-3 text-sm font-black text-white shadow-[0_16px_40px_rgba(14,165,233,0.2)] transition-all hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(14,165,233,0.28)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>{isSimulating ? "Running..." : "Run Simulation"}</span>
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr] mb-6">
+      <div className="mb-6 grid items-start gap-6 lg:grid-cols-[320px_1fr]">
         {/* Left list of countries: Futuristic Sidebar Control */}
-        <div className="rounded-[2rem] bg-white p-5 flex flex-col h-[750px] border border-slate-200 shadow-[0_18px_50px_rgba(15,23,42,0.08)] relative overflow-hidden dark:border-white/10 dark:bg-slate-900">
-          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent pointer-events-none z-10 dark:from-slate-900" />
-          
-          <div className="relative mb-5 group">
-            <Search className="absolute inset-y-0 left-3.5 h-4 w-4 my-auto text-muted-foreground group-focus-within:text-neon transition-colors" />
-            <Input
-              placeholder="Search country..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-11 border-slate-200 bg-slate-50 text-foreground text-sm focus-visible:ring-cyan-500 focus-visible:border-cyan-500 rounded-xl h-11 transition-all dark:border-white/10 dark:bg-white/5 dark:focus-visible:ring-neon dark:focus-visible:border-neon dark:focus-visible:bg-white/[0.08]"
-            />
-          </div>
-
-          <div className="flex-grow overflow-y-auto space-y-1.5 pr-1.5 scrollbar-custom pb-16">
-            {filteredTeams.map((t) => {
-              const active = t.code === selectedCode;
-              return (
-                <button
-                  key={t.code}
-                  onClick={() => setSelectedCode(t.code)}
-                  className={`w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${
-                    active
-                      ? "bg-gradient-to-r from-cyan-50 to-fuchsia-50 border-cyan-300 text-slate-950 shadow-[0_12px_30px_rgba(14,165,233,0.12)] font-bold dark:from-neon/10 dark:to-neon-2/10 dark:border-neon/30 dark:text-white dark:shadow-[0_0_15px_rgba(6,182,212,0.1)]"
-                      : "border-slate-200 bg-slate-50 text-muted-foreground hover:bg-slate-100 hover:text-slate-950 dark:border-white/5 dark:bg-white/[0.01] dark:hover:bg-white/5 dark:hover:text-white"
-                  }`}
-                >
-                  {active && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-cyan-500 to-fuchsia-500 dark:from-neon dark:to-neon-2" />
-                  )}
-                  <div className="flex items-center gap-3 min-w-0 z-10">
-                    <span className="text-2xl shrink-0 drop-shadow-md group-hover:scale-110 transition-transform duration-300 select-none">
-                      {t.flag}
-                    </span>
-                    <span className="truncate tracking-wide">{t.name}</span>
-                  </div>
-                  <div className="text-xs font-mono font-bold text-fuchsia-600 text-right z-10 opacity-90 dark:text-neon-2">
-                    {Math.round(t.elo)}
-                  </div>
-                </button>
-              );
-            })}
-            {filteredTeams.length === 0 && (
-              <div className="text-center py-12 text-xs text-muted-foreground">
-                No country matches &quot;{searchQuery}&quot;
+        <Accordion
+          type="multiple"
+          defaultValue={["country-list"]}
+          className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900"
+        >
+          <AccordionItem value="country-list" className="border-none data-[state=open]:flex data-[state=open]:flex-col data-[state=open]:lg:h-[920px]">
+            <AccordionTrigger className="shrink-0 px-5 pt-5 pb-3 hover:no-underline">
+              <div>
+                <div className="font-display text-lg font-bold text-foreground">Country Rankings</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Browse and simulate every national team</div>
               </div>
-            )}
-          </div>
-        </div>
+            </AccordionTrigger>
+            <AccordionContent className="min-h-0 flex-col px-5 pb-5 data-[state=open]:flex data-[state=open]:flex-1">
+              <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="relative mb-5 group">
+                  <Search className="absolute inset-y-0 left-3.5 h-4 w-4 my-auto text-muted-foreground group-focus-within:text-neon transition-colors" />
+                  <Input
+                    placeholder="Search country..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-11 border-slate-200 bg-slate-50 text-foreground text-sm focus-visible:ring-cyan-500 focus-visible:border-cyan-500 rounded-xl h-11 transition-all dark:border-white/10 dark:bg-white/5 dark:focus-visible:ring-neon dark:focus-visible:border-neon dark:focus-visible:bg-white/[0.08]"
+                  />
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1.5 scrollbar-custom pb-16">
+                  {filteredTeams.map((t) => {
+                    const active = t.code === selectedCode;
+                    return (
+                      <button
+                        key={t.code}
+                        onClick={() => setSelectedCode(t.code)}
+                        className={`w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${
+                          active
+                            ? "bg-gradient-to-r from-cyan-50 to-fuchsia-50 border-cyan-300 text-slate-950 shadow-[0_12px_30px_rgba(14,165,233,0.12)] font-bold dark:from-neon/10 dark:to-neon-2/10 dark:border-neon/30 dark:text-white dark:shadow-[0_0_15px_rgba(6,182,212,0.1)]"
+                            : "border-slate-200 bg-slate-50 text-muted-foreground hover:bg-slate-100 hover:text-slate-950 dark:border-white/5 dark:bg-white/[0.01] dark:hover:bg-white/5 dark:hover:text-white"
+                        }`}
+                      >
+                        {active && (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-cyan-500 to-fuchsia-500 dark:from-neon dark:to-neon-2" />
+                        )}
+                        <div className="flex items-center gap-3 min-w-0 z-10">
+                          <span className="text-2xl shrink-0 drop-shadow-md group-hover:scale-110 transition-transform duration-300 select-none">
+                            {t.flag}
+                          </span>
+                          <span className="truncate tracking-wide">{t.name}</span>
+                        </div>
+                        <div className="text-xs font-mono font-bold text-fuchsia-600 text-right z-10 opacity-90 dark:text-neon-2">
+                          {Math.round(t.elo)}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {filteredTeams.length === 0 && (
+                    <div className="text-center py-12 text-xs text-muted-foreground">
+                      No country matches &quot;{searchQuery}&quot;
+                    </div>
+                  )}
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
         {/* Right main analysis panel */}
         <div className="space-y-6 min-w-0">
           {/* Header Team info & progression stats: Premium glass card */}
-          <div className="rounded-[2.25rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] relative overflow-hidden dark:border-white/10 dark:bg-slate-900">
+          <Accordion
+            type="multiple"
+            defaultValue={["team-overview"]}
+            className="rounded-[2.25rem] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)] relative dark:border-white/10 dark:bg-slate-900"
+          >
+            <AccordionItem value="team-overview" className="border-none">
+              <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
+                <div>
+                  <div className="font-display text-xl font-extrabold text-foreground">Team Overview</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Profile, champion odds, and stage progression</div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-6 pb-6">
+            <div className="relative">
             <div className="absolute -right-16 -top-16 w-56 h-56 bg-emerald-100/70 rounded-full filter blur-3xl pointer-events-none dark:bg-neon/10" />
             <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-fuchsia-100/70 rounded-full filter blur-3xl pointer-events-none dark:bg-neon-2/10" />
             <div className="flex flex-col lg:flex-row justify-between items-stretch gap-6 border-b border-slate-200 pb-6 mb-6 dark:border-white/5">
@@ -730,7 +809,7 @@ export default function CountryPredictionsClient({
                         </button>
                       ) : (
                         <button
-                          onClick={() => signIn()}
+                          onClick={() => openAuthModal("signin")}
                           className="flex items-center gap-2 bg-gradient-to-r from-cyan-50 to-fuchsia-50 border border-cyan-300 hover:from-cyan-100 hover:to-fuchsia-100 text-slate-900 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 dark:from-neon/20 dark:to-neon-2/20 dark:border-neon/30 dark:hover:from-neon/30 dark:hover:to-neon-2/30 dark:text-white"
                         >
                           <User className="w-3.5 h-3.5 text-neon-2" />
@@ -819,7 +898,7 @@ export default function CountryPredictionsClient({
             </div>
 
             {/* Stages Progression Matrix */}
-            <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
               {stageCards.map((s) => {
                 const count = simResults?.stages[s.key] || 0;
                 const pct = (count / 1000) * 100;
@@ -827,55 +906,79 @@ export default function CountryPredictionsClient({
                 return (
                   <div 
                     key={s.key} 
-                    className={`border rounded-[1.75rem] p-3.5 transition-all duration-300 relative overflow-hidden group ${
+                    className={`relative flex min-h-[128px] flex-col rounded-[1.75rem] border p-4 transition-all duration-300 overflow-hidden group ${
                       active 
-                        ? "bg-slate-50 border-slate-200 hover:border-cyan-300 hover:bg-white dark:bg-white/[0.02] dark:border-white/10 dark:hover:border-neon/30 dark:hover:bg-white/[0.04]" 
-                        : "bg-slate-100 border-slate-200 opacity-50 dark:bg-black/[0.1] dark:border-white/5 dark:opacity-30"
+                        ? "border-slate-200 bg-white hover:border-cyan-300 dark:bg-white/[0.03] dark:border-white/10 dark:hover:border-neon/30 dark:hover:bg-white/[0.05]" 
+                        : "border-slate-200 bg-slate-50/80 dark:bg-black/[0.1] dark:border-white/5 opacity-60"
                     }`}
                   >
-                    <div className="absolute top-0 right-0 w-8 h-8 -mr-2 -mt-2 bg-gradient-to-br from-cyan-200/80 to-transparent rounded-full filter blur-md opacity-0 group-hover:opacity-100 transition-opacity dark:from-neon/10" />
+                    <div className="absolute top-0 right-0 h-8 w-8 -mr-2 -mt-2 rounded-full bg-gradient-to-br from-cyan-200/80 to-transparent opacity-0 blur-md transition-opacity group-hover:opacity-100 dark:from-neon/10" />
                     
-                    <div className="flex justify-between items-start gap-1">
-                      <span className="text-[9px] uppercase tracking-wider text-slate-700 dark:text-muted-foreground font-bold leading-tight">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-600 dark:text-muted-foreground leading-tight">
                         {s.label}
                       </span>
                       {s.icon === "🏆" ? (
-                        <Trophy className={`w-3.5 h-3.5 ${active ? "text-yellow-400" : "text-muted-foreground"}`} />
+                        <Trophy className={`h-4 w-4 shrink-0 ${active ? "text-yellow-500" : "text-muted-foreground"}`} />
                       ) : (
-                        <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-foreground/20">{s.icon}</span>
+                        <span className="shrink-0 text-[11px] font-mono font-bold text-slate-400 dark:text-foreground/25">{s.icon}</span>
                       )}
                     </div>
-                    <div className={`mt-2 text-xl font-black font-mono tabular-nums leading-none ${active ? "text-slate-950 dark:text-foreground" : "text-muted-foreground"}`}>
+
+                    <div className={`mt-5 text-[2rem] font-black font-mono tabular-nums leading-none ${active ? "text-slate-900 dark:text-foreground" : "text-slate-400 dark:text-muted-foreground"}`}>
                       {pct.toFixed(1)}%
                     </div>
                     
-                    <div className="mt-3 h-1 bg-slate-200 rounded-full overflow-hidden dark:bg-white/5">
-                      <div
-                        className="h-full rounded-full transition-all duration-1000 ease-out"
-                        style={{ 
-                          width: `${pct}%`,
-                          background: s.key === "champion" 
-                            ? "linear-gradient(90deg, #d4a109, #f4c430)" 
-                            : "linear-gradient(90deg, #0f8a4b, #b239d2)"
-                        }}
-                      />
+                    <div className="mt-auto pt-5">
+                      <div className="relative overflow-hidden rounded-full">
+                        <div
+                          className="h-2 w-full rounded-full"
+                          style={{
+                            background:
+                              s.key === "champion"
+                                ? "linear-gradient(90deg, rgba(212,161,9,0.22), rgba(244,196,48,0.26))"
+                                : "linear-gradient(90deg, rgba(15,138,69,0.22), rgba(178,57,210,0.24))",
+                          }}
+                        />
+                        <div
+                          className="absolute inset-y-0 left-0 rounded-full transition-all duration-1000 ease-out"
+                          style={{
+                            width: pct === 0 ? "0%" : `${pct}%`,
+                            background:
+                              s.key === "champion"
+                                ? "linear-gradient(90deg, #d4a109, #f4c430)"
+                                : "linear-gradient(90deg, #0f8a4b, #b239d2)",
+                            boxShadow:
+                              s.key === "champion"
+                                ? "0 0 16px rgba(244,196,48,0.28)"
+                                : "0 0 18px rgba(178,57,210,0.22)",
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-          </div>
+
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
           {/* Dual Charts Row */}
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid items-start gap-6 md:grid-cols-2">
             {/* Radar Attributes Card */}
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative overflow-hidden flex flex-col justify-between dark:border-white/10 dark:bg-slate-900">
-              <div>
-                <div className="flex justify-between items-center mb-6">
+            <Accordion type="multiple" defaultValue={["performance-attributes"]} className="rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="performance-attributes" className="border-none">
+                <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
                   <div>
-                    <h3 className="font-display font-bold text-lg text-foreground">Performance Attributes</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</p>
+                    <div className="font-display font-bold text-lg text-foreground">Performance Attributes</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</div>
                   </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-6 pb-6">
+                <div className="flex justify-end mb-6">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30">
                     Attributes
                   </span>
@@ -883,79 +986,77 @@ export default function CountryPredictionsClient({
                 <div className="h-64 flex items-center justify-center">
                   <ResponsiveContainer width="100%" height="100%">
                     <RadarChart data={radarData} outerRadius={85}>
-                      <PolarGrid stroke={activeTheme === "light" ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.08)"} />
+                      <PolarGrid stroke={activeTheme === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.14)"} />
                       <PolarAngleAxis dataKey="axis" tick={{ fill: activeTheme === "light" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.6)", fontSize: 10, fontFamily: "var(--font-display)" }} />
                       <Radar dataKey="v" stroke="var(--color-neon)" fill="var(--color-neon)" fillOpacity={activeTheme === "light" ? 0.35 : 0.2} />
                     </RadarChart>
                   </ResponsiveContainer>
                 </div>
-              </div>
-            </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
             {/* Squad Quality Tiers Card */}
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative overflow-hidden flex flex-col justify-between dark:border-white/10 dark:bg-slate-900">
-              <div>
-                <div className="flex justify-between items-center mb-6">
+            <Accordion type="multiple" defaultValue={["squad-quality"]} className="rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="squad-quality" className="border-none">
+                <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
                   <div>
-                    <h3 className="font-display font-bold text-lg text-foreground">Squad Quality Tiers</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</p>
+                    <div className="font-display font-bold text-lg text-foreground">Squad Quality Tiers</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</div>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-200 px-2 py-0.5 rounded-full dark:text-neon-2 dark:bg-neon-2/10 dark:border-neon-2/30">
+                </AccordionTrigger>
+                <AccordionContent className="px-6 pb-6">
+                <div className="flex justify-end mb-6">
+                  <span className="self-start rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-fuchsia-700 dark:border-neon-2/30 dark:bg-neon-2/10 dark:text-neon-2">
                     Squad Profile
                   </span>
                 </div>
-                
-                <div className="grid grid-cols-[100px_1fr] gap-6 items-center mt-4 h-52">
-                  {/* Large circular stat */}
-                  <div className="flex flex-col items-center justify-center bg-slate-50 border border-slate-200 rounded-[1.75rem] py-6 px-3 text-center h-full dark:bg-white/[0.02] dark:border-white/5">
-                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-bold">Avg Rating</span>
-                    <span className="text-3xl font-black text-foreground mt-2 font-mono">{squadStats.avgRating}%</span>
-                    <span className="text-[9px] text-neon mt-2 font-bold">{squadStats.total} Players</span>
+
+                <div className="mt-6 grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start">
+                  <div className="flex min-h-[220px] flex-col justify-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/5 dark:bg-white/[0.02]">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</span>
+                    <span className="mt-3 text-5xl font-black font-mono text-foreground">
+                      {squadStats.avgRating || "--"}
+                      {squadStats.avgRating ? <span className="text-2xl align-top">%</span> : null}
+                    </span>
+                    <span className="mt-4 text-sm font-semibold text-emerald-700 dark:text-neon">{squadStats.total} Players</span>
                   </div>
-                  
-                  {/* Horizontal Progress Bars */}
-                  <div className="space-y-4">
-                    {[
-                      { label: "Elite", count: squadStats.elite, color: "bg-cyan-400" },
-                      { label: "Very Strong", count: squadStats.veryStrong, color: "bg-purple-400" },
-                      { label: "Strong", count: squadStats.strong, color: "bg-amber-400" },
-                      { label: "Good/Average", count: squadStats.average + squadStats.weak, color: "bg-slate-400" },
-                    ].map((tier) => {
-                      const pct = squadStats.total > 0 ? (tier.count / squadStats.total) * 100 : 0;
-                      return (
-                        <div key={tier.label} className="space-y-1">
-                          <div className="flex justify-between text-[11px] font-bold">
-                            <span className="text-muted-foreground">{tier.label}</span>
-                            <span className="text-foreground font-mono">{tier.count} <span className="text-[9px] text-muted-foreground">({Math.round(pct)}%)</span></span>
-                          </div>
-                          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full ${tier.color} transition-all duration-500`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
+
+                  <div className="space-y-5">
+                    {squadTiers.map((tier) => (
+                      <div key={tier.label} className="grid grid-cols-[minmax(110px,140px)_minmax(0,1fr)_auto] items-center gap-4">
+                        <div className="text-sm font-semibold text-foreground">{tier.label}</div>
+                        <div className="h-4 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/8">
+                          <div
+                            className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
+                            style={{ width: `${Math.max(tier.pct, tier.count > 0 ? 4 : 0)}%` }}
+                          />
                         </div>
-                      );
-                    })}
+                        <div className="min-w-[72px] text-right font-mono text-sm font-bold tabular-nums text-foreground">
+                          {tier.count}
+                          <span className="ml-2 text-xs text-muted-foreground">({tier.pct}%)</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
 
-          <div className="rounded-[2rem] bg-white p-6 border border-slate-200 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative overflow-hidden dark:border-white/10 dark:bg-slate-900">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-slate-200 pb-5 mb-6 dark:border-white/5">
-              <div>
-                <h3 className="font-display font-bold text-xl text-foreground flex items-center gap-2">
-                  <TrendingUp className="text-cyan-600 dark:text-neon" />
-                  Expected Path to Glory
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Calculated dynamically from the most common matchups and scores across all simulations.
-                </p>
-              </div>
+          <Accordion type="multiple" defaultValue={["expected-path"]} className="rounded-[2rem] bg-white border border-slate-200 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
+            <AccordionItem value="expected-path" className="border-none">
+              <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
+                <div>
+                  <div className="font-display font-bold text-xl text-foreground">Expected Path to Glory</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Calculated dynamically from the most common matchups and scores across all simulations.</div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-6 pb-6">
+            <div className="flex justify-end border-b border-slate-200 pb-5 mb-6 dark:border-white/5">
               <div className="text-[10px] uppercase bg-cyan-50 border border-cyan-200 text-cyan-700 px-3.5 py-1.5 rounded-full font-bold self-start sm:self-auto shadow-sm dark:bg-neon/10 dark:border-neon/30 dark:text-neon">
-                Model: {selectedModel}
+                Model: {formattedModelName}
               </div>
             </div>
 
@@ -1028,24 +1129,24 @@ export default function CountryPredictionsClient({
                 </div>
               </div>
             )}
-          </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
       </div>
 
       {/* Redesigned Full Mock Tournament Bracket */}
-      <div className="w-full bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 md:p-8 overflow-hidden relative shadow-[0_18px_50px_rgba(15,23,42,0.08)] mt-8">
+      <Accordion type="multiple" defaultValue={["path-to-glory"]} className="w-full bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-[2rem] relative shadow-[0_18px_50px_rgba(15,23,42,0.08)] mt-8">
+        <AccordionItem value="path-to-glory" className="border-none">
+          <AccordionTrigger className="px-6 md:px-8 pt-6 md:pt-8 pb-3 hover:no-underline">
+            <div>
+              <div className="font-display font-extrabold text-2xl text-foreground dark:text-white tracking-tight">Path to Glory</div>
+              <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">Most likely path to lifting the trophy for {selectedTeam.name}</div>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-6 md:px-8 pb-6 md:pb-8">
+      <div className="relative">
         <div className="absolute right-0 top-0 w-96 h-96 bg-cyan-100/60 dark:bg-[#00c6ff]/5 rounded-full filter blur-3xl pointer-events-none" />
-        
-        <div className="border-b border-border dark:border-white/10 pb-5 mb-8 relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h3 className="font-display font-extrabold text-2xl text-foreground dark:text-white tracking-tight">
-              Path to Glory
-            </h3>
-            <p className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">
-              Most likely path to lifting the trophy for {selectedTeam.name}
-            </p>
-          </div>
-        </div>
 
         {simResults?.mockTournament && (
           <div className="w-full overflow-x-auto scrollbar-custom pb-8 relative z-10">
@@ -1289,6 +1390,9 @@ export default function CountryPredictionsClient({
           </div>
         )}
       </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {/* Confirmation Dialog: Futuristic Styled Modal */}
       <Dialog open={showConfirmPopup} onOpenChange={(open) => {

@@ -14,8 +14,15 @@ const PATH_TO_FINAL = [
   { stage: "Semi Final", opp: "France", winPct: 47 },
   { stage: "Final", opp: "Argentina", winPct: 44 },
 ];
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from "recharts";
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { ChevronRight, Trophy, Sparkles } from "lucide-react";
+
+type PlayerRecord = {
+  "Team Code"?: string;
+  "Player Name"?: string;
+  "Name on Shirt"?: string;
+  "Overall Rating"?: string;
+};
 
 const stages = [
   { key: "qualify", label: "Group Stage", icon: "G" },
@@ -34,7 +41,7 @@ export function ProbabilityExplorer() {
   const router = useRouter();
   const [code, setCode] = useState("BRA");
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [players, setPlayers] = useState<any[]>([]);
+  const [players, setPlayers] = useState<PlayerRecord[]>([]);
 
   useEffect(() => {
     fetch("/players.json")
@@ -44,6 +51,7 @@ export function ProbabilityExplorer() {
   }, []);
 
   const team = teams.find((t) => t.code === code) || teams[0];
+  const teamGroup = Object.entries(groupsConfig).find((entry) => entry[1].includes(team.code))?.[0] || "-";
 
   const getTopPlayer = (teamCode: string) => {
     if (!players || players.length === 0) return "Loading...";
@@ -73,14 +81,43 @@ export function ProbabilityExplorer() {
     { axis: "Elo", v: Math.round(((team.elo || 1500) - 1300) / 6) },
   ]), [team]);
 
-  const trend = useMemo(() => ([
-    { m: "Jan", v: Math.max(2, team.prob.champion - 5) },
-    { m: "Feb", v: Math.max(2, team.prob.champion - 4) },
-    { m: "Mar", v: Math.max(2, team.prob.champion - 2.5) },
-    { m: "Apr", v: Math.max(2, team.prob.champion - 1) },
-    { m: "May", v: team.prob.champion + 0.5 },
-    { m: "Now", v: team.prob.champion },
-  ]), [team]);
+  const squadQuality = useMemo(() => {
+    const teamPlayers = players
+      .filter((player: PlayerRecord) => player["Team Code"] === team.code)
+      .map((player: PlayerRecord) => ({
+        ...player,
+        rating: parseInt(player["Overall Rating"]?.replace("%", "") || "0", 10),
+      }))
+      .filter((player) => Number.isFinite(player.rating) && player.rating > 0);
+
+    const tiers = [
+      { label: "Elite", min: 90, max: 100, color: "from-amber-400 via-yellow-400 to-lime-300" },
+      { label: "Very Strong", min: 85, max: 89, color: "from-neon to-neon-2" },
+      { label: "Strong", min: 80, max: 84, color: "from-sky-500 to-cyan-400" },
+      { label: "Good/Average", min: 0, max: 79, color: "from-slate-500 to-slate-400" },
+    ] as const;
+
+    const total = teamPlayers.length;
+    const averageRating = total
+      ? Math.round(teamPlayers.reduce((sum, player) => sum + player.rating, 0) / total)
+      : 0;
+
+    return {
+      total,
+      averageRating,
+      tiers: tiers.map((tier) => {
+        const count = teamPlayers.filter(
+          (player) => player.rating >= tier.min && player.rating <= tier.max,
+        ).length;
+
+        return {
+          ...tier,
+          count,
+          percentage: total ? Math.round((count / total) * 100) : 0,
+        };
+      }),
+    };
+  }, [players, team.code]);
 
   const handleSimulationClick = () => {
     if (session) {
@@ -109,7 +146,7 @@ export function ProbabilityExplorer() {
 
       <div className="mt-8 grid gap-5 lg:grid-cols-[280px_1fr] min-w-0">
         {/* Team list */}
-        <div className="glass rounded-2xl p-2 lg:max-h-[920px] lg:overflow-y-auto scrollbar-custom">
+        <div className="glass rounded-2xl p-2 lg:max-h-[990px] lg:overflow-y-auto scrollbar-custom">
           <div className="grid grid-cols-3 gap-1 lg:grid-cols-1">
             {sortedTeams.map((t) => {
               const active = t.code === code;
@@ -119,8 +156,8 @@ export function ProbabilityExplorer() {
                   onClick={() => setCode(t.code)}
                   className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${
                     active
-                      ? "bg-gradient-to-r from-neon/10 to-neon-2/10 border-neon/30 text-white font-bold"
-                      : "border-transparent bg-transparent hover:bg-white/5 text-muted-foreground hover:text-white"
+                      ? "bg-gradient-to-r from-neon/10 to-neon-2/10 border-neon/25 text-foreground font-bold shadow-[0_10px_30px_-20px_color-mix(in_oklab,var(--color-neon)_65%,transparent)]"
+                      : "border-transparent bg-transparent text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
                   }`}
                 >
                   {active && (
@@ -155,7 +192,7 @@ export function ProbabilityExplorer() {
                       <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-extrabold flex items-center gap-1.5">
                         <span>FIFA Rank #{team.rank}</span>
                         <span className="text-white/20">&bull;</span>
-                        <span className="text-neon-2">Group {Object.entries(groupsConfig).find(([_, list]) => list.includes(team.code))?.[0] || "-"}</span>
+                        <span className="text-neon-2">Group {teamGroup}</span>
                       </div>
                       <h2 className="text-4xl font-extrabold font-display text-foreground mt-1 tracking-tight">
                         {team.name}
@@ -242,7 +279,7 @@ export function ProbabilityExplorer() {
             {/* Stages Progression Matrix */}
             <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
               {stages.map((s) => {
-                const pct = (team.prob as any)[s.key] as number;
+                const pct = team.prob[s.key as keyof typeof team.prob] as number;
                 const active = pct > 0;
                 return (
                   <div 
@@ -295,33 +332,59 @@ export function ProbabilityExplorer() {
               <div className="h-60">
                 <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <RadarChart data={radar} outerRadius={75}>
-                    <PolarGrid stroke="rgba(255,255,255,0.1)" />
+                    <PolarGrid
+                      stroke="color-mix(in oklab, var(--color-foreground) 20%, transparent)"
+                    />
                     <PolarAngleAxis dataKey="axis" tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }} />
-                    <Radar dataKey="v" stroke="var(--color-neon)" fill="var(--color-neon)" fillOpacity={0.35} />
+                    <Radar
+                      dataKey="v"
+                      stroke="var(--color-neon)"
+                      fill="var(--color-neon)"
+                      fillOpacity={0.28}
+                    />
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
             </div>
             <div className="glass rounded-2xl p-5 min-w-0 overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div className="font-display text-lg font-semibold">Probability Trend</div>
-                <div className="text-xs text-muted-foreground">Last 6 months</div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="font-display text-lg font-semibold">Squad Quality Tiers</div>
+                  <div className="text-xs text-muted-foreground">Distribution of squad players across rating tiers</div>
+                </div>
+                <div className="self-start rounded-full border border-neon-2/30 bg-neon-2/8 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-neon-2">
+                  Squad Profile
+                </div>
               </div>
-              <div className="h-60">
-                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                  <AreaChart data={trend}>
-                    <defs>
-                      <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--color-neon)" stopOpacity={0.6} />
-                        <stop offset="100%" stopColor="var(--color-neon)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="m" tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis hide />
-                    <Tooltip contentStyle={{ background: "var(--color-popover)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12 }} formatter={(v: any) => [`${Number(v).toFixed(1)}%`, "Champion %"]} />
-                    <Area dataKey="v" stroke="var(--color-neon)" strokeWidth={2} fill="url(#trendFill)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+              <div className="mt-6 grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start">
+                <div className="flex min-h-[220px] flex-col justify-center rounded-[2rem] border border-border bg-muted/45 p-6 text-center shadow-glass">
+                  <div className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</div>
+                  <div className="mt-3 text-5xl font-black font-mono text-foreground">
+                    {squadQuality.averageRating || "--"}
+                    {squadQuality.averageRating ? <span className="text-2xl align-top">%</span> : null}
+                  </div>
+                  <div className="mt-4 text-sm font-semibold text-neon">
+                    {squadQuality.total} Players
+                  </div>
+                </div>
+
+                <div className="space-y-5">
+                  {squadQuality.tiers.map((tier) => (
+                    <div key={tier.label} className="grid grid-cols-[minmax(110px,140px)_minmax(0,1fr)_auto] items-center gap-4">
+                      <div className="text-sm font-semibold text-foreground">{tier.label}</div>
+                      <div className="h-4 rounded-full bg-black/6 dark:bg-white/8 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
+                          style={{ width: `${Math.max(tier.percentage, tier.count > 0 ? 4 : 0)}%` }}
+                        />
+                      </div>
+                      <div className="min-w-[72px] text-right font-mono text-sm font-bold tabular-nums text-foreground">
+                        {tier.count}
+                        <span className="ml-2 text-xs text-muted-foreground">({tier.percentage}%)</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

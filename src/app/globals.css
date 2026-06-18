@@ -202,6 +202,17 @@
   background: var(--gradient-hero);
 }
 
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+@utility animate-accordion-down { animation: accordion-down 0.3s ease-out forwards; }
+@utility animate-accordion-up { animation: accordion-up 0.3s ease-out forwards; }
+
 @keyframes float-slow {
   0%, 100% { transform: translateY(0) }
   50% { transform: translateY(-12px) }

@@ -3,14 +3,15 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
 import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus } from "lucide-react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { StaminaBar, AlignmentGauge, TemperatureSlider } from "@/components/ui/SciFiControls";
 import { useSimulationStore } from "@/lib/store/simulationStore";
 import { toast } from "sonner";
 import { getMatchExpectedGoals } from "@/lib/simulation/model";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { UpgradeModal } from "./UpgradeModal";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { buildAuthModalHref } from "@/lib/auth-modal";
 
 interface PredictorMatch {
   id: string; // group-X-index
@@ -262,11 +263,22 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const getTeam = (code: string) => teams.find(t => t.code === code) || teams[0];
   const { data: session } = useSession();
   const { players, isInitialized, initializeData, selectedModel } = useSimulationStore();
+  const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // ─── Live data from worldcup26.ir ───
   const [liveGames, setLiveGames] = useState<any[]>([]);
   const [liveStadiums, setLiveStadiums] = useState<any[]>([]);
+
+  const openAuthModal = (mode: "signin" | "signup" = "signin") => {
+    router.push(buildAuthModalHref({
+      pathname,
+      search: searchParams.toString(),
+      mode,
+      callbackUrl: pathname,
+    }));
+  };
 
   useEffect(() => {
     // Fetch games + stadiums from worldcup26.ir live API.
@@ -797,7 +809,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     return;
   };
 
-  // Save predictions in bulk (AI/randomized fills)
+
   const saveBulkToDb = async (
     updatedMatches: PredictorMatch[],
     updatedKoWinners?: typeof koWinners,
@@ -1704,7 +1716,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             </p>
           </div>
           <button
-            onClick={() => signIn()}
+            onClick={() => openAuthModal("signin")}
             className="rounded-lg bg-green-600 dark:bg-green-400 text-white dark:text-green-950 px-4 py-2 text-xs font-bold hover:bg-green-700 dark:hover:bg-green-300 transition w-full sm:w-auto shrink-0"
           >
             Sign In / Sign Up
