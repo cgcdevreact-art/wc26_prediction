@@ -60,7 +60,7 @@ function SignInContent() {
               </span>
               <h1 className="text-2xl font-bold tracking-tight text-foreground">Welcome Back</h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Sign in to your account to save predictions and climb the leaderboard.
+                Sign in to your account to save predictions.
               </p>
             </div>
 
