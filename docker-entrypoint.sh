@@ -5,6 +5,11 @@ if [ -n "$DATABASE_URL" ]; then
   case "$DATABASE_URL" in
     file:*)
       mkdir -p /app/prisma
+      db_path="${DATABASE_URL#file:}"
+      case "$db_path" in
+        /*) sqlite_path="$db_path" ;;
+        *) sqlite_path="/app/prisma/$db_path" ;;
+      esac
       ;;
     *)
       echo "Waiting for database..."
@@ -14,8 +19,15 @@ if [ -n "$DATABASE_URL" ]; then
       ;;
   esac
 
-  echo "Applying Prisma schema..."
-  npx prisma db push
+  if [ "${RUN_PRISMA_DB_PUSH:-}" = "true" ]; then
+    echo "RUN_PRISMA_DB_PUSH=true; applying Prisma schema..."
+    npx prisma db push
+  elif [ -n "${sqlite_path:-}" ] && [ ! -f "$sqlite_path" ]; then
+    echo "SQLite database not found at $sqlite_path; creating schema..."
+    npx prisma db push
+  else
+    echo "Existing database detected; skipping Prisma db push to avoid data loss."
+  fi
 fi
 
 exec "$@"

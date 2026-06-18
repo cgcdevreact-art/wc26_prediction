@@ -37,13 +37,15 @@ docker compose up -d --build
 
 The app will be available on `http://localhost:4000`.
 
-On first boot, the app container uses `.env`, ensures `/app/prisma` exists, and runs:
+On first boot, the app container uses `.env`, ensures `/app/prisma` exists, and creates the schema only if the SQLite database file does not already exist:
 
 ```bash
 npx prisma db push
 ```
 
-That creates the SQLite tables from `prisma/schema.prisma`.
+That creates the SQLite tables from `prisma/schema.prisma` for a fresh DB.
+
+If `prisma/dev.db` already exists, startup skips `prisma db push` to avoid destructive schema changes such as dropping non-empty tables that are not present in the current Prisma schema.
 
 ## Required `.env`
 
@@ -122,6 +124,8 @@ The workflow preserves the server-side `.env` and SQLite DB. It removes any repo
 Normal rebuilds should not delete data because the DB file lives on the server at `/home/ubuntu/wc26_prediction/staging/prisma/dev.db`, outside the rebuilt image.
 
 For the first staging CI/CD run, if `/home/ubuntu/wc26_prediction/staging/.env` or `/home/ubuntu/wc26_prediction/staging/prisma/dev.db` do not exist yet, the workflow copies them from the old manual path under `/home/ubuntu/wc26_prediction/main` when available.
+
+Do not use `prisma db push --accept-data-loss` on the live DB unless you have intentionally decided to drop the warned tables/columns and have a verified backup.
 
 ## Fresh Database Setup
 
