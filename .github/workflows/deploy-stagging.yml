@@ -12,9 +12,60 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
 
+    env:
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SERVER_SSH_KEY_stagging: ${{ secrets.SERVER_SSH_KEY_stagging }}
+      SERVER_DIR: /home/ubuntu/wc26_prediction/staging
+      LEGACY_DIR: /home/ubuntu/wc26_prediction/main
+      BACKUP_DIR: /home/ubuntu/wc26_prediction/backups
+      COMPOSE_PROJECT: wc26-staging
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Prepare SSH key
+        run: |
+          set -e
+
+          if [ -z "$SERVER_HOST" ]; then
+            echo "::error::SERVER_HOST secret is missing."
+            exit 1
+          fi
+
+          if [ -z "$SERVER_USER" ]; then
+            echo "::error::SERVER_USER secret is missing."
+            exit 1
+          fi
+
+          if [ -z "$SERVER_SSH_KEY_stagging" ]; then
+            echo "::error::SERVER_SSH_KEY_stagging secret is missing."
+            exit 1
+          fi
+
+          mkdir -p ~/.ssh
+          printf '%s' "$SERVER_SSH_KEY_stagging" | sed 's/\\n/\n/g; s/\r$//' > ~/.ssh/wc26_staging_key
+          chmod 600 ~/.ssh/wc26_staging_key
+
+          if ! grep -q "BEGIN .*PRIVATE KEY" ~/.ssh/wc26_staging_key; then
+            echo "::error::SERVER_SSH_KEY_stagging does not look like a private key. Paste the full private key, including BEGIN/END lines."
+            exit 1
+          fi
+
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+          cat > ~/.ssh/config <<EOF
+          Host wc26-staging-server
+            HostName $SERVER_HOST
+            User $SERVER_USER
+            IdentityFile ~/.ssh/wc26_staging_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+          EOF
+
+          ssh -o BatchMode=yes wc26-staging-server "echo SSH authentication OK"
 
       - name: Remove local-only files from deploy payload
         run: |
@@ -26,152 +77,150 @@ jobs:
           rm -f prisma/dev.db-shm
 
       - name: Ensure server directory exists
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            mkdir -p /home/ubuntu/wc26_prediction/staging
-            mkdir -p /home/ubuntu/wc26_prediction/staging/prisma
-            mkdir -p /home/ubuntu/wc26_prediction/backups
+        run: |
+          set -e
 
-            if [ ! -f /home/ubuntu/wc26_prediction/staging/.env ] && [ -f /home/ubuntu/wc26_prediction/main/.env ]; then
-              cp /home/ubuntu/wc26_prediction/main/.env /home/ubuntu/wc26_prediction/staging/.env
-              echo "Copied existing .env from main to staging."
+          ssh wc26-staging-server "
+            set -e
+            mkdir -p '$SERVER_DIR'
+            mkdir -p '$SERVER_DIR/prisma'
+            mkdir -p '$BACKUP_DIR'
+
+            if [ ! -f '$SERVER_DIR/.env' ] && [ -f '$LEGACY_DIR/.env' ]; then
+              cp '$LEGACY_DIR/.env' '$SERVER_DIR/.env'
+              echo 'Copied existing .env from legacy main path to staging.'
             fi
+          "
 
       - name: Backup server database before file sync
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            set -e
+        run: |
+          set -e
 
-            cd /home/ubuntu/wc26_prediction/staging
+          ssh wc26-staging-server "
+            set -e
+            cd '$SERVER_DIR'
 
             if [ -f prisma/dev.db ]; then
-              backup="/home/ubuntu/wc26_prediction/backups/dev-before-sync-$(date +%Y%m%d-%H%M%S).db"
-              cp prisma/dev.db "$backup"
-              echo "SQLite DB backup created before sync: $backup"
+              backup='$BACKUP_DIR/dev-before-sync-'\"\$(date +%Y%m%d-%H%M%S)\"'.db'
+              cp prisma/dev.db \"\$backup\"
+              echo \"SQLite DB backup created before sync: \$backup\"
             else
-              echo "No existing prisma/dev.db found before sync. Fresh DB will be created on startup."
+              echo 'No existing staging prisma/dev.db found before sync.'
             fi
+          "
 
       - name: Copy repository to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "."
-          target: "/home/ubuntu/wc26_prediction/staging"
-          overwrite: true
+        run: |
+          set -e
+
+          tar \
+            --exclude='./.env' \
+            --exclude='./.git' \
+            --exclude='./prisma/dev.db' \
+            --exclude='./prisma/dev.db-journal' \
+            --exclude='./prisma/dev.db-wal' \
+            --exclude='./prisma/dev.db-shm' \
+            -czf - . | ssh wc26-staging-server "tar -xzf - -C '$SERVER_DIR'"
 
       - name: Deploy application
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          timeout: 30m
-          command_timeout: 30m
-          script: |
+        run: |
+          set -e
+
+          ssh wc26-staging-server "
             set -e
 
-            cd /home/ubuntu/wc26_prediction/staging
+            cd '$SERVER_DIR'
 
-            echo "================================="
-            echo "Current directory:"
+            echo '================================='
+            echo 'Current directory:'
             pwd
-            echo "================================="
+            echo '================================='
 
             if [ ! -f .env ]; then
-              echo "ERROR: .env file is missing at /home/ubuntu/wc26_prediction/staging/.env"
-              echo "Create it on the server before deploying."
+              echo 'ERROR: .env file is missing at $SERVER_DIR/.env'
+              echo 'Create it on the server before deploying.'
               exit 1
             fi
 
-            echo ""
-            echo "Server resources before deploy:"
+            echo ''
+            echo 'Server resources before deploy:'
             free -h || true
             df -h / || true
             docker version || true
 
-            echo ""
-            echo "Docker compose configuration:"
-            docker compose -p wc26-staging config
+            echo ''
+            echo 'Docker compose configuration:'
+            docker compose -p '$COMPOSE_PROJECT' config
 
-            echo ""
-            echo "Stopping legacy manually-created staging container if it exists..."
+            echo ''
+            echo 'Stopping legacy manually-created staging container if it exists...'
             docker stop wc26_prediction_app || true
 
-            echo ""
-            echo "Migrating existing SQLite DB from old main path on first staging deploy..."
+            echo ''
+            echo 'Migrating existing SQLite DB from old main path on first staging deploy...'
             mkdir -p prisma
-            if [ ! -f prisma/dev.db ] && [ -f /home/ubuntu/wc26_prediction/main/prisma/dev.db ]; then
-              cp /home/ubuntu/wc26_prediction/main/prisma/dev.db prisma/dev.db
-              echo "Copied existing SQLite DB from main to staging after stopping legacy container."
+            if [ ! -f prisma/dev.db ] && [ -f '$LEGACY_DIR/prisma/dev.db' ]; then
+              cp '$LEGACY_DIR/prisma/dev.db' prisma/dev.db
+              echo 'Copied existing SQLite DB from legacy main path to staging after stopping legacy container.'
             else
-              echo "Staging DB already exists, or no legacy DB exists. No DB migration needed."
+              echo 'Staging DB already exists, or no legacy DB exists. No DB migration needed.'
             fi
 
-            echo ""
-            echo "Stopping only wc26 staging containers..."
-            docker compose -p wc26-staging stop app || true
+            echo ''
+            echo 'Stopping only wc26 staging containers...'
+            docker compose -p '$COMPOSE_PROJECT' stop app || true
 
-            echo ""
-            echo "Backing up SQLite DB after app stop..."
-            mkdir -p /home/ubuntu/wc26_prediction/backups
+            echo ''
+            echo 'Backing up SQLite DB after app stop...'
+            mkdir -p '$BACKUP_DIR'
             if [ -f prisma/dev.db ]; then
-              backup="/home/ubuntu/wc26_prediction/backups/dev-after-stop-$(date +%Y%m%d-%H%M%S).db"
-              cp prisma/dev.db "$backup"
-              echo "SQLite DB backup created after app stop: $backup"
+              backup='$BACKUP_DIR/dev-after-stop-'\"\$(date +%Y%m%d-%H%M%S)\"'.db'
+              cp prisma/dev.db \"\$backup\"
+              echo \"SQLite DB backup created after app stop: \$backup\"
             else
-              echo "No existing prisma/dev.db found after app stop. Fresh DB will be created on startup."
+              echo 'No existing prisma/dev.db found after app stop. Fresh DB will be created on startup.'
             fi
 
-            echo ""
-            echo "Removing only wc26 staging containers..."
-            docker compose -p wc26-staging down --remove-orphans || true
+            echo ''
+            echo 'Removing only wc26 staging containers...'
+            docker compose -p '$COMPOSE_PROJECT' down --remove-orphans || true
 
-            echo ""
-            echo "Removing legacy manually-created staging container if it exists..."
+            echo ''
+            echo 'Removing legacy manually-created staging container if it exists...'
             docker rm -f wc26_prediction_app || true
 
-            echo ""
-            echo "Removing stopped wc26 staging containers..."
-            docker compose -p wc26-staging rm -f || true
+            echo ''
+            echo 'Removing stopped wc26 staging containers...'
+            docker compose -p '$COMPOSE_PROJECT' rm -f || true
 
-            echo ""
-            echo "Cleaning unused Docker resources and build cache..."
+            echo ''
+            echo 'Cleaning unused Docker resources and build cache...'
             docker system prune -af || true
 
-            echo ""
-            echo "Building Docker image..."
-            DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain docker compose -p wc26-staging build --pull --progress=plain
+            echo ''
+            echo 'Building Docker image...'
+            DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain docker compose -p '$COMPOSE_PROJECT' build --pull --progress=plain
 
-            echo ""
-            echo "Starting fresh wc26 staging containers..."
-            docker compose -p wc26-staging up -d --force-recreate --remove-orphans
+            echo ''
+            echo 'Starting fresh wc26 staging containers...'
+            docker compose -p '$COMPOSE_PROJECT' up -d --force-recreate --remove-orphans
 
-            echo ""
-            echo "Waiting for startup..."
+            echo ''
+            echo 'Waiting for startup...'
             sleep 20
 
-            echo ""
-            echo "Compose status:"
-            docker compose -p wc26-staging ps
+            echo ''
+            echo 'Compose status:'
+            docker compose -p '$COMPOSE_PROJECT' ps
 
-            echo ""
-            echo "Recent container logs:"
-            docker compose -p wc26-staging logs --tail=80
+            echo ''
+            echo 'Recent container logs:'
+            docker compose -p '$COMPOSE_PROJECT' logs --tail=80
 
-            echo ""
-            echo "Running containers:"
+            echo ''
+            echo 'Running containers:'
             docker ps
 
-            echo ""
-            echo "Deployment successful."
+            echo ''
+            echo 'Deployment successful.'
+          "
