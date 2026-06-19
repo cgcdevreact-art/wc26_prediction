@@ -16,7 +16,6 @@ type RankedPlayer = {
   position: string;
   positionCode: string;
   age: number;
-  club: string;
   overallRating: number;
   overallRatingLabel: string;
   baseQuality: number;
@@ -34,7 +33,7 @@ type RankedPlayer = {
 type SortKey =
   | "playerName"
   | "team"
-  | "positionCode"
+  | "position"
   | "age"
   | "overallRating"
   | "baseQuality"
@@ -85,7 +84,6 @@ export function PlayersRankingsTable({
       position: player.Position,
       positionCode: player["Position Code"],
       age: parseNumber(player["Age on 2026-06-11"]),
-      club: player.Club,
       overallRating: parseNumber(player["Overall Rating"]),
       overallRatingLabel: player["Overall Rating"] || "0%",
       baseQuality: parseNumber(player["Base Quality"]),
@@ -102,11 +100,21 @@ export function PlayersRankingsTable({
   }, [initialPlayers]);
 
   const teamOptions = useMemo(
-    () => ["ALL", ...Array.from(new Set(players.map((player) => player.teamCode))).sort()],
+    () => [
+      { value: "ALL", label: "All Teams" },
+      ...Array.from(new Map(players.map((player) => [player.teamCode, player.team])).entries())
+        .map(([value, label]) => ({ value, label }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    ],
     [players],
   );
   const positionOptions = useMemo(
-    () => ["ALL", ...Array.from(new Set(players.map((player) => player.positionCode))).sort()],
+    () => [
+      { value: "ALL", label: "All Positions" },
+      ...Array.from(new Map(players.map((player) => [player.positionCode, player.position])).entries())
+        .map(([value, label]) => ({ value, label }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    ],
     [players],
   );
   const tierOptions = useMemo(
@@ -121,7 +129,6 @@ export function PlayersRankingsTable({
         loweredSearch &&
         !player.playerName.toLowerCase().includes(loweredSearch) &&
         !player.team.toLowerCase().includes(loweredSearch) &&
-        !player.club.toLowerCase().includes(loweredSearch) &&
         !player.position.toLowerCase().includes(loweredSearch)
       ) {
         return false;
@@ -161,7 +168,7 @@ export function PlayersRankingsTable({
     setSort((current) =>
       current.key === key
         ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
-        : { key, direction: key === "playerName" || key === "team" || key === "positionCode" || key === "ratingTier" ? "asc" : "desc" },
+        : { key, direction: key === "playerName" || key === "team" || key === "position" || key === "ratingTier" ? "asc" : "desc" },
     );
   };
 
@@ -175,7 +182,7 @@ export function PlayersRankingsTable({
   };
 
   const columns: { key: SortKey; label: string; render: (player: RankedPlayer) => React.ReactNode }[] = [
-    { key: "positionCode", label: "Pos", render: (player) => player.positionCode },
+    { key: "position", label: "Position", render: (player) => player.position },
     { key: "age", label: "Age", render: (player) => player.age.toFixed(1) },
     { key: "overallRating", label: "Overall", render: (player) => player.overallRatingLabel },
     { key: "baseQuality", label: "Base Quality", render: (player) => player.baseQuality },
@@ -210,16 +217,14 @@ export function PlayersRankingsTable({
           onChange={(e) => setAndResetPage(() => setTeamFilter(e.target.value))}
           className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm text-foreground shadow-sm outline-none focus:border-cyan-500 dark:border-white/10 dark:bg-white/[0.04]"
         >
-          <option value="ALL">All Teams</option>
-          {teamOptions.filter((v) => v !== "ALL").map((v) => <option key={v} value={v}>{v}</option>)}
+          {teamOptions.map((team) => <option key={team.value} value={team.value}>{team.label}</option>)}
         </select>
         <select
           value={positionFilter}
           onChange={(e) => setAndResetPage(() => setPositionFilter(e.target.value))}
           className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm text-foreground shadow-sm outline-none focus:border-cyan-500 dark:border-white/10 dark:bg-white/[0.04]"
         >
-          <option value="ALL">All Positions</option>
-          {positionOptions.filter((v) => v !== "ALL").map((v) => <option key={v} value={v}>{v}</option>)}
+          {positionOptions.map((position) => <option key={position.value} value={position.value}>{position.label}</option>)}
         </select>
         <select
           value={tierFilter}
@@ -231,8 +236,8 @@ export function PlayersRankingsTable({
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
-        <table className="w-full min-w-[1700px] text-left text-[13px]">
+      <div className="overflow-x-auto scrollbar-custom rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
+        <table className="w-full min-w-[1500px] text-left text-[13px]">
           <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[10px] uppercase tracking-[0.14em] text-slate-600 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-300">
             <tr>
               <th className="w-12 px-3 py-3 font-semibold whitespace-nowrap">#</th>
@@ -253,7 +258,6 @@ export function PlayersRankingsTable({
                   </button>
                 </th>
               ))}
-              <th className="w-[260px] px-3 py-3 font-semibold whitespace-nowrap">Club</th>
             </tr>
           </thead>
           <tbody>
@@ -276,20 +280,20 @@ export function PlayersRankingsTable({
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-2">
                     <CountryFlag code={player.teamCode} flag={flagMap[player.teamCode]} name={player.team} className="h-5 w-7 shrink-0 rounded object-cover" emojiClassName="text-xl leading-none" />
-                    <div className="min-w-0">
-                      <div className="truncate font-semibold text-slate-900 dark:text-white">{player.team}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">{player.teamCode}</div>
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-slate-900 dark:text-white">{player.team}</div>
+                        <div className="text-[10px] tracking-wider text-slate-500 dark:text-slate-400">{player.position}</div>
+                      </div>
                     </div>
-                  </div>
-                </td>
+                  </td>
                 {columns.map((column) => (
                   <td key={column.key} className="px-2.5 py-3 font-mono tabular-nums text-slate-800 dark:text-slate-100">
                     {column.key === "overallRating" ? (
                       <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
                         {column.render(player)}
                       </span>
-                    ) : column.key === "positionCode" ? (
-                      <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-sky-50 px-2 py-0.5 font-semibold text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20">
+                    ) : column.key === "position" ? (
+                      <span className="inline-flex rounded-full bg-sky-50 px-2.5 py-0.5 font-semibold text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20">
                         {column.render(player)}
                       </span>
                     ) : column.key === "ratingTier" ? (
@@ -301,7 +305,6 @@ export function PlayersRankingsTable({
                     )}
                   </td>
                 ))}
-                <td className="px-3 py-3 text-slate-700 dark:text-slate-200">{player.club}</td>
               </tr>
             ))}
           </tbody>

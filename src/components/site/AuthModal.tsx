@@ -26,6 +26,11 @@ export function AuthModal({
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  const reloadAfterAuth = () => {
+    if (typeof window === "undefined") return;
+    window.location.assign(callbackUrl || window.location.pathname);
+  };
+
   if (!isOpen || typeof document === "undefined") return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,12 +63,13 @@ export function AuthModal({
         toast.error(signInRes.error || "Authentication failed. Please check your credentials.");
       } else {
         toast.success("Signed in successfully!");
-        onClose();
+        reloadAfterAuth();
+        return;
       }
     } catch (error) {
       if (error instanceof Error && error.message === "NEXT_REDIRECT") {
-        // This is expected during successful signIn redirect in Next.js
-        onClose();
+        // Successful server-side auth can surface as NEXT_REDIRECT in client-invoked actions.
+        reloadAfterAuth();
         return;
       }
       toast.error("Something went wrong. Please try again.");

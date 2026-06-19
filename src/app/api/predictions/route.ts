@@ -38,7 +38,7 @@ export async function POST(request: Request) {
         await ensureMatchPlaceholder(targetMatchId);
 
         let predictedWinner = inputWinner || null;
-        if (type === "MATCH_SCORE" && predictedHomeScore !== undefined && predictedHomeScore !== "" && predictedAwayScore !== undefined && predictedAwayScore !== "") {
+        if (type.startsWith("MATCH_SCORE") && predictedHomeScore !== undefined && predictedHomeScore !== "" && predictedAwayScore !== undefined && predictedAwayScore !== "") {
           predictedWinner = Number(predictedHomeScore) > Number(predictedAwayScore) ? "HOME_TEAM" : (Number(predictedHomeScore) < Number(predictedAwayScore) ? "AWAY_TEAM" : "DRAW");
         }
 
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       await ensureMatchPlaceholder(targetMatchId);
 
       let predictedWinner = inputWinner || null;
-      if (type === "MATCH_SCORE" && predictedHomeScore !== undefined && predictedHomeScore !== "" && predictedAwayScore !== undefined && predictedAwayScore !== "") {
+      if (type.startsWith("MATCH_SCORE") && predictedHomeScore !== undefined && predictedHomeScore !== "" && predictedAwayScore !== undefined && predictedAwayScore !== "") {
         predictedWinner = Number(predictedHomeScore) > Number(predictedAwayScore) ? "HOME_TEAM" : (Number(predictedHomeScore) < Number(predictedAwayScore) ? "AWAY_TEAM" : "DRAW");
       }
 
@@ -124,6 +124,46 @@ export async function GET() {
     });
     return NextResponse.json(predictions);
   } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const slot = searchParams.get("slot");
+
+  try {
+    if (!slot || slot === "active" || slot === "0") {
+      await prisma.prediction.deleteMany({
+        where: {
+          userId: session.user.id,
+          OR: [
+            { type: { in: ["MATCH_SCORE", "KNOCKOUT_WINNER"] } },
+            { type: "SLOT_METADATA", matchId: 999000 }
+          ]
+        }
+      });
+    } else {
+      const slotNum = Number(slot);
+      await prisma.prediction.deleteMany({
+        where: {
+          userId: session.user.id,
+          OR: [
+            { type: { in: [`MATCH_SCORE_SLOT_${slotNum}`, `KNOCKOUT_WINNER_SLOT_${slotNum}`] } },
+            { type: "SLOT_METADATA", matchId: 999000 + slotNum }
+          ]
+        }
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Error inside predictions DELETE API:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

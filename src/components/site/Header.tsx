@@ -124,16 +124,21 @@ export function Header() {
         </Link>
         
         <nav className="hidden items-center gap-1.5 xl:flex shrink-0 whitespace-nowrap">
-          <div className="relative" ref={simulatorMenuRef}>
+          <div
+            className="relative pt-2"
+            ref={simulatorMenuRef}
+            onMouseEnter={() => setSimulatorMenuOpen(true)}
+            onMouseLeave={() => setSimulatorMenuOpen(false)}
+          >
             <button
               onClick={() => setSimulatorMenuOpen((open) => !open)}
-              className="flex items-center gap-1 rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm text-muted-foreground transition hover:text-foreground"
+              className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm text-muted-foreground transition hover:text-foreground"
             >
               <span>Simulator</span>
               <ChevronDown className="h-3.5 w-3.5 opacity-60" />
             </button>
             {simulatorMenuOpen && (
-              <div className="absolute left-0 mt-2 w-48 rounded-xl border border-border dark:border-white/10 bg-white/95 dark:bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
+              <div className="absolute left-0 top-full w-48 rounded-xl border border-border dark:border-white/10 bg-white/95 dark:bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
                 {SIMULATOR_NAV.map((item) => {
                   const Icon = item.icon;
                   return (
@@ -163,10 +168,15 @@ export function Header() {
           ))}
           
           {/* Custom Redesigned Model Selector */}
-          <div className="relative ml-2 mr-1" ref={dropdownRef}>
+          <div
+            className="relative ml-2 mr-1 pt-2"
+            ref={dropdownRef}
+            onMouseEnter={() => setDropdownOpen(true)}
+            onMouseLeave={() => setDropdownOpen(false)}
+          >
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-[11px] font-medium rounded-lg px-2.5 py-1.5 text-foreground transition duration-200 select-none outline-none"
+              className="flex cursor-pointer items-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-[11px] font-medium rounded-lg px-2.5 py-1.5 text-foreground transition duration-200 select-none outline-none"
             >
               {selectedModel === "pro" && <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />}
               {selectedModel === "advanced" && <Brain className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />}
@@ -180,7 +190,7 @@ export function Header() {
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border dark:border-white/10 bg-white/95 dark:bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
+              <div className="absolute right-0 top-full w-56 rounded-xl border border-border dark:border-white/10 bg-white/95 dark:bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
                 <button
                   onClick={() => {
                     handleModelChange("base");
@@ -251,10 +261,15 @@ export function Header() {
           </button>
 
           {session ? (
-            <div className="relative ml-4 pl-4 border-l border-white/10 dark:border-white/10 animate-fade-in shrink-0" ref={profileMenuRef}>
+            <div
+              className="relative ml-4 pl-4 pt-2 border-l border-slate-300 dark:border-white/10 animate-fade-in shrink-0"
+              ref={profileMenuRef}
+              onMouseEnter={() => setProfileMenuOpen(true)}
+              onMouseLeave={() => setProfileMenuOpen(false)}
+            >
               <button
                 onClick={() => setProfileMenuOpen((open) => !open)}
-                className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition hover:bg-black/5 dark:hover:bg-white/5"
+                className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 transition hover:bg-black/5 dark:hover:bg-white/5"
               >
                 <div className="flex items-center gap-2">
                   {session.user?.image ? (
@@ -283,7 +298,7 @@ export function Header() {
               </button>
 
               {profileMenuOpen && (
-                <div className="absolute right-0 mt-2 w-52 rounded-xl border border-border dark:border-white/10 bg-white/95 dark:bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
+                <div className="absolute right-0 top-full w-52 rounded-xl border border-border dark:border-white/10 bg-white/95 dark:bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
                   <Link
                     href="/profile"
                     onClick={() => setProfileMenuOpen(false)}
@@ -329,7 +344,7 @@ export function Header() {
       </div>
       
       {open && (
-        <div className="xl:hidden border-t border-white/5 dark:border-white/5 px-4 py-3 flex flex-col gap-2">
+        <div className="xl:hidden border-t border-slate-200 dark:border-white/5 px-4 py-3 flex flex-col gap-2">
           <div className="rounded-md px-3 py-2 text-sm text-muted-foreground">
             <div className="font-medium text-foreground">Simulator</div>
             <div className="mt-2 flex flex-col gap-1">
@@ -397,7 +412,7 @@ export function Header() {
           </div>
 
           {session ? (
-            <div className="flex items-center justify-between border-t border-white/5 dark:border-white/5 pt-3 mt-1 px-3">
+            <div className="flex items-center justify-between border-t border-slate-200 dark:border-white/5 pt-3 mt-1 px-3">
               <div className="flex flex-col gap-2">
                 <div className="flex flex-col">
                   <span className="text-xs font-semibold text-muted-foreground truncate">{session.user?.name}</span>

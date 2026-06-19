@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { redirect } from "next/navigation";
-import { Trophy, Calendar, CheckCircle, Sparkles } from "lucide-react";
+import { Trophy, Sparkles } from "lucide-react";
 import { getTeams } from "@/lib/data";
 import {
   Accordion,
@@ -34,12 +34,17 @@ export const metadata = {
   description: "Track your World Cup 2026 predictions and leaderboard status.",
 };
 
-export default async function PredictionsPage() {
+export default async function PredictionsPage(props: {
+  searchParams: Promise<{ slot?: string }>;
+}) {
   const session = await auth();
 
   if (!session?.user?.id) {
     redirect("/");
   }
+
+  const { slot } = await props.searchParams;
+  const currentSlotId = slot ? parseInt(slot) : 0;
 
   let predictions: any[] = [];
   try {
@@ -67,12 +72,61 @@ export default async function PredictionsPage() {
   }
   const teamsMap = new Map(teams.map(t => [t.code, t]));
 
-  const matchesPreds = predictions.filter(p => p.type === "MATCH_SCORE");
-  const knockoutPreds = predictions.filter(p => p.type === "KNOCKOUT_WINNER");
+  // Load metadata to get slot names
+  const metadataRows = predictions.filter(p => p.type === "SLOT_METADATA");
+  const slotNames: Record<number, string> = {
+    0: "Official Active Prediction",
+    1: "Save 1",
+    2: "Save 2",
+    3: "Save 3",
+    4: "Save 4",
+    5: "Save 5",
+  };
+  metadataRows.forEach(p => {
+    const slotId = p.matchId - 999000;
+    if (slotId >= 1 && slotId <= 5) {
+      try {
+        const parsed = JSON.parse(p.predictedWinner);
+        if (parsed?.name) {
+          slotNames[slotId] = parsed.name;
+        }
+      } catch (e) {}
+    }
+  });
+
+  const matchType = currentSlotId === 0 ? "MATCH_SCORE" : `MATCH_SCORE_SLOT_${currentSlotId}`;
+  const koType = currentSlotId === 0 ? "KNOCKOUT_WINNER" : `KNOCKOUT_WINNER_SLOT_${currentSlotId}`;
+
+  const matchesPreds = predictions.filter(p => p.type === matchType);
+  const knockoutPreds = predictions.filter(p => p.type === koType);
   const countryPreds = predictions.filter(p => p.type === "COUNTRY_PROJECTION");
 
+  const activeMetadataRow = predictions.find(p => p.type === "SLOT_METADATA" && p.matchId === 999000 + currentSlotId);
+  let activeSummary: any = null;
+  if (activeMetadataRow) {
+    try {
+      const parsed = JSON.parse(activeMetadataRow.predictedWinner);
+      activeSummary = parsed.summary;
+    } catch (e) {}
+  }
+
+  const groupPredictedCount = activeSummary?.groupPredictedCount ?? matchesPreds.filter(p => p.predictedHomeScore !== null && p.predictedAwayScore !== null).length;
+  const bracketPredictedCount = activeSummary?.bracketPredictedCount ?? knockoutPreds.filter(p => p.predictedTeamId !== null || p.predictedWinner !== null).length;
+  const championCode = activeSummary?.championCode ?? (() => {
+    const finalPred = knockoutPreds.find(p => p.matchId === 500);
+    if (finalPred) {
+      if (finalPred.predictedTeamId) return intToTeamCode(finalPred.predictedTeamId);
+      try {
+        const parsed = JSON.parse(finalPred.predictedWinner);
+        return parsed?.winnerCode || null;
+      } catch (e) {}
+    }
+    return null;
+  })();
+  const standingsSummary = activeSummary?.standingsSummary || null;
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
       <Header />
       <main className="mx-auto max-w-5xl px-4 py-24 md:px-6">
         <div className="mb-12">
@@ -84,184 +138,165 @@ export default async function PredictionsPage() {
           </p>
         </div>
 
+        {/* Slot Selector */}
+        <div className="mb-8 flex flex-wrap items-center gap-4 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-5 rounded-[2rem] shadow-sm">
+          <span className="text-sm font-extrabold text-slate-800 dark:text-muted-foreground uppercase tracking-wider">
+            Prediction Set:
+          </span>
+          <div className="flex flex-wrap gap-2.5">
+            {[0, 1, 2, 3, 4, 5].map((slotId) => {
+              const isActive = currentSlotId === slotId;
+              const hasData = slotId === 0 || predictions.some(p => p.type === `MATCH_SCORE_SLOT_${slotId}` || p.type === `KNOCKOUT_WINNER_SLOT_${slotId}`);
+              
+              return (
+                <a
+                  key={slotId}
+                  href={slotId === 0 ? "/predictions" : `/predictions?slot=${slotId}`}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                    isActive
+                      ? "bg-gradient-to-r from-cyan-600 to-fuchsia-600 border-transparent text-white shadow-md active:scale-95"
+                      : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 dark:text-slate-300"
+                  } ${!hasData && slotId !== 0 ? "opacity-50 hover:opacity-100" : ""}`}
+                >
+                  {slotNames[slotId]} {!hasData && slotId !== 0 && " (Empty)"}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Prediction Summary Section */}
+        <div className="mb-8 bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-6 rounded-[2rem] shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 border-b border-slate-150 dark:border-white/5 pb-4">
+            <div>
+              <h2 className="text-xl font-bold font-display text-slate-900 dark:text-white flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-neon" />
+                <span>{slotNames[currentSlotId]} Overview</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Summary of standings, progress, and champion picks for this slot.
+              </p>
+            </div>
+            
+            {/* Predicted Champion Preview */}
+            {championCode && teamsMap.get(championCode) && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/10 dark:border-amber-500/20 text-xs shadow-sm self-start sm:self-auto">
+                <Trophy className="h-4 w-4 text-gold shrink-0" />
+                <span className="text-slate-550 dark:text-slate-450">Champion:</span>
+                <CountryFlag
+                  code={championCode}
+                  flag={teamsMap.get(championCode)?.flag || ""}
+                  name={teamsMap.get(championCode)?.name || ""}
+                  className="h-3.5 w-5 rounded-[2px] object-cover"
+                  emojiClassName="text-sm leading-none"
+                />
+                <span className="font-display font-extrabold text-gradient">{teamsMap.get(championCode)?.name}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Group Stage Progress */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold text-slate-700 dark:text-slate-350">
+                <span>Group Stage Matches</span>
+                <span className="font-mono text-cyan-600 dark:text-neon">{groupPredictedCount} / 72 Predicted</span>
+              </div>
+              <div className="h-2 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, (groupPredictedCount / 72) * 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Bracket Progress */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold text-slate-700 dark:text-slate-350">
+                <span>Bracket Matches</span>
+                <span className="font-mono text-purple-600 dark:text-purple-400">{bracketPredictedCount} / 32 Predicted</span>
+              </div>
+              <div className="h-2 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-fuchsia-500 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, (bracketPredictedCount / 32) * 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Group Standings */}
+          {standingsSummary ? (
+            <div className="space-y-3">
+              <h3 className="text-xs font-extrabold text-slate-800 dark:text-muted-foreground uppercase tracking-wider">
+                Predicted Group Stage Standings
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {Object.entries(standingsSummary).map(([group, teams]: [string, any]) => {
+                  const winnerTeam = teams.winner ? teamsMap.get(teams.winner) : null;
+                  const runnerUpTeam = teams.runnerUp ? teamsMap.get(teams.runnerUp) : null;
+
+                  return (
+                    <div key={group} className="bg-slate-50 dark:bg-white/[0.01] p-3 rounded-2xl border border-slate-200 dark:border-white/5 flex flex-col gap-1.5 shadow-sm">
+                      <div className="text-[10px] font-black text-slate-500 dark:text-slate-400 border-b border-slate-200/50 dark:border-white/5 pb-1 mb-1 font-mono uppercase tracking-wider">
+                        Group {group}
+                      </div>
+                      
+                      {winnerTeam ? (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-850 dark:text-slate-200 truncate">
+                          <span className="text-amber-500 dark:text-amber-400 font-bold font-mono text-[10px] shrink-0 w-5">1st</span>
+                          <CountryFlag
+                            code={winnerTeam.code}
+                            flag={winnerTeam.flag}
+                            name={winnerTeam.name}
+                            className="h-3 w-4.5 rounded-[1px] object-cover shrink-0"
+                            emojiClassName="text-sm shrink-0 leading-none"
+                          />
+                          <span className="truncate font-semibold">{winnerTeam.name}</span>
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-slate-400 dark:text-slate-650 italic">No winner pick</div>
+                      )}
+
+                      {runnerUpTeam ? (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-350 truncate">
+                          <span className="text-slate-400 dark:text-slate-500 font-bold font-mono text-[10px] shrink-0 w-5">2nd</span>
+                          <CountryFlag
+                            code={runnerUpTeam.code}
+                            flag={runnerUpTeam.flag}
+                            name={runnerUpTeam.name}
+                            className="h-3 w-4.5 rounded-[1px] object-cover shrink-0"
+                            emojiClassName="text-sm shrink-0 leading-none"
+                          />
+                          <span className="truncate font-medium">{runnerUpTeam.name}</span>
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-slate-400 dark:text-slate-650 italic">No runner-up</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-slate-50 dark:bg-white/[0.01] rounded-2xl border border-slate-200 dark:border-white/5 p-4 text-center">
+              <p className="text-xs text-slate-550 dark:text-slate-400">
+                To view a full group standings summary, please save your predictions from the{" "}
+                <a href="/simulator" className="text-cyan-600 dark:text-cyan-400 font-bold underline hover:opacity-80">
+                  Tournament Simulator
+                </a>
+                .
+              </p>
+            </div>
+          )}
+        </div>
+
         <Accordion type="single" collapsible className="w-full space-y-6">
-          {/* Match Scores */}
-          <AccordionItem value="group-matches" className="glass-strong rounded-2xl border-none px-6 py-2">
-            <AccordionTrigger className="hover:no-underline [&[data-state=open]>svg]:rotate-180 text-left">
-              <div className="flex items-center gap-2 font-display text-2xl font-bold">
-                <Calendar className="text-neon" /> Group Matches
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="mt-4 overflow-x-auto">
-                {matchesPreds.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No match predictions yet.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-white/10 hover:bg-transparent">
-                        <TableHead className="w-[100px] text-muted-foreground">Match ID</TableHead>
-                        <TableHead className="text-right text-muted-foreground">Home</TableHead>
-                        <TableHead className="text-center text-muted-foreground">Score</TableHead>
-                        <TableHead className="text-muted-foreground">Away</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {matchesPreds.map(p => (
-                        <TableRow key={p.id} className="border-white/10 hover:bg-white/5 transition-colors">
-                          <TableCell className="font-mono text-xs text-muted-foreground">
-                            {p.matchId}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {p.match?.homeTeam?.name || "Home"}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className="bg-black/40 px-3 py-1 rounded-md text-neon border border-white/10 shadow-glass font-bold whitespace-nowrap inline-block">
-                              {p.predictedHomeScore ?? "-"} : {p.predictedAwayScore ?? "-"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {p.match?.awayTeam?.name || "Away"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Knockout Bracket */}
-          <AccordionItem value="knockout-stage" className="glass-strong rounded-2xl border-none px-6 py-2">
-            <AccordionTrigger className="hover:no-underline [&[data-state=open]>svg]:rotate-180 text-left">
-              <div className="flex items-center gap-2 font-display text-2xl font-bold">
-                <Trophy className="text-gold" /> Knockout Stage
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="mt-4 overflow-x-auto">
-                {knockoutPreds.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No knockout predictions yet.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-white/10 hover:bg-transparent">
-                        <TableHead className="w-[160px] text-muted-foreground text-xs">Stage</TableHead>
-                        <TableHead className="text-right text-muted-foreground text-xs">Home</TableHead>
-                        <TableHead className="text-center text-muted-foreground text-xs">Score</TableHead>
-                        <TableHead className="text-muted-foreground text-xs">Away</TableHead>
-                        <TableHead className="text-muted-foreground text-xs">Winner Pick</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {knockoutPreds.map(p => {
-                        let homeCode = "";
-                        let awayCode = "";
-                        let winnerCode = p.predictedTeamId ? intToTeamCode(p.predictedTeamId) : "";
-
-                        if (p.predictedWinner) {
-                          try {
-                            const parsed = JSON.parse(p.predictedWinner);
-                            if (parsed && typeof parsed === "object") {
-                              homeCode = parsed.homeCode || "";
-                              awayCode = parsed.awayCode || "";
-                              if (parsed.winnerCode) winnerCode = parsed.winnerCode;
-                            }
-                          } catch (e) {
-                            // backward compatibility
-                          }
-                        }
-
-                        const homeTeam = homeCode ? teamsMap.get(homeCode) : null;
-                        const awayTeam = awayCode ? teamsMap.get(awayCode) : null;
-                        const winnerTeam = winnerCode ? teamsMap.get(winnerCode) : null;
-
-                        let stageName = `Match ${p.matchId}`;
-                        const id = p.matchId;
-                        if (id >= 100 && id < 116) stageName = `Round of 32 (M${id - 100 + 1})`;
-                        else if (id >= 200 && id < 208) stageName = `Round of 16 (M${id - 200 + 1})`;
-                        else if (id >= 300 && id < 304) stageName = `Quarter Final (M${id - 300 + 1})`;
-                        else if (id >= 400 && id < 402) stageName = `Semi Final (M${id - 400 + 1})`;
-                        else if (id === 500) stageName = "Final";
-                        else if (id === 501) stageName = "Third Place Match";
-
-                        return (
-                          <TableRow key={p.id} className="border-white/10 hover:bg-white/5 transition-colors">
-                            <TableCell className="font-medium text-muted-foreground text-xs whitespace-nowrap">
-                              <div className="flex items-center gap-1.5">
-                                <CheckCircle className="h-3.5 w-3.5 text-neon shrink-0" />
-                                <span>{stageName}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-medium text-xs">
-                              {homeTeam ? (
-                                <div className="flex items-center gap-1.5 justify-end">
-                                  <span>{homeTeam.name}</span>
-                                  <CountryFlag
-                                    code={homeTeam.code}
-                                    flag={homeTeam.flag}
-                                    name={homeTeam.name}
-                                    className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
-                                    emojiClassName="text-lg shrink-0 leading-none"
-                                  />
-                                </div>
-                              ) : (
-                                homeCode || "-"
-                              )}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <span className="bg-black/40 px-2.5 py-0.5 rounded text-neon border border-white/10 font-bold font-mono whitespace-nowrap inline-block text-xs">
-                                {p.predictedHomeScore ?? "-"} : {p.predictedAwayScore ?? "-"}
-                              </span>
-                            </TableCell>
-                            <TableCell className="font-medium text-xs">
-                              {awayTeam ? (
-                                <div className="flex items-center gap-1.5">
-                                  <CountryFlag
-                                    code={awayTeam.code}
-                                    flag={awayTeam.flag}
-                                    name={awayTeam.name}
-                                    className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
-                                    emojiClassName="text-lg shrink-0 leading-none"
-                                  />
-                                  <span>{awayTeam.name}</span>
-                                </div>
-                              ) : (
-                                awayCode || "-"
-                              )}
-                            </TableCell>
-                            <TableCell className="text-xs">
-                              {winnerTeam ? (
-                                <div className="flex items-center gap-1.5">
-                                  <CountryFlag
-                                    code={winnerTeam.code}
-                                    flag={winnerTeam.flag}
-                                    name={winnerTeam.name}
-                                    className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
-                                    emojiClassName="text-lg shrink-0 leading-none"
-                                  />
-                                  <span className="font-display font-extrabold text-gradient">{winnerTeam.name}</span>
-                                </div>
-                              ) : (
-                                <span className="font-display font-semibold text-gradient">{winnerCode || "-"}</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
           {/* Country Projections */}
           <AccordionItem value="country-projections" className="glass-strong rounded-2xl border-none px-6 py-2">
             <AccordionTrigger className="hover:no-underline [&[data-state=open]>svg]:rotate-180 text-left">
               <div className="flex items-center gap-2 font-display text-2xl font-bold">
-                <Sparkles className="text-neon" /> Country Projections
+                <Sparkles className="text-neon" /> Country Predictions
               </div>
             </AccordionTrigger>
             <AccordionContent>
@@ -271,7 +306,7 @@ export default async function PredictionsPage() {
                 ) : (
                   <Table>
                     <TableHeader>
-                      <TableRow className="border-white/10 hover:bg-transparent">
+                      <TableRow className="border-slate-200 dark:border-white/10 hover:bg-transparent">
                         <TableHead className="w-[200px] text-muted-foreground">Country</TableHead>
                         <TableHead className="text-muted-foreground">Elo</TableHead>
                         <TableHead className="text-muted-foreground whitespace-nowrap">Champ Prob.</TableHead>
@@ -295,7 +330,7 @@ export default async function PredictionsPage() {
                           .join(" ➔ ");
 
                         return (
-                          <TableRow key={p.id} className="border-white/10 hover:bg-white/5 transition-colors">
+                          <TableRow key={p.id} className="border-slate-100 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <CountryFlag
@@ -311,7 +346,7 @@ export default async function PredictionsPage() {
                             <TableCell className="font-mono text-xs text-muted-foreground">
                               {data.elo}
                             </TableCell>
-                            <TableCell className="font-display font-bold text-white">
+                            <TableCell className="font-display font-bold text-slate-900 dark:text-white">
                               {data.championProb}%
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground leading-relaxed">

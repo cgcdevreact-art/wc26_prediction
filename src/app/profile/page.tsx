@@ -334,7 +334,7 @@ export default async function ProfilePage() {
           </section>
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+        {/* <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
           <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4 dark:border-white/5">
               <div>
@@ -439,7 +439,7 @@ export default async function ProfilePage() {
               ))}
             </div>
           </section>
-        </div>
+        </div> */}
       </main>
 
       <Footer />

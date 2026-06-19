@@ -23,7 +23,7 @@ export function GlobalAuthModal() {
 
   useEffect(() => {
     if (!isOpen || status !== "authenticated") return;
-    window.location.href = closeHref;
+    window.location.replace(closeHref);
   }, [closeHref, isOpen, status]);
 
   return (

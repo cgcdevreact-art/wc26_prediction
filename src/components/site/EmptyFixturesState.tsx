@@ -24,10 +24,6 @@ export function EmptyFixturesState({ onReset }: EmptyFixturesStateProps) {
         No Matchups Found
       </h3>
 
-      {/* Description */}
-      <p className="text-slate-500 dark:text-slate-400 text-sm max-w-sm mb-6 leading-relaxed">
-        We couldn't find any fixtures matching your current filters. Try adjusting your selections or reset filters to browse the schedule.
-      </p>
 
       {/* Reset Button */}
       <button

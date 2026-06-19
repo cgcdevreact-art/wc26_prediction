@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
-import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus } from "lucide-react";
+import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { StaminaBar, AlignmentGauge, TemperatureSlider } from "@/components/ui/SciFiControls";
 import { useSimulationStore } from "@/lib/store/simulationStore";
@@ -503,6 +504,22 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   const [matches, setMatches] = useState<PredictorMatch[]>(initialMatches);
 
+  // Slots and multi-saves states
+  const [currentSlot, setCurrentSlot] = useState<number | null>(null);
+  const [allPredictions, setAllPredictions] = useState<any[]>([]);
+  const [slotNames, setSlotNames] = useState<Record<number, string>>({
+    0: "Official Prediction", 1: "Save 1", 2: "Save 2", 3: "Save 3", 4: "Save 4", 5: "Save 5"
+  });
+  const [slotDates, setSlotDates] = useState<Record<number, string>>({
+    0: "", 1: "", 2: "", 3: "", 4: "", 5: ""
+  });
+  const [isSavesModalOpen, setIsSavesModalOpen] = useState(false);
+  const [editingSlotId, setEditingSlotId] = useState<number | null>(null);
+  const [editingSlotName, setEditingSlotName] = useState("");
+  const [expandedSlotDetails, setExpandedSlotDetails] = useState<Record<number, boolean>>({});
+  const [slotToOverwriteConfirm, setSlotToOverwriteConfirm] = useState<number | null>(null);
+  const [slotSummaries, setSlotSummaries] = useState<Record<number, any>>({});
+
   // Knockout prediction state storing team codes
   // Knockout prediction state storing team codes
   const [koWinners, setKoWinners] = useState<{
@@ -727,82 +744,250 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   };
 
   // Load predictions from DB on authentication
+  const fetchAllUserPredictions = async () => {
+    if (!session?.user?.id) return;
+    try {
+      const res = await fetch("/api/predictions");
+      if (res.ok) {
+        const preds = await res.json();
+        setAllPredictions(preds);
+        return preds;
+      }
+    } catch (err) {
+      console.error("Failed to load user predictions", err);
+    }
+  };
+
+  useEffect(() => {
+    if (allPredictions.length === 0) return;
+
+    const names: Record<number, string> = { 0: "Official Prediction", 1: "Save 1", 2: "Save 2", 3: "Save 3", 4: "Save 4", 5: "Save 5" };
+    const dates: Record<number, string> = { 0: "", 1: "", 2: "", 3: "", 4: "", 5: "" };
+    const summaries: Record<number, any> = {};
+
+    const metadataPreds = allPredictions.filter((p: any) => p.type === "SLOT_METADATA");
+    metadataPreds.forEach((p: any) => {
+      const slotId = p.matchId - 999000;
+      if (slotId >= 0 && slotId <= 5) {
+        try {
+          const meta = JSON.parse(p.predictedWinner);
+          if (meta?.name && slotId > 0) names[slotId] = meta.name;
+          if (meta?.updatedAt) dates[slotId] = new Date(meta.updatedAt).toLocaleString();
+          if (meta?.summary) summaries[slotId] = meta.summary;
+        } catch (e) {
+          // ignore
+        }
+      }
+    });
+
+    for (let slotId = 0; slotId <= 5; slotId++) {
+      if (!dates[slotId]) {
+        const matchType = slotId === 0 ? "MATCH_SCORE" : `MATCH_SCORE_SLOT_${slotId}`;
+        const koType = slotId === 0 ? "KNOCKOUT_WINNER" : `KNOCKOUT_WINNER_SLOT_${slotId}`;
+        const slotPreds = allPredictions.filter((p: any) => 
+          p.type === matchType || 
+          p.type === koType
+        );
+        if (slotPreds.length > 0) {
+          const latestDate = new Date(Math.max(...slotPreds.map((p: any) => new Date(p.updatedAt).getTime())));
+          dates[slotId] = latestDate.toLocaleString();
+        }
+      }
+    }
+
+    setSlotNames(names);
+    setSlotDates(dates);
+    setSlotSummaries(summaries);
+  }, [allPredictions]);
+
+  // Load predictions from DB on authentication
   useEffect(() => {
     if (!session?.user?.id) return;
 
     const fetchUserPredictions = async () => {
-      try {
-        const res = await fetch("/api/predictions");
-        if (res.ok) {
-          const preds = await res.json();
-          if (!preds || preds.length === 0) return;
+      const preds = await fetchAllUserPredictions();
+      if (!preds || preds.length === 0) return;
 
-          const groupPreds = preds.filter((p: any) => p.type === "MATCH_SCORE");
-          const koPreds = preds.filter((p: any) => p.type === "KNOCKOUT_WINNER");
+      const groupPreds = preds.filter((p: any) => p.type === "MATCH_SCORE");
+      const koPreds = preds.filter((p: any) => p.type === "KNOCKOUT_WINNER");
 
-          // Hydrate matches
-          if (groupPreds.length > 0) {
-            setMatches((prev) =>
-              prev.map((m) => {
-                const numId = getNumericId(m.id);
-                const pred = groupPreds.find((p: any) => p.matchId === numId);
-                if (pred) {
-                  return {
-                    ...m,
-                    homeScore: pred.predictedHomeScore ?? "",
-                    awayScore: pred.predictedAwayScore ?? "",
-                  };
-                }
-                return m;
-              })
-            );
-          }
+      // Hydrate matches
+      if (groupPreds.length > 0) {
+        setMatches((prev) =>
+          prev.map((m) => {
+            const numId = getNumericId(m.id);
+            const pred = groupPreds.find((p: any) => p.matchId === numId);
+            if (pred) {
+              return {
+                ...m,
+                homeScore: pred.predictedHomeScore ?? "",
+                awayScore: pred.predictedAwayScore ?? "",
+              };
+            }
+            return m;
+          })
+        );
+      }
 
-          // Hydrate knockout bracket
-          if (koPreds.length > 0) {
-            setKoWinners((prev) => {
-              const next = { ...prev };
-              const nextScores: Record<string, { home: number | ""; away: number | "" }> = {};
+      // Hydrate knockout bracket
+      if (koPreds.length > 0) {
+        setKoWinners((prev) => {
+          const next = { ...prev };
+          const nextScores: Record<string, { home: number | ""; away: number | "" }> = {};
 
-              koPreds.forEach((p: any) => {
-                const id = p.matchId;
-                const team = intToTeamCode(p.predictedTeamId);
-                let round: "r32" | "r16" | "qf" | "sf" | "final" | null = null;
-                let idx = 0;
+          koPreds.forEach((p: any) => {
+            const id = p.matchId;
+            const team = intToTeamCode(p.predictedTeamId);
+            let round: "r32" | "r16" | "qf" | "sf" | "final" | null = null;
+            let idx = 0;
 
-                if (id >= 100 && id < 116) { round = "r32"; idx = id - 100; }
-                else if (id >= 200 && id < 208) { round = "r16"; idx = id - 200; }
-                else if (id >= 300 && id < 304) { round = "qf"; idx = id - 300; }
-                else if (id >= 400 && id < 402) { round = "sf"; idx = id - 400; }
-                else if (id === 500) { round = "final"; idx = 0; }
-                else if (id === 501) {
-                  setThirdWinner(team);
-                  setThirdScores({
-                    home: p.predictedHomeScore ?? "",
-                    away: p.predictedAwayScore ?? ""
-                  });
-                }
-
-                if (round) {
-                  next[round][idx] = team;
-                  nextScores[`${round}-${idx}`] = {
-                    home: p.predictedHomeScore ?? "",
-                    away: p.predictedAwayScore ?? ""
-                  };
-                }
+            if (id >= 100 && id < 116) { round = "r32"; idx = id - 100; }
+            else if (id >= 200 && id < 208) { round = "r16"; idx = id - 200; }
+            else if (id >= 300 && id < 304) { round = "qf"; idx = id - 300; }
+            else if (id >= 400 && id < 402) { round = "sf"; idx = id - 400; }
+            else if (id === 500) { round = "final"; idx = 0; }
+            else if (id === 501) {
+              setThirdWinner(team);
+              setThirdScores({
+                home: p.predictedHomeScore ?? "",
+                away: p.predictedAwayScore ?? ""
               });
-              setKoScores((prevScores) => ({ ...prevScores, ...nextScores }));
-              return next;
-            });
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load user predictions", err);
+            }
+
+            if (round) {
+              next[round][idx] = team;
+              nextScores[`${round}-${idx}`] = {
+                home: p.predictedHomeScore ?? "",
+                away: p.predictedAwayScore ?? ""
+              };
+            }
+          });
+          setKoScores((prevScores) => ({ ...prevScores, ...nextScores }));
+          return next;
+        });
       }
     };
 
     fetchUserPredictions();
   }, [session]);
+
+  const handleLoadFromSlot = async (slotId: number | null) => {
+    const matchType = slotId ? `MATCH_SCORE_SLOT_${slotId}` : "MATCH_SCORE";
+    const koType = slotId ? `KNOCKOUT_WINNER_SLOT_${slotId}` : "KNOCKOUT_WINNER";
+
+    const groupPreds = allPredictions.filter((p: any) => p.type === matchType);
+    const koPreds = allPredictions.filter((p: any) => p.type === koType);
+
+    // Hydrate matches
+    setMatches((prev) =>
+      prev.map((m) => {
+        const numId = getNumericId(m.id);
+        const pred = groupPreds.find((p: any) => p.matchId === numId);
+        return {
+          ...m,
+          homeScore: pred ? (pred.predictedHomeScore ?? "") : "",
+          awayScore: pred ? (pred.predictedAwayScore ?? "") : "",
+        };
+      })
+    );
+
+    // Load knockout bracket
+    const nextWinners: typeof koWinners = {
+      r32: Array(16).fill(null),
+      r16: Array(8).fill(null),
+      qf: Array(4).fill(null),
+      sf: Array(2).fill(null),
+      final: Array(1).fill(null),
+    };
+    const nextScores: Record<string, { home: number | ""; away: number | "" }> = {};
+    let loadedThirdWinner: string | null = null;
+    let loadedThirdScores = { home: "" as number | "", away: "" as number | "" };
+
+    koPreds.forEach((p: any) => {
+      const id = p.matchId;
+      const team = intToTeamCode(p.predictedTeamId);
+      let round: "r32" | "r16" | "qf" | "sf" | "final" | null = null;
+      let idx = 0;
+
+      if (id >= 100 && id < 116) { round = "r32"; idx = id - 100; }
+      else if (id >= 200 && id < 208) { round = "r16"; idx = id - 200; }
+      else if (id >= 300 && id < 304) { round = "qf"; idx = id - 300; }
+      else if (id >= 400 && id < 402) { round = "sf"; idx = id - 400; }
+      else if (id === 500) { round = "final"; idx = 0; }
+      else if (id === 501) {
+        loadedThirdWinner = team;
+        loadedThirdScores = {
+          home: p.predictedHomeScore ?? "",
+          away: p.predictedAwayScore ?? ""
+        };
+      }
+
+      if (round) {
+        nextWinners[round][idx] = team;
+        nextScores[`${round}-${idx}`] = {
+          home: p.predictedHomeScore ?? "",
+          away: p.predictedAwayScore ?? ""
+        };
+      }
+    });
+
+    setKoWinners(nextWinners);
+    setKoScores(nextScores);
+    setThirdWinner(loadedThirdWinner);
+    setThirdScores(loadedThirdScores);
+    setCurrentSlot(slotId);
+    toast.success(slotId ? `Successfully loaded progress from Save Slot "${slotNames[slotId]}"!` : "Successfully loaded Official Prediction!");
+  };
+
+  const handleRenameSlot = async (slotId: number, newName: string) => {
+    if (!session?.user?.id) return;
+    
+    setSlotNames((prev) => ({ ...prev, [slotId]: newName }));
+
+    const payload = {
+      matchId: 999000 + slotId,
+      type: "SLOT_METADATA",
+      predictedWinner: JSON.stringify({
+        name: newName,
+        updatedAt: new Date().toISOString()
+      })
+    };
+
+    try {
+      const res = await fetch("/api/predictions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        await fetchAllUserPredictions();
+        toast.success(`Slot ${slotId} renamed to "${newName}"`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to rename slot");
+    }
+  };
+
+  const handleClearSlot = async (slotId: number) => {
+    if (!session?.user?.id) return;
+
+    try {
+      const res = await fetch(`/api/predictions?slot=${slotId}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        await fetchAllUserPredictions();
+        if (currentSlot === slotId) {
+          handleReset();
+        }
+        toast.success(`Cleared Save Slot ${slotId}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to clear slot");
+    }
+  };
 
   // Save single prediction to DB
   const savePredictionToDb = async (matchId: number, type: string, homeScore: number | "", awayScore: number | "", teamCode?: string | null) => {
@@ -810,6 +995,90 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     return;
   };
 
+  const getPredictionSummary = (
+    mList: PredictorMatch[],
+    koW: typeof koWinners,
+    koS: typeof koScores,
+    tWinner: string | null,
+    tScores: typeof thirdScores
+  ) => {
+    const groupPredictedCount = mList.filter(m => m.homeScore !== "" && m.awayScore !== "").length;
+    
+    const data: Record<string, Record<string, any>> = {};
+    Object.entries(GROUPS_CONFIG).forEach(([group, codes]) => {
+      data[group] = {};
+      codes.forEach((code) => {
+        data[group][code] = {
+          code,
+          pts: 0,
+          gd: 0,
+          gf: 0,
+          elo: getTeam(code)?.elo || 0
+        };
+      });
+    });
+
+    mList.forEach((m) => {
+      const g = m.group;
+      const h = m.homeCode;
+      const a = m.awayCode;
+      if (m.homeScore !== "" && m.awayScore !== "") {
+        const hs = Number(m.homeScore);
+        const as = Number(m.awayScore);
+        
+        if (data[g] && data[g][h] && data[g][a]) {
+          data[g][h].gf += hs;
+          data[g][h].ga += as;
+          data[g][a].gf += as;
+          data[g][a].ga += hs;
+          data[g][h].gd = data[g][h].gf - data[g][h].ga;
+          data[g][a].gd = data[g][a].gf - data[g][a].ga;
+
+          if (hs > as) {
+            data[g][h].pts += 3;
+          } else if (hs < as) {
+            data[g][a].pts += 3;
+          } else {
+            data[g][h].pts += 1;
+            data[g][a].pts += 1;
+          }
+        }
+      }
+    });
+
+    const standingsSummary: Record<string, { winner: string; runnerUp: string }> = {};
+    Object.entries(data).forEach(([group, groupTeams]) => {
+      const sorted = Object.values(groupTeams).sort((a: any, b: any) => {
+        if (b.pts !== a.pts) return b.pts - a.pts;
+        if (b.gd !== a.gd) return b.gd - a.gd;
+        if (b.gf !== a.gf) return b.gf - a.gf;
+        return b.elo - a.elo;
+      });
+      standingsSummary[group] = {
+        winner: sorted[0]?.code || "",
+        runnerUp: sorted[1]?.code || ""
+      };
+    });
+
+    let bracketPredictedCount = 0;
+    const rounds: ("r32" | "r16" | "qf" | "sf" | "final")[] = ["r32", "r16", "qf", "sf", "final"];
+    rounds.forEach((round) => {
+      koW[round].forEach((code) => {
+        if (code) bracketPredictedCount++;
+      });
+    });
+    if (tWinner) bracketPredictedCount++;
+
+    const championCode = koW.final[0] || null;
+
+    return {
+      groupPredictedCount,
+      totalGroupMatches: mList.length,
+      standingsSummary,
+      bracketPredictedCount,
+      championCode
+    };
+  };
 
   const saveBulkToDb = async (
     updatedMatches: PredictorMatch[],
@@ -817,17 +1086,23 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     updatedKoScores?: typeof koScores,
     updatedThirdWinner?: string | null,
     updatedThirdScores?: typeof thirdScores,
-    manual: boolean = false
+    manual: boolean = false,
+    slotId: number | null = null
   ) => {
-    if (!session?.user?.id || !manual) return;
+    if (!session?.user?.id || (!manual && slotId === null)) return;
+
+    const targetSlot = slotId !== null ? slotId : currentSlot;
 
     const payload: any[] = [];
+    const matchType = targetSlot ? `MATCH_SCORE_SLOT_${targetSlot}` : "MATCH_SCORE";
+    const koType = targetSlot ? `KNOCKOUT_WINNER_SLOT_${targetSlot}` : "KNOCKOUT_WINNER";
+
     updatedMatches.forEach((m) => {
       payload.push({
         matchId: getNumericId(m.id),
-        type: "MATCH_SCORE",
-        predictedHomeScore: m.homeScore,
-        predictedAwayScore: m.awayScore,
+        type: matchType,
+        predictedHomeScore: m.homeScore !== "" ? Number(m.homeScore) : null,
+        predictedAwayScore: m.awayScore !== "" ? Number(m.awayScore) : null,
       });
     });
 
@@ -842,7 +1117,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         const matchup = koMatchups.r32[idx] || { home: null, away: null };
         payload.push({
           matchId: 100 + idx,
-          type: "KNOCKOUT_WINNER",
+          type: koType,
           predictedTeamId: teamCodeToInt(code),
           predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
           predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
@@ -860,7 +1135,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         const matchup = koMatchups.r16[idx] || { home: null, away: null };
         payload.push({
           matchId: 200 + idx,
-          type: "KNOCKOUT_WINNER",
+          type: koType,
           predictedTeamId: teamCodeToInt(code),
           predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
           predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
@@ -878,7 +1153,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         const matchup = koMatchups.qf[idx] || { home: null, away: null };
         payload.push({
           matchId: 300 + idx,
-          type: "KNOCKOUT_WINNER",
+          type: koType,
           predictedTeamId: teamCodeToInt(code),
           predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
           predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
@@ -896,7 +1171,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         const matchup = koMatchups.sf[idx] || { home: null, away: null };
         payload.push({
           matchId: 400 + idx,
-          type: "KNOCKOUT_WINNER",
+          type: koType,
           predictedTeamId: teamCodeToInt(code),
           predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
           predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
@@ -913,7 +1188,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       const matchup = koMatchups.final[0] || { home: null, away: null };
       payload.push({
         matchId: 500,
-        type: "KNOCKOUT_WINNER",
+        type: koType,
         predictedTeamId: teamCodeToInt(activeWinners.final[0]),
         predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
         predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
@@ -933,7 +1208,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       };
       payload.push({
         matchId: 501,
-        type: "KNOCKOUT_WINNER",
+        type: koType,
         predictedTeamId: teamCodeToInt(activeThirdWinner),
         predictedHomeScore: activeThirdScores.home !== "" ? Number(activeThirdScores.home) : null,
         predictedAwayScore: activeThirdScores.away !== "" ? Number(activeThirdScores.away) : null,
@@ -945,12 +1220,32 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       });
     }
 
+    const metadataSlot = targetSlot !== null ? targetSlot : 0;
+    const slotName = metadataSlot === 0 ? "Official Prediction" : (slotNames[metadataSlot] || `Save Slot ${metadataSlot}`);
+    const summary = getPredictionSummary(
+      updatedMatches,
+      activeWinners,
+      activeScores,
+      activeThirdWinner,
+      activeThirdScores
+    );
+    payload.push({
+      matchId: 999000 + metadataSlot,
+      type: "SLOT_METADATA",
+      predictedWinner: JSON.stringify({
+        name: slotName,
+        updatedAt: new Date().toISOString(),
+        summary
+      })
+    });
+
     try {
       await fetch("/api/predictions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      await fetchAllUserPredictions();
     } catch (err) {
       console.error("Failed to save predictions in bulk", err);
     }
@@ -1684,10 +1979,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       toast.error("Please sign in to save your progress!");
       return;
     }
-    setIsSaving(true);
-    await saveBulkToDb(matches, koWinners, koScores, thirdWinner, thirdScores, true);
-    toast.success("Progress saved successfully!");
-    setIsSaving(false);
+    
+    setIsSavesModalOpen(true);
   };
 
   // Recalculate Knockouts on model change
@@ -1733,11 +2026,16 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       {/* Top dashboard control bar */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-border dark:border-white/10 pb-6 mb-8">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <Trophy className="h-6 w-6 text-gold" />
             <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl text-foreground dark:text-white">
               {onlyKnockout ? "Knockout Bracket Builder" : "World Cup 2026 Simulator"}
             </h1>
+            {session?.user?.id && (
+              <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30 mt-1">
+                Active Slot: {currentSlot !== null ? slotNames[currentSlot] : "Official Prediction"}
+              </span>
+            )}
           </div>
           <p className="mt-1 max-w-[450px] text-sm text-muted-foreground">
             {onlyKnockout 
@@ -1758,6 +2056,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 Free Sims: <strong className="text-neon">{creditsUsed}</strong> / 5
               </div>
             )
+          )}
+          {session?.user?.id && (
+            <button
+              onClick={() => setIsSavesModalOpen(true)}
+              className={toolbarButtonClass}
+            >
+              <FolderOpen className="h-4 w-4 text-cyan-400" />
+              Saves Manager
+            </button>
           )}
           <button
             onClick={handleSaveProgress}
@@ -3106,8 +3413,316 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       <UpgradeModal
         isOpen={upgradeModalOpen}
         onClose={() => setUpgradeModalOpen(false)}
-        reason={upgradeModalReason}
+        reason="credits"
       />
+
+      {/* Saves Manager Modal */}
+      {isSavesModalOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/75 backdrop-blur-md transition-opacity duration-300"
+            onClick={() => setIsSavesModalOpen(false)}
+          />
+
+          {/* Content Card */}
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-900 dark:text-white p-6 shadow-[0_24px_80px_rgba(0,0,0,0.3)] md:p-8 animate-fade-in z-50 max-h-[85vh] flex flex-col">
+            {/* Glow Effects */}
+            <div className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-cyan-500/10 blur-2xl animate-pulse dark:block hidden" />
+            <div className="pointer-events-none absolute -right-16 -bottom-16 h-48 w-48 rounded-full bg-fuchsia-500/10 blur-2xl animate-pulse dark:block hidden" />
+
+            {/* Close Button */}
+            <button
+              onClick={() => setIsSavesModalOpen(false)}
+              className="absolute right-5 top-5 rounded-full p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/5 dark:hover:text-white transition"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="mb-6">
+              <h2 className="font-display text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                <Trophy className="h-6 w-6 text-gold" />
+                <span>Saved Brackets & Predictions</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Save, load, and rename multiple prediction paths. Slot 0 is used for global leaderboard points.
+              </p>
+            </div>
+
+            {/* Active Slot Info and Actions */}
+            {currentSlot !== null && (
+              <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-cyan-50 via-slate-50/50 to-fuchsia-50 dark:from-cyan-950/40 dark:via-slate-900/60 dark:to-fuchsia-950/40 border border-cyan-500/20 shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-widest bg-cyan-100 dark:bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-800/30">Active Slot</span>
+                      <strong className="text-sm text-slate-950 dark:text-slate-100">{slotNames[currentSlot]}</strong>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">You are currently editing this save slot. Any changes made to scores or winner picks are local until saved.</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={async () => {
+                        await handleLoadFromSlot(currentSlot);
+                        setIsSavesModalOpen(false);
+                      }}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 border border-slate-200 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 text-slate-700 dark:text-white transition active:scale-95"
+                      title="Discard local changes and load the last saved state of this slot"
+                    >
+                      Restore Saved
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSlotToOverwriteConfirm(currentSlot);
+                      }}
+                      className="px-3 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-cyan-600 to-fuchsia-600 text-white transition active:scale-95 shadow-md"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* List of Slots */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-custom">
+              {[0, 1, 2, 3, 4, 5].map((slotId) => {
+                const isOfficial = slotId === 0;
+                const hasData = !!slotDates[slotId];
+                const isCurrent = currentSlot === slotId || (slotId === 0 && currentSlot === null);
+                const isEditing = editingSlotId === slotId;
+                const summary = slotSummaries[slotId];
+                const isConfirming = slotToOverwriteConfirm === slotId;
+
+                return (
+                  <div 
+                    key={slotId}
+                    className={`p-4 rounded-2xl border transition-all duration-300 flex flex-col gap-3 ${
+                      isCurrent
+                        ? "bg-gradient-to-r from-cyan-50 to-fuchsia-50 dark:from-cyan-950/20 dark:to-fuchsia-950/20 border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.05)]"
+                        : "bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-white/5"
+                    }`}
+                  >
+                    {/* Upper row: Title, badge, date & load/save buttons */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex-grow min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isOfficial ? (
+                            <span className="text-[10px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-widest bg-cyan-50 dark:bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-800/30">Official</span>
+                          ) : (
+                            <span className="text-xs font-mono font-bold text-slate-550 dark:text-slate-400">Slot {slotId}</span>
+                          )}
+                          
+                          {isEditing && !isOfficial ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={editingSlotName}
+                                onChange={(e) => setEditingSlotName(e.target.value)}
+                                className="bg-white dark:bg-slate-900 border border-cyan-500/40 rounded px-2 py-0.5 text-xs text-slate-950 dark:text-white focus:outline-none focus:border-cyan-500 font-bold"
+                                autoFocus
+                                maxLength={30}
+                              />
+                              <button
+                                onClick={() => {
+                                  if (editingSlotName.trim()) {
+                                    handleRenameSlot(slotId, editingSlotName.trim());
+                                  }
+                                  setEditingSlotId(null);
+                                }}
+                                className="p-1 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition"
+                              >
+                                <Check className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={() => setEditingSlotId(null)}
+                                className="p-1 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className={`font-display font-extrabold text-sm truncate ${hasData ? "text-slate-800 dark:text-slate-100" : "text-slate-400 italic dark:text-slate-500"}`}>
+                                {isOfficial ? "Official Active Prediction" : slotNames[slotId]}
+                              </span>
+                              {!isOfficial && (
+                                <button
+                                  onClick={() => {
+                                    setEditingSlotId(slotId);
+                                    setEditingSlotName(slotNames[slotId]);
+                                  }}
+                                  className="p-1 text-slate-400 dark:text-slate-500 hover:text-slate-950 dark:hover:text-white rounded hover:bg-slate-100 dark:hover:bg-white/5 transition"
+                                  title="Rename Slot"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                              )}
+                              {isCurrent && <Check className="h-4 w-4 text-emerald-550 dark:text-emerald-400 shrink-0" />}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5 font-medium">
+                          <span>{hasData ? `Saved on: ${slotDates[slotId]}` : "Empty Slot"}</span>
+                          {isOfficial && <span className="text-slate-400 dark:text-slate-550 font-mono">• Used for Leaderboard points</span>}
+                        </div>
+                      </div>
+
+                      {/* Buttons */}
+                      <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+                        {hasData && (
+                          <button
+                            onClick={() => {
+                              handleLoadFromSlot(isOfficial ? null : slotId);
+                              setIsSavesModalOpen(false);
+                            }}
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 border border-slate-200 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 text-slate-700 dark:text-white flex items-center gap-1.5 transition active:scale-95"
+                          >
+                            <FolderOpen className="h-3.5 w-3.5 text-cyan-500 dark:text-cyan-400" /> Load
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            if (hasData) {
+                              setSlotToOverwriteConfirm(slotId);
+                            } else {
+                              saveBulkToDb(matches, koWinners, koScores, thirdWinner, thirdScores, true, isOfficial ? null : slotId);
+                              toast.success(isOfficial ? "Saved to Official Prediction!" : `Progress saved to Slot "${slotNames[slotId]}"!`);
+                            }
+                          }}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 ${
+                            hasData 
+                              ? "bg-slate-100 hover:bg-slate-200 border border-slate-200 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 text-slate-700 dark:text-white"
+                              : "bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-500/20 text-white hover:opacity-90 font-black shadow-md"
+                          }`}
+                        >
+                          <Save className="h-3.5 w-3.5" /> {hasData ? "Overwrite" : "Save Here"}
+                        </button>
+                        {hasData && !isOfficial && (
+                          <button
+                            onClick={() => handleClearSlot(slotId)}
+                            className="p-2 text-rose-600 hover:bg-rose-500/10 border border-slate-200 dark:text-rose-400 dark:border-rose-500/10 dark:hover:border-rose-500/30 rounded-xl transition active:scale-95"
+                            title="Clear Slot"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Overwrite Confirmation Overlay/Inline */}
+                    {isConfirming && (
+                      <div className="bg-slate-50 dark:bg-slate-900 border border-amber-500/20 dark:border-amber-500/30 rounded-xl p-3 mt-1 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fade-in">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 animate-bounce" />
+                          <span className="text-xs text-slate-700 dark:text-slate-200 font-medium">
+                            Overwrite <strong className="text-amber-600 dark:text-amber-400">"{isOfficial ? "Official Active Prediction" : slotNames[slotId]}"</strong>? The existing save will be replaced.
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => setSlotToOverwriteConfirm(null)}
+                            className="px-3 py-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition"
+                          >
+                            Keep Existing (Cancel)
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await saveBulkToDb(matches, koWinners, koScores, thirdWinner, thirdScores, true, isOfficial ? null : slotId);
+                              toast.success(isOfficial ? "Saved to Official Prediction!" : `Progress saved to Slot "${slotNames[slotId]}"!`);
+                              setSlotToOverwriteConfirm(null);
+                            }}
+                            className="px-3.5 py-1 text-[11px] font-black rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 transition hover:brightness-110 active:scale-95"
+                          >
+                            Yes, Overwrite
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Details Summary */}
+                    {hasData && summary && (
+                      <div className="bg-slate-100/50 dark:bg-slate-900/40 rounded-xl p-3 border border-slate-200 dark:border-white/5 space-y-2.5">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-550 dark:text-slate-400">Group Stage:</span>
+                            <strong className="text-emerald-600 dark:text-emerald-400">{summary.groupPredictedCount || 0} / 72 matches</strong>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-550 dark:text-slate-400">Bracket:</span>
+                            <strong className="text-purple-600 dark:text-purple-400">{summary.bracketPredictedCount || 0} / 32 matches</strong>
+                          </div>
+                          {summary.championCode && (
+                            <div className="flex items-center gap-1.5 sm:ml-auto">
+                              <span className="text-slate-550 dark:text-slate-400">Predicted Champion:</span>
+                              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 font-bold border border-amber-500/20">
+                                <CountryFlag flag={getTeam(summary.championCode).flag} className="h-3 w-4.5" />
+                                {getTeam(summary.championCode).name}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Expandable Group Standings details */}
+                        {summary.standingsSummary && (
+                          <div>
+                            <button
+                              onClick={() => setExpandedSlotDetails(prev => ({ ...prev, [slotId]: !prev[slotId] }))}
+                              className="text-[10px] text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 font-bold flex items-center gap-1 transition"
+                            >
+                              {expandedSlotDetails[slotId] ? "Hide Standings Details ▲" : "Show Standings Details ▼"}
+                            </button>
+                            
+                            {expandedSlotDetails[slotId] && (
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 mt-2 pt-2 border-t border-slate-200 dark:border-white/5 animate-fade-in">
+                                {Object.entries(summary.standingsSummary).map(([group, teams]: [string, any]) => (
+                                  <div key={group} className="bg-white dark:bg-slate-950/60 p-2 rounded-lg border border-slate-200 dark:border-white/5 flex flex-col gap-1">
+                                    <div className="text-[10px] font-black text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-white/5 pb-0.5 mb-1">Group {group}</div>
+                                    {teams.winner ? (
+                                      <div className="flex items-center gap-1 text-[10px] text-slate-800 dark:text-slate-200 truncate">
+                                        <span className="text-amber-500 dark:text-amber-400 font-bold shrink-0">1st</span>
+                                        <CountryFlag flag={getTeam(teams.winner).flag} className="h-2.5 w-4 inline-block shrink-0" />
+                                        <span className="truncate">{getTeam(teams.winner).name}</span>
+                                      </div>
+                                    ) : (
+                                      <div className="text-[10px] text-slate-400 dark:text-slate-650 italic">No prediction</div>
+                                    )}
+                                    {teams.runnerUp ? (
+                                      <div className="flex items-center gap-1 text-[10px] text-slate-700 dark:text-slate-300 truncate">
+                                        <span className="text-slate-500 dark:text-slate-400 font-bold shrink-0">2nd</span>
+                                        <CountryFlag flag={getTeam(teams.runnerUp).flag} className="h-2.5 w-4 inline-block shrink-0" />
+                                        <span className="truncate">{getTeam(teams.runnerUp).name}</span>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="mt-6 pt-4 border-t border-slate-200 dark:border-white/5 flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+              <span>Active Save Target: <strong className="text-cyan-500 dark:text-cyan-400">{currentSlot ? slotNames[currentSlot] : "Official Prediction"}</strong></span>
+              <button
+                onClick={() => setIsSavesModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-white transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

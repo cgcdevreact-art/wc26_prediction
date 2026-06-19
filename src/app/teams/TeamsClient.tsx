@@ -62,7 +62,9 @@ export default function TeamsClient({
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalReason, setModalReason] = useState<"plus" | "pro" | "credits" | "guest">("plus");
+  const [activeTab, setActiveTab] = useState("list");
   const [rankingSearch, setRankingSearch] = useState("");
+  const [rankingTeamFilter, setRankingTeamFilter] = useState("ALL");
   const [rankingSort, setRankingSort] = useState<{ key: RankingSortKey; direction: "asc" | "desc" }>({
     key: "rank",
     direction: "asc",
@@ -149,21 +151,35 @@ export default function TeamsClient({
   const filteredRankingTeams = useMemo(() => {
     if (!rankingSearch) return rankingTeams;
     const lowerSearch = rankingSearch.toLowerCase();
-    return rankingTeams.filter(
-      (team) =>
-        team.name.toLowerCase().includes(lowerSearch) ||
-        team.code.toLowerCase().includes(lowerSearch),
+    return rankingTeams.filter((team) =>
+      team.name.toLowerCase().includes(lowerSearch) ||
+      team.code.toLowerCase().includes(lowerSearch),
     );
   }, [rankingSearch, rankingTeams]);
 
+  const rankingTeamOptions = useMemo(
+    () => [
+      { code: "ALL", name: "All Teams" },
+      ...rankingTeams
+        .map((team) => ({ code: team.code, name: team.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    ],
+    [rankingTeams],
+  );
+
+  const visibleRankingTeams = useMemo(() => {
+    if (rankingTeamFilter === "ALL") return filteredRankingTeams;
+    return filteredRankingTeams.filter((team) => team.code === rankingTeamFilter);
+  }, [filteredRankingTeams, rankingTeamFilter]);
+
   const sortedRankingTeams = useMemo(() => {
-    return [...filteredRankingTeams].sort((a, b) => {
+    return [...visibleRankingTeams].sort((a, b) => {
       const direction = rankingSort.direction === "asc" ? 1 : -1;
       const aValue = a[rankingSort.key];
       const bValue = b[rankingSort.key];
       return (aValue > bValue ? 1 : aValue < bValue ? -1 : 0) * direction;
     });
-  }, [filteredRankingTeams, rankingSort]);
+  }, [visibleRankingTeams, rankingSort]);
 
   const rankingColumns: {
     key: RankingSortKey;
@@ -211,6 +227,16 @@ export default function TeamsClient({
     router.push(`/teams/${teamCode}`);
   };
 
+  const handleTabChange = (value: string) => {
+    if (value !== "list" && subTier === "free") {
+      setModalReason("plus");
+      setModalOpen(true);
+      setActiveTab("list");
+      return;
+    }
+    setActiveTab(value);
+  };
+
   if (!mounted || !isInitialized) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -221,7 +247,7 @@ export default function TeamsClient({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <Tabs defaultValue="list" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="h-auto rounded-full border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
           <TabsTrigger
             value="list"
@@ -373,17 +399,31 @@ export default function TeamsClient({
 
         <TabsContent value="rankings" className="space-y-6">
           <div className="space-y-5">
-            <div className="relative max-w-md">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <Search className="h-5 w-5 text-muted-foreground" />
+            <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] md:grid-cols-2 xl:grid-cols-4 dark:border-white/10 dark:bg-slate-950">
+              <div className="relative xl:col-span-2">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <Search className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Search rankings..."
+                  value={rankingSearch}
+                  onChange={(e) => setRankingSearch(e.target.value)}
+                  className="h-12 rounded-xl border-slate-200 bg-white pl-10 text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-cyan-500 dark:border-white/10 dark:bg-white/[0.04] dark:focus-visible:ring-neon"
+                />
               </div>
-              <Input
-                type="text"
-                placeholder="Search rankings..."
-                value={rankingSearch}
-                onChange={(e) => setRankingSearch(e.target.value)}
-                className="h-12 rounded-xl border-slate-200 bg-white pl-10 text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-cyan-500 dark:border-white/10 dark:bg-white/[0.04] dark:focus-visible:ring-neon"
-              />
+
+              <select
+                value={rankingTeamFilter}
+                onChange={(e) => setRankingTeamFilter(e.target.value)}
+                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm text-foreground shadow-sm outline-none focus:border-cyan-500 dark:border-white/10 dark:bg-white/[0.04]"
+              >
+                {rankingTeamOptions.map((team) => (
+                  <option key={team.code} value={team.code}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
@@ -475,7 +515,7 @@ export default function TeamsClient({
               </table>
               {sortedRankingTeams.length === 0 && (
                 <div className="py-20 text-center text-muted-foreground">
-                  No ranked teams found matching "{rankingSearch}"
+                  No ranked teams found for the current filters.
                 </div>
               )}
             </div>

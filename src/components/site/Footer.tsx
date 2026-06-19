@@ -11,7 +11,7 @@ export function Footer() {
             <span className="grid h-8 w-8 place-items-center rounded-md bg-gradient-to-br from-neon to-neon-2 text-background"><Trophy className="h-4 w-4" /></span>
             <div className="font-semibold">WC26 <span className="text-gradient">PREDICT</span></div>
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">The most addictive way to predict World Cup 2026. Probabilities. Picks. Glory. No gambling.</p>
+          <p className="mt-3 text-xs text-muted-foreground">The most engaging way to predict World Cup 2026. Probabilities. Picks. Glory.</p>
         </div>
         <FooterCol 
           title="Predict" 
@@ -41,7 +41,7 @@ export function Footer() {
           ]} 
         />
       </div>
-      <div className="border-t border-white/5 py-4 text-center text-xs text-muted-foreground">© 2026 WC26 Predict · Built for fans, not bookies.</div>
+      <div className="border-t border-white/5 py-4 text-center text-xs text-muted-foreground">© 2026 WC26 Predict · Built for fans.</div>
     </footer>
   );
 }

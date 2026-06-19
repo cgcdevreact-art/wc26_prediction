@@ -26,9 +26,10 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
     return theme;
   }, [theme]);
 
-  const radarGridStroke = activeTheme === "light" ? "rgba(71,85,105,0.28)" : "rgba(255,255,255,0.18)";
+  const radarGridStroke = activeTheme === "light" ? "rgba(71,85,105,0.38)" : "rgba(255,255,255,0.18)";
   const radarAxisFill = activeTheme === "light" ? "rgba(15,23,42,0.78)" : "rgba(255,255,255,0.72)";
   const radarLegendColor = activeTheme === "light" ? "rgba(51,65,85,0.9)" : "rgba(226,232,240,0.9)";
+  const comparisonDivider = activeTheme === "light" ? "border-slate-200" : "border-white/5";
 
   const data = [
     { axis: "Attack", a: tA.attack, b: tB.attack },
@@ -50,6 +51,16 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
     ["Goals / Match", tA.goalsPerMatch.toFixed(2), tB.goalsPerMatch.toFixed(2), "higher"],
   ];
 
+  const handleTeamAChange = (nextCode: string) => {
+    if (nextCode === b) return;
+    setA(nextCode);
+  };
+
+  const handleTeamBChange = (nextCode: string) => {
+    if (nextCode === a) return;
+    setB(nextCode);
+  };
+
   return (
     <section className={standalone ? "mx-auto max-w-7xl px-4 py-10 md:px-6" : "mx-auto max-w-7xl px-4 py-16 md:px-6"}>
       {!standalone && (
@@ -58,11 +69,11 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
       <div className="mt-8 grid gap-5 lg:grid-cols-2 min-w-0">
         <div className="glass-strong rounded-2xl p-5 min-w-0 overflow-hidden">
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-            <TeamPicker value={a} onChange={setA} accent="neon" />
+            <TeamPicker value={a} onChange={handleTeamAChange} excludeCode={b} accent="neon" />
             <button onClick={() => { setA(b); setB(a); }} className="grid h-10 w-10 place-items-center rounded-full bg-white/5 hover:bg-white/10" aria-label="swap">
               <ArrowLeftRight className="h-4 w-4" />
             </button>
-            <TeamPicker value={b} onChange={setB} accent="neon-2" />
+            <TeamPicker value={b} onChange={handleTeamBChange} excludeCode={a} accent="neon-2" />
           </div>
           <div className="mt-4 h-72">
             <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
@@ -78,7 +89,7 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
         </div>
 
         <div className="glass rounded-2xl p-5">
-          <div className="grid grid-cols-[1fr_90px_90px] gap-2 border-b border-white/5 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className={`grid grid-cols-[1fr_90px_90px] gap-2 border-b pb-2 text-[10px] uppercase tracking-wider text-muted-foreground ${comparisonDivider}`}>
             <div>Metric</div>
             <div className="flex items-center justify-end gap-2 text-right">
               <CountryFlag code={tA.code} flag={tA.flag} name={tA.name} className="h-4 w-6 rounded-[2px] object-cover" emojiClassName="text-base leading-none" />
@@ -94,7 +105,7 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
             const nb = parseFloat(String(vb).replace(/[^\d.-]/g, ""));
             const aBetter = dir === "higher" ? na > nb : na < nb;
             return (
-              <div key={label} className="grid grid-cols-[1fr_90px_90px] items-center gap-2 border-b border-white/5 py-2 text-sm">
+              <div key={label} className={`grid grid-cols-[1fr_90px_90px] items-center gap-2 border-b py-2 text-sm ${comparisonDivider}`}>
                 <div className="text-muted-foreground">{label}</div>
                 <div className={`text-right font-semibold ${aBetter ? "text-neon" : ""}`}>{va}</div>
                 <div className={`text-right font-semibold ${!aBetter ? "text-[var(--color-neon-2)]" : ""}`}>{vb}</div>
@@ -107,10 +118,21 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
   );
 }
 
-function TeamPicker({ value, onChange, accent }: { value: string; onChange: (v: string) => void; accent: "neon" | "neon-2" }) {
+function TeamPicker({
+  value,
+  onChange,
+  excludeCode,
+  accent,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  excludeCode: string;
+  accent: "neon" | "neon-2";
+}) {
   const teams = useTeams();
   const t = teams.find(team => team.code === value) || teams[0];
   const ring = accent === "neon" ? "ring-neon/40" : "ring-[var(--color-neon-2)]/40";
+  const availableTeams = teams.filter((team) => team.code === value || team.code !== excludeCode);
   return (
       <div className={`rounded-2xl bg-white/5 p-3 ring-1 ${ring}`}>
       <div className="flex items-center gap-3">
@@ -124,7 +146,7 @@ function TeamPicker({ value, onChange, accent }: { value: string; onChange: (v: 
         <div className="min-w-0 flex-1">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">#{t.rank}</div>
           <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full bg-transparent text-base font-semibold outline-none">
-            {teams.map((tt) => (
+            {availableTeams.map((tt) => (
               <option key={tt.code} value={tt.code} className="bg-popover text-foreground">{tt.name}</option>
             ))}
           </select>
