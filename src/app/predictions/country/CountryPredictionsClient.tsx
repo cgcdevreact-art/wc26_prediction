@@ -99,7 +99,7 @@ export default function CountryPredictionsClient({
     }
 
     // Authenticated user flow
-    const tier = subscriptionTier || session.user.subscriptionTier || "free";
+    const tier = (subscriptionTier || session.user.subscriptionTier || "free").toLowerCase();
     if (tier !== "free") {
       return true;
     }
@@ -352,12 +352,17 @@ export default function CountryPredictionsClient({
             });
             const bestThirds = thirds.slice(0, 8);
 
-            const getWinner = (g: string) => groupStandings[g][0].code;
-            const getRunner = (g: string) => groupStandings[g][1].code;
+            const getWinner = (g: string) => groupStandings[g]?.[0]?.code || "";
+            const getRunner = (g: string) => groupStandings[g]?.[1]?.code || "";
             const getThird = (idx: number) => bestThirds[idx]?.code || "ARG";
 
+            const qualifiedTeams = Array.from(new Set([
+              ...Object.keys(GROUPS_CONFIG).flatMap((groupKey) => [getWinner(groupKey), getRunner(groupKey)]),
+              ...bestThirds.map((team) => team.code),
+            ].filter(Boolean)));
+
             // Generate R32 pairings
-            const r32Pairings = [
+            const rawR32Pairings = [
               { home: getWinner("A"), away: getThird(7) },
               { home: getRunner("B"), away: getRunner("C") },
               { home: getWinner("C"), away: getThird(6) },
@@ -375,6 +380,37 @@ export default function CountryPredictionsClient({
               { home: getWinner("I"), away: getWinner("J") },
               { home: getWinner("K"), away: getWinner("L") },
             ];
+
+            const assignedTeams = new Set<string>();
+            const takeReplacementTeam = (otherTeam?: string) => {
+              const replacement = qualifiedTeams.find((teamCode) => !assignedTeams.has(teamCode) && teamCode !== otherTeam);
+              if (replacement) {
+                assignedTeams.add(replacement);
+              }
+              return replacement || "";
+            };
+
+            const r32Pairings = rawR32Pairings.map((pair) => {
+              let home = pair.home;
+              if (!home || assignedTeams.has(home)) {
+                home = takeReplacementTeam();
+              } else {
+                assignedTeams.add(home);
+              }
+
+              let away = pair.away;
+              if (!away || away === home || assignedTeams.has(away)) {
+                away = takeReplacementTeam(home);
+              } else {
+                assignedTeams.add(away);
+              }
+
+              if (away === home) {
+                away = takeReplacementTeam(home);
+              }
+
+              return { home, away };
+            }).filter((pair) => pair.home && pair.away && pair.home !== pair.away);
 
             // Check if selected country is in R32
             const inR32 = r32Pairings.some(p => p.home === selectedCode || p.away === selectedCode);
@@ -746,7 +782,10 @@ export default function CountryPredictionsClient({
               Path to Glory Explorer
             </h1>
             <p className="mt-2 text-muted-foreground text-sm max-w-2xl leading-relaxed">
-              Simulate the entire tournament 1,000 times dynamically based on the active model. Compare predictions across different ELO and form weights.
+              Simulate the entire tournament 1,000 times dynamically based on the active model. 
+              {selectedModel === "base" && " Uses Elo / Att / Def stats."}
+              {selectedModel === "advanced" && " Includes Squad value & stats."}
+              {selectedModel === "pro" && " Incorporates Player aspects & form."}
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
@@ -1007,9 +1046,9 @@ export default function CountryPredictionsClient({
                       return (
                         <div
                           key={s.key}
-                          className={`relative flex min-h-[128px] flex-col rounded-[1.75rem] border p-4 transition-all duration-300 overflow-hidden group ${active
-                            ? "border-slate-200 bg-white hover:border-cyan-300 dark:bg-white/[0.03] dark:border-white/10 dark:hover:border-neon/30 dark:hover:bg-white/[0.05]"
-                            : "border-slate-200 bg-slate-50/80 dark:bg-black/[0.1] dark:border-white/5 opacity-60"
+                          className={`relative flex min-h-[144px] flex-col rounded-[1.75rem] border p-4 transition-all duration-300 overflow-hidden group ${active
+                            ? "border-cyan-500/50 bg-gradient-to-br from-cyan-500/10 via-emerald-500/10 to-fuchsia-500/10 shadow-[0_0_30px_rgba(6,182,212,0.15)] dark:from-cyan-500/20 dark:via-emerald-500/10 dark:to-fuchsia-500/20"
+                            : "border-slate-200 bg-white hover:border-cyan-500/30 hover:bg-slate-50 dark:border-white/5 dark:bg-slate-900/50 dark:hover:bg-slate-800/80"
                             }`}
                         >
                           <div className="absolute top-0 right-0 h-8 w-8 -mr-2 -mt-2 rounded-full bg-gradient-to-br from-cyan-200/80 to-transparent opacity-0 blur-md transition-opacity group-hover:opacity-100 dark:from-neon/10" />
@@ -1461,7 +1500,7 @@ export default function CountryPredictionsClient({
                     {/* Final Column */}
                     <div className="h-[2080px] w-56 relative shrink-0">
                       {/* High fidelity Champion Showcase */}
-                      <div className="absolute top-[380px] -translate-y-1/2 left-0 right-0 flex flex-col items-center p-8 bg-gradient-to-br from-[#1e1b4b]/20 dark:from-[#1e1b4b]/80 to-[#311042]/20 dark:to-[#311042]/80 rounded-3xl border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.1)] z-20 hover:border-yellow-500/50 transition-all duration-500 group">
+                      <div className="absolute top-[780px] -translate-y-1/2 left-0 right-0 flex flex-col items-center p-8 bg-gradient-to-br from-[#1e1b4b]/20 dark:from-[#1e1b4b]/80 to-[#311042]/20 dark:to-[#311042]/80 rounded-3xl border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.1)] z-20 hover:border-yellow-500/50 transition-all duration-500 group">
                         <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl" />
                         <Trophy className="w-20 h-20 text-yellow-500 dark:text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.5)] mb-4 animate-float" />
                         <div className="text-[10px] font-bold text-yellow-600 dark:text-yellow-500 tracking-widest uppercase mb-2">World Cup Champion</div>
@@ -1541,7 +1580,7 @@ export default function CountryPredictionsClient({
               {isSimulating ? (
                 <div className="flex w-full flex-col items-center justify-center gap-4 py-2">
                   <img
-                    src="/lottie/World Cup!.svg"
+                    src="/lottie/Footballer.svg"
                     alt="Simulation loading"
                     className="h-80 w-80 object-contain"
                   />

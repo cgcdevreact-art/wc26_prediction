@@ -393,7 +393,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     }
 
     // Authenticated user flow
-    const tier = session.user.subscriptionTier || "free";
+    const tier = (session.user.subscriptionTier || "free").toLowerCase();
     if (tier !== "free") {
       return true;
     }
@@ -401,7 +401,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     try {
       const res = await fetch("/api/user/credits", { method: "POST" });
       const data = await res.json();
-      
+
       if (res.status === 403) {
         setUpgradeModalReason("credits");
         setUpgradeModalOpen(true);
@@ -464,6 +464,31 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     });
     setMatches(predicted);
     saveBulkToDb(predicted);
+  };
+
+  const resetGroup = (groupName: string) => {
+    const resetMatches = matches.map((m) => {
+      if (m.group !== groupName) return m;
+      return {
+        ...m,
+        homeScore: "",
+        awayScore: "",
+      };
+    });
+    setMatches(resetMatches);
+
+    const clearedWinners = {
+      r32: Array(16).fill(null),
+      r16: Array(8).fill(null),
+      qf: Array(4).fill(null),
+      sf: Array(2).fill(null),
+      final: Array(1).fill(null),
+    };
+    setKoWinners(clearedWinners);
+    setKoScores({});
+    setThirdWinner(null);
+    setThirdScores({ home: "", away: "" });
+    saveBulkToDb(resetMatches, clearedWinners, {}, null, { home: "", away: "" });
   };
 
   const randomizeGroup = (groupName: string) => {
@@ -784,8 +809,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       if (!dates[slotId]) {
         const matchType = slotId === 0 ? "MATCH_SCORE" : `MATCH_SCORE_SLOT_${slotId}`;
         const koType = slotId === 0 ? "KNOCKOUT_WINNER" : `KNOCKOUT_WINNER_SLOT_${slotId}`;
-        const slotPreds = allPredictions.filter((p: any) => 
-          p.type === matchType || 
+        const slotPreds = allPredictions.filter((p: any) =>
+          p.type === matchType ||
           p.type === koType
         );
         if (slotPreds.length > 0) {
@@ -941,7 +966,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   const handleRenameSlot = async (slotId: number, newName: string) => {
     if (!session?.user?.id) return;
-    
+
     setSlotNames((prev) => ({ ...prev, [slotId]: newName }));
 
     const payload = {
@@ -1003,7 +1028,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     tScores: typeof thirdScores
   ) => {
     const groupPredictedCount = mList.filter(m => m.homeScore !== "" && m.awayScore !== "").length;
-    
+
     const data: Record<string, Record<string, any>> = {};
     Object.entries(GROUPS_CONFIG).forEach(([group, codes]) => {
       data[group] = {};
@@ -1025,7 +1050,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       if (m.homeScore !== "" && m.awayScore !== "") {
         const hs = Number(m.homeScore);
         const as = Number(m.awayScore);
-        
+
         if (data[g] && data[g][h] && data[g][a]) {
           data[g][h].gf += hs;
           data[g][h].ga += as;
@@ -1421,10 +1446,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         for (let i = 0; i < koMatchups[round].length; i++) {
           const match = koMatchups[round][i];
           if (match.home === teamCode || match.away === teamCode) {
-             const winner = koWinners[round][i];
-             if (winner !== null && winner !== teamCode) {
-                return true;
-             }
+            const winner = koWinners[round][i];
+            if (winner !== null && winner !== teamCode) {
+              return true;
+            }
           }
         }
       }
@@ -1756,35 +1781,27 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   // Clear Board
   const handleReset = () => {
-    const targetGroups = selectedGroups.length > 0 ? selectedGroups : Object.keys(GROUPS_CONFIG);
     const resetMatches = matches.map((m) => {
-      if (!targetGroups.includes(m.group)) return m;
-      const initial = initialMatches.find((im) => im.id === m.id);
       return {
         ...m,
-        homeScore: initial ? initial.homeScore : "",
-        awayScore: initial ? initial.awayScore : "",
+        homeScore: "",
+        awayScore: "",
       };
     });
     setMatches(resetMatches);
 
-    if (selectedGroups.length === 0) {
-      const clearedWinners = {
-        r32: Array(16).fill(null),
-        r16: Array(8).fill(null),
-        qf: Array(4).fill(null),
-        sf: Array(2).fill(null),
-        final: Array(1).fill(null),
-      };
-      setKoWinners(clearedWinners);
-      setKoScores({});
-      setThirdWinner(null);
-      setThirdScores({ home: "", away: "" });
-      saveBulkToDb(resetMatches, clearedWinners, {}, null, { home: "", away: "" });
-    } else {
-      saveBulkToDb(resetMatches);
-    }
-    setSelectedGroups([]);
+    const clearedWinners = {
+      r32: Array(16).fill(null),
+      r16: Array(8).fill(null),
+      qf: Array(4).fill(null),
+      sf: Array(2).fill(null),
+      final: Array(1).fill(null),
+    };
+    setKoWinners(clearedWinners);
+    setKoScores({});
+    setThirdWinner(null);
+    setThirdScores({ home: "", away: "" });
+    saveBulkToDb(resetMatches, clearedWinners, {}, null, { home: "", away: "" });
   };
 
   const simulateKoMatch = (home: string, away: string) => {
@@ -1873,12 +1890,12 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   // AI Predict knockouts
   const handleAiPredictKnockouts = (forceOverwrite = false) => {
     const updatedWinners = forceOverwrite ? {
-        r32: Array(16).fill(null),
-        r16: Array(8).fill(null),
-        qf: Array(4).fill(null),
-        sf: Array(2).fill(null),
-        final: Array(1).fill(null),
-      } : { ...koWinners };
+      r32: Array(16).fill(null),
+      r16: Array(8).fill(null),
+      qf: Array(4).fill(null),
+      sf: Array(2).fill(null),
+      final: Array(1).fill(null),
+    } : { ...koWinners };
     const updatedScores = forceOverwrite ? {} : { ...koScores };
 
     // Simulate R32 if needed
@@ -1979,7 +1996,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       toast.error("Please sign in to save your progress!");
       return;
     }
-    
+
     setIsSavesModalOpen(true);
   };
 
@@ -1988,7 +2005,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   useEffect(() => {
     if (isInitialized && prevModelRef.current !== selectedModel) {
       prevModelRef.current = selectedModel;
-      
+
       // Re-calculate the knockout bracket according to the new model
       // We force an overwrite of the knockouts
       handleAiPredictKnockouts(true);
@@ -2038,7 +2055,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             )}
           </div>
           <p className="mt-1 max-w-[450px] text-sm text-muted-foreground">
-            {onlyKnockout 
+            {onlyKnockout
               ? "Build your knockout bracket from the Round of 32 down to the Champion."
               : "Fully interactive 48-team tournament predictor. Set scores, qualify third-places, and build your knockout bracket."
             }
@@ -2066,14 +2083,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               Saves Manager
             </button>
           )}
-          <button
-            onClick={handleSaveProgress}
-            disabled={isSaving}
-            className={`${toolbarButtonClass} disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-slate-300 disabled:hover:bg-white disabled:hover:text-slate-950 dark:disabled:hover:border-white/10 dark:disabled:hover:bg-slate-900 dark:disabled:hover:text-white`}
-          >
-            {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-            Save Progress
-          </button>
+
           {onlyKnockout ? (
             <>
               <button
@@ -2094,23 +2104,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           ) : (
             <>
               <button
-                onClick={() => {
-                  if (selectedGroups.length === 12) {
-                    setSelectedGroups([]);
-                  } else {
-                    setSelectedGroups(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]);
-                  }
-                }}
-                className={toolbarButtonClass}
-              >
-                {selectedGroups.length === 12 ? "Deselect All" : "Select All"}
-              </button>
-              <button
-                onClick={handleAiPredictWithCredits}
+                onClick={() => handleAiPredictWithCredits()}
                 className={primaryToolbarButtonClass}
               >
                 <Sparkles className="h-4 w-4" />
-                {selectedGroups.length > 0 ? `Simulate Selected` : "Simulate All"}
+                Simulate All
               </button>
               <button
                 onClick={handleReset}
@@ -2138,7 +2136,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               <Trophy className="h-6 w-6 text-yellow-500" />
             </div>
           </div>
-          
+
           <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topTeamsData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
@@ -2148,15 +2146,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                     <stop offset="100%" stopColor="#C084FC" />
                   </linearGradient>
                 </defs>
-                <XAxis 
-                  dataKey="code" 
-                  tick={{ fill: "#64748b", fontSize: 11, fontWeight: 600 }} 
-                  axisLine={false} 
-                  tickLine={false} 
+                <XAxis
+                  dataKey="code"
+                  tick={{ fill: "#64748b", fontSize: 11, fontWeight: 600 }}
+                  axisLine={false}
+                  tickLine={false}
                   tickMargin={12}
                 />
                 <YAxis hide />
-                <Tooltip 
+                <Tooltip
                   cursor={{ fill: "var(--color-muted)", opacity: 0.15 }}
                   contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 12, fontSize: 13, boxShadow: "var(--shadow-glass)" }}
                   formatter={(value: any, name: any, props: any) => {
@@ -2166,8 +2164,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                   labelStyle={{ color: "var(--color-neon)", fontWeight: "bold", marginBottom: 6 }}
                   itemStyle={{ color: "var(--foreground)" }}
                 />
-                <Bar 
-                  dataKey="winProb" 
+                <Bar
+                  dataKey="winProb"
                   fill="url(#barGradient)"
                   radius={[6, 6, 6, 6]}
                   barSize={40}
@@ -2176,11 +2174,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               </BarChart>
             </ResponsiveContainer>
           </div>
-          
+
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
             {topTeamsData.slice(0, 4).map((team) => (
-              <div 
-                key={team.code} 
+              <div
+                key={team.code}
                 className="flex flex-col items-center justify-center bg-muted/30 dark:bg-white/5 border border-border dark:border-white/10 rounded-2xl py-4 shadow-glass transition-all animate-fade-in"
               >
                 <CountryFlag
@@ -2217,15 +2215,17 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           >
             Group Stage
           </button>
-          <button
-            onClick={() => setActiveTab("knockout")}
-            className={`flex items-center gap-2 px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "knockout"
-              ? "border-neon text-neon"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-          >
-            Knockout Bracket
-          </button>
+          {isGroupStageComplete && (
+            <button
+              onClick={() => setActiveTab("knockout")}
+              className={`flex items-center gap-2 px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "knockout"
+                ? "border-neon text-neon"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+            >
+              Knockout Bracket
+            </button>
+          )}
         </div>
       )}
 
@@ -2236,55 +2236,47 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             {Object.keys(GROUPS_CONFIG).map((groupName) => {
               const groupMatches = matches.filter((m) => m.group === groupName);
               const groupStandings = standings[groupName];
-              const isSelected = selectedGroups.includes(groupName);
+              const isGroupPredicted = groupMatches.length > 0 && groupMatches.every((m) => m.homeScore !== "" && m.awayScore !== "");
 
               return (
                 <div
                   key={groupName}
-                  className={`glass-strong rounded-2xl p-4 border flex flex-col justify-between transition duration-300 shadow-glass ${isSelected
-                    ? "border-neon bg-neon/5 shadow-[0_0_15px_rgba(6,182,212,0.25)]"
+                  className={`glass-strong rounded-2xl p-4 border flex flex-col justify-between transition duration-300 shadow-glass ${isGroupPredicted
+                    ? "border-emerald-500/50 bg-emerald-500/5 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
                     : "border-border hover:border-neon/30"
                     }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <h2
-                          className="font-display font-bold text-lg text-gradient cursor-pointer hover:opacity-80 flex items-center gap-1.5"
-                          onClick={() => toggleGroupSelection(groupName)}
-                          title="Click to select/deselect group"
-                        >
-                          Group {groupName}
-                        </h2>
-                        {/* Quick Actions for Single Group */}
-                        <div className="flex items-center gap-0.5">
+                      <h2 className="font-display font-bold text-lg text-gradient flex items-center gap-1.5">
+                        Group {groupName}
+                      </h2>
+                      {/* Quick Actions / Status for Single Group */}
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                        {isGroupPredicted ? (
+                          <>
+                            <span className="text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 shadow-sm flex items-center gap-1">
+                              <Check className="h-3 w-3" /> Simulated
+                            </span>
+                            <button
+                              onClick={() => resetGroup(groupName)}
+                              title="Reset Group"
+                              className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded-full transition"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        ) : (
                           <button
                             onClick={() => predictGroup(groupName)}
-                            title="AI Predict Group"
-                            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 text-neon hover:scale-105 transition"
+                            title="Predict Group"
+                            className="text-cyan-500 hover:text-cyan-400 hover:underline transition font-black"
                           >
-                            <Sparkles className="h-3 w-3" />
+                            Run Simulation
                           </button>
-                          <button
-                            onClick={() => randomizeGroup(groupName)}
-                            title="Randomise Group"
-                            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground hover:scale-105 transition"
-                          >
-                            <Play className="h-3 w-3" />
-                          </button>
-                        </div>
+                        )}
                       </div>
-                      <button
-                        onClick={() => toggleGroupSelection(groupName)}
-                        className={`text-[10px] px-2.5 py-0.5 rounded-full font-semibold transition duration-200 border ${isSelected
-                          ? "bg-neon/20 border-neon text-neon shadow-[0_0_8px_rgba(6,182,212,0.4)]"
-                          : "bg-muted/30 dark:bg-white/5 border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground"
-                          }`}
-                      >
-                        {isSelected ? "✓ Selected" : "Select"}
-                      </button>
                     </div>
-
                     <table className="w-full text-[11px] sm:text-xs text-left mb-4 border-collapse">
                       <thead>
                         <tr className="border-b border-border text-muted-foreground">
@@ -2540,7 +2532,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
       {/* Knockout Bracket View */}
       {activeTab === "knockout" && (
-        <div className="space-y-8 animate-fade-in">
+        <div id="knockout-bracket-view" className="space-y-6 md:space-y-8 animate-in slide-in-from-right-8 fade-in duration-500 pt-4">
           {!isGroupStageComplete ? (
             <div className="glass-strong rounded-3xl p-12 text-center max-w-xl mx-auto flex flex-col items-center gap-4 border border-white/10 my-8 shadow-glass bg-black/40">
               <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground">
@@ -2551,7 +2543,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 The Knockout stage requires all 72 group stage matches to have predicted scores before teams can be seeded.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                 <button
+                <button
                   onClick={async () => {
                     const allowed = await consumeCredit();
                     if (allowed) {
@@ -2652,7 +2644,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
                     {/* Horizontal Scrollable Bracket Tree */}
                     <div className="w-full select-none border border-border dark:border-white/5 rounded-3xl bg-muted/40 dark:bg-black/20 p-2 md:p-4">
-                      <div 
+                      <div
                         className="flex gap-4 items-stretch w-full px-2 lg:px-4 py-4 overflow-x-auto scrollbar-custom min-h-[760px] lg:min-h-[820px]"
                         style={{ zoom: zoomScale / 100 }}
                       >
@@ -3401,7 +3393,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             <button
               onClick={() => {
                 setActiveTab("knockout");
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                setTimeout(() => {
+                  document.getElementById("knockout-bracket-view")?.scrollIntoView({ behavior: "smooth" });
+                }, 50);
               }}
               className="rounded-xl bg-gradient-to-r from-neon to-neon-2 px-4 py-2.5 text-xs font-bold text-background neon-border transition hover:opacity-90 hover:scale-105 shrink-0 shadow-neon active:scale-95 duration-200"
             >
@@ -3420,7 +3414,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       {isSavesModalOpen && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
           {/* Backdrop */}
-          <div 
+          <div
             className="fixed inset-0 bg-black/75 backdrop-blur-md transition-opacity duration-300"
             onClick={() => setIsSavesModalOpen(false)}
           />
@@ -3497,13 +3491,12 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 const isConfirming = slotToOverwriteConfirm === slotId;
 
                 return (
-                  <div 
+                  <div
                     key={slotId}
-                    className={`p-4 rounded-2xl border transition-all duration-300 flex flex-col gap-3 ${
-                      isCurrent
-                        ? "bg-gradient-to-r from-cyan-50 to-fuchsia-50 dark:from-cyan-950/20 dark:to-fuchsia-950/20 border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.05)]"
-                        : "bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-white/5"
-                    }`}
+                    className={`p-4 rounded-2xl border transition-all duration-300 flex flex-col gap-3 ${isCurrent
+                      ? "bg-gradient-to-r from-cyan-50 to-fuchsia-50 dark:from-cyan-950/20 dark:to-fuchsia-950/20 border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.05)]"
+                      : "bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-white/5"
+                      }`}
                   >
                     {/* Upper row: Title, badge, date & load/save buttons */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -3514,7 +3507,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           ) : (
                             <span className="text-xs font-mono font-bold text-slate-550 dark:text-slate-400">Slot {slotId}</span>
                           )}
-                          
+
                           {isEditing && !isOfficial ? (
                             <div className="flex items-center gap-1">
                               <input
@@ -3570,6 +3563,22 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                         </div>
                       </div>
 
+                      {/* Summary Display */}
+                      {hasData && summary && (
+                        <div className="mt-3 p-3 bg-white/50 dark:bg-slate-900/50 border border-slate-200/50 dark:border-white/5 rounded-xl text-[11px] flex flex-col gap-2">
+                          <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                            <span>Groups: <strong>{summary.groupPredictedCount} / {summary.totalGroupMatches}</strong></span>
+                            <span>Knockout: <strong>{summary.bracketPredictedCount} / 16</strong></span>
+                          </div>
+                          {summary.championCode && (
+                            <div className="flex items-center gap-1.5 mt-0.5 font-bold text-yellow-600 dark:text-yellow-500">
+                              <Trophy className="h-3 w-3" />
+                              Champion: {getTeam(summary.championCode)?.name || summary.championCode}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Buttons */}
                       <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
                         {hasData && (
@@ -3592,11 +3601,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               toast.success(isOfficial ? "Saved to Official Prediction!" : `Progress saved to Slot "${slotNames[slotId]}"!`);
                             }
                           }}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 ${
-                            hasData 
-                              ? "bg-slate-100 hover:bg-slate-200 border border-slate-200 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 text-slate-700 dark:text-white"
-                              : "bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-500/20 text-white hover:opacity-90 font-black shadow-md"
-                          }`}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 ${hasData
+                            ? "bg-slate-100 hover:bg-slate-200 border border-slate-200 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 text-slate-700 dark:text-white"
+                            : "bg-gradient-to-r from-emerald-600 to-teal-600 border border-emerald-500/20 text-white hover:opacity-90 font-black shadow-md"
+                            }`}
                         >
                           <Save className="h-3.5 w-3.5" /> {hasData ? "Overwrite" : "Save Here"}
                         </button>
@@ -3674,7 +3682,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             >
                               {expandedSlotDetails[slotId] ? "Hide Standings Details ▲" : "Show Standings Details ▼"}
                             </button>
-                            
+
                             {expandedSlotDetails[slotId] && (
                               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 mt-2 pt-2 border-t border-slate-200 dark:border-white/5 animate-fade-in">
                                 {Object.entries(summary.standingsSummary).map(([group, teams]: [string, any]) => (
