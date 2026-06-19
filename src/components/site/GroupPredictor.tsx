@@ -12,6 +12,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { UpgradeModal } from "./UpgradeModal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 
 interface PredictorMatch {
   id: string; // group-X-index
@@ -1870,7 +1871,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 key={team.code} 
                 className="flex flex-col items-center justify-center bg-muted/30 dark:bg-white/5 border border-border dark:border-white/10 rounded-2xl py-4 shadow-glass transition-all animate-fade-in"
               >
-                <span className="text-xl filter drop-shadow-sm mb-1">{team.flag}</span>
+                <CountryFlag
+                  code={team.code}
+                  flag={team.flag}
+                  name={team.name}
+                  className="mb-1 h-6 w-8 rounded object-cover drop-shadow-sm"
+                  emojiClassName="mb-1 text-xl leading-none"
+                />
                 <span className="text-[10px] font-bold text-muted-foreground uppercase">{team.code}</span>
                 <span className="text-sm font-bold text-emerald-600 dark:text-[#6EE7B7] mt-1 flex items-center gap-1.5">
                   <span>{team.winProb.toFixed(1)}%</span>
@@ -2001,7 +2008,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 </span>
                               </td>
                               <td className="py-1 truncate flex items-center gap-1.5 max-w-[90px]">
-                                <span className="text-base shrink-0">{row.team.flag}</span>
+                                <CountryFlag
+                                  code={row.team.code}
+                                  flag={row.team.flag}
+                                  name={row.team.name}
+                                  className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                  emojiClassName="text-base shrink-0 leading-none"
+                                />
                                 <span className="truncate">{row.team.name}</span>
                               </td>
                               <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
@@ -2070,7 +2083,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             {/* Home Team */}
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
                               <span className="truncate font-semibold text-foreground/90 text-right text-[11px] sm:text-xs">{tHome.name}</span>
-                              <span className="text-base shrink-0">{tHome.flag}</span>
+                              <CountryFlag
+                                code={tHome.code}
+                                flag={tHome.flag}
+                                name={tHome.name}
+                                className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                emojiClassName="text-base shrink-0 leading-none"
+                              />
                             </div>
 
                             {/* Score Display */}
@@ -2086,7 +2105,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
                             {/* Away Team */}
                             <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                              <span className="text-base shrink-0">{tAway.flag}</span>
+                              <CountryFlag
+                                code={tAway.code}
+                                flag={tAway.flag}
+                                name={tAway.name}
+                                className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                emojiClassName="text-base shrink-0 leading-none"
+                              />
                               <span className="truncate font-semibold text-foreground/90 text-[11px] sm:text-xs">{tAway.name}</span>
                             </div>
                           </div>
@@ -2164,7 +2189,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                         <td className="py-2.5 pl-3 font-semibold">{idx + 1}</td>
                         <td className="py-2.5 text-center font-bold text-gradient">Group {row.code.charAt(0)}</td>
                         <td className="py-2.5 flex items-center gap-2">
-                          <span className="text-xl">{row.team.flag}</span>
+                          <CountryFlag
+                            code={row.team.code}
+                            flag={row.team.flag}
+                            name={row.team.name}
+                            className="h-5 w-7 shrink-0 rounded object-cover"
+                            emojiClassName="text-xl leading-none"
+                          />
                           <span className="font-medium">{row.team.name}</span>
                         </td>
                         <td className="py-2.5 text-center font-mono">{row.played}</td>
@@ -2246,7 +2277,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             <div key={row.code} className="flex items-center justify-between text-[11px] py-0.5">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <span className="text-[10px] text-muted-foreground w-3 text-center">{idx + 1}</span>
-                                <span className="text-sm shrink-0">{row.team.flag}</span>
+                                <CountryFlag
+                                  code={row.team.code}
+                                  flag={row.team.flag}
+                                  name={row.team.name}
+                                  className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                  emojiClassName="text-sm shrink-0 leading-none"
+                                />
                                 <span className={`truncate font-medium ${qualify ? "text-neon font-semibold" : "text-muted-foreground"}`}>
                                   {row.team.name}
                                 </span>
@@ -2497,7 +2534,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                     World Cup Champion
                                   </div>
                                   <div className="text-2xl font-display font-bold mt-2 flex items-center gap-1.5 justify-center">
-                                    <span>{getTeam(koWinners.final[0]).flag}</span>
+                                    <CountryFlag
+                                      code={getTeam(koWinners.final[0]).code}
+                                      flag={getTeam(koWinners.final[0]).flag}
+                                      name={getTeam(koWinners.final[0]).name}
+                                      className="h-6 w-8 shrink-0 rounded object-cover"
+                                      emojiClassName="text-2xl leading-none"
+                                    />
                                     <span className="text-gradient truncate max-w-[180px]">{getTeam(koWinners.final[0]).name}</span>
                                   </div>
                                   <div className="text-[10px] text-muted-foreground mt-1">
@@ -2855,7 +2898,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 <div className="grid grid-cols-3 items-center bg-muted/20 dark:bg-zinc-950/60 p-4 rounded-2xl border border-border dark:border-zinc-800">
                   {/* Home Team */}
                   <div className="flex flex-col items-center text-center space-y-1">
-                    <span className="text-3xl filter drop-shadow-md">{homeTeam.flag}</span>
+                    <CountryFlag
+                      code={homeTeam.code}
+                      flag={homeTeam.flag}
+                      name={homeTeam.name}
+                      className="h-8 w-10 rounded object-cover drop-shadow-md"
+                      emojiClassName="text-3xl leading-none"
+                    />
                     <span className="font-display font-bold text-sm leading-tight max-w-[120px] truncate">{homeTeam.name}</span>
                     <span className="text-[10px] text-muted-foreground/80 font-mono">Rating: {homeTeam.elo.toFixed(0)}</span>
                   </div>
@@ -2878,7 +2927,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
                   {/* Away Team */}
                   <div className="flex flex-col items-center text-center space-y-1">
-                    <span className="text-3xl filter drop-shadow-md">{awayTeam.flag}</span>
+                    <CountryFlag
+                      code={awayTeam.code}
+                      flag={awayTeam.flag}
+                      name={awayTeam.name}
+                      className="h-8 w-10 rounded object-cover drop-shadow-md"
+                      emojiClassName="text-3xl leading-none"
+                    />
                     <span className="font-display font-bold text-sm leading-tight max-w-[120px] truncate">{awayTeam.name}</span>
                     <span className="text-[10px] text-muted-foreground/80 font-mono">Rating: {awayTeam.elo.toFixed(0)}</span>
                   </div>
@@ -3129,7 +3184,13 @@ function KnockoutMatchCard({
               }`}
           >
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-base shrink-0">{tHome?.flag}</span>
+              <CountryFlag
+                code={tHome?.code}
+                flag={tHome?.flag}
+                name={tHome?.name}
+                className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                emojiClassName="text-base shrink-0 leading-none"
+              />
               <span className={`text-xs font-medium truncate ${winnerCode === homeCode ? "font-bold text-neon" : ""}`}>
                 {tHome?.name}
               </span>
@@ -3159,7 +3220,13 @@ function KnockoutMatchCard({
               }`}
           >
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-base shrink-0">{tAway?.flag}</span>
+              <CountryFlag
+                code={tAway?.code}
+                flag={tAway?.flag}
+                name={tAway?.name}
+                className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                emojiClassName="text-base shrink-0 leading-none"
+              />
               <span className={`text-xs font-medium truncate ${winnerCode === awayCode ? "font-bold text-neon" : ""}`}>
                 {tAway?.name}
               </span>

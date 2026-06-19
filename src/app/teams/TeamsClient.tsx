@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTeams } from "@/components/TeamsProvider";
 import { UpgradeModal } from "@/components/site/UpgradeModal";
 import { useSimulationStore, TeamStats, PlayerStats } from "@/lib/store/simulationStore";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 
 type RankingTeam = {
   code: string;
@@ -181,7 +182,6 @@ export default function TeamsClient({
               </thead>
               <tbody>
                 {filteredTeams.map((team, index) => {
-                  const flag = flagMap[team["Team Code"]] || "🏳️";
                   const appTeam = appTeams.find((t) => t.code === team["Team Code"]);
                   const teamPlayers = getTeamPlayers(team["Team Code"]);
                   const topPlayer = teamPlayers[0];
@@ -198,7 +198,13 @@ export default function TeamsClient({
                         {index + 1}
                       </td>
                       <td className="flex items-center space-x-3 px-4 py-3">
-                        <div className="text-2xl leading-none drop-shadow-md">{flag}</div>
+                        <CountryFlag
+                          code={team["Team Code"]}
+                          flag={flagMap[team["Team Code"]] || appTeam?.flag}
+                          name={team.Team}
+                          className="h-6 w-8 shrink-0 rounded object-cover drop-shadow-md"
+                          emojiClassName="text-2xl leading-none drop-shadow-md"
+                        />
                         <div className="flex flex-col">
                           <span className="font-bold text-foreground transition-colors group-hover:text-neon">
                             {team.Team}
@@ -312,7 +318,13 @@ export default function TeamsClient({
                       >
                         <div className="flex min-w-0 items-center gap-3">
                           <span className="w-7 text-center text-xs font-mono text-muted-foreground">{index + 1}</span>
-                          <span className="text-2xl leading-none">{team.flag}</span>
+                          <CountryFlag
+                            code={team.code}
+                            flag={team.flag}
+                            name={team.name}
+                            className="h-6 w-8 shrink-0 rounded object-cover"
+                            emojiClassName="text-2xl leading-none"
+                          />
                           <div className="min-w-0">
                             <div className="truncate font-semibold text-foreground">{team.name}</div>
                             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{team.code}</div>

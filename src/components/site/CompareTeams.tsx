@@ -5,6 +5,7 @@ import { useTeams } from "@/components/TeamsProvider";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, Legend } from "recharts";
 import { SectionHeader } from "./ProbabilityExplorer";
 import { ArrowLeftRight } from "lucide-react";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 
 export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
   const teams = useTeams();
@@ -63,8 +64,14 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
         <div className="glass rounded-2xl p-5">
           <div className="grid grid-cols-[1fr_90px_90px] gap-2 border-b border-white/5 pb-2 text-[10px] uppercase tracking-wider text-muted-foreground">
             <div>Metric</div>
-            <div className="text-right">{tA.flag} {tA.code}</div>
-            <div className="text-right">{tB.flag} {tB.code}</div>
+            <div className="flex items-center justify-end gap-2 text-right">
+              <CountryFlag code={tA.code} flag={tA.flag} name={tA.name} className="h-4 w-6 rounded-[2px] object-cover" emojiClassName="text-base leading-none" />
+              <span>{tA.code}</span>
+            </div>
+            <div className="flex items-center justify-end gap-2 text-right">
+              <CountryFlag code={tB.code} flag={tB.flag} name={tB.name} className="h-4 w-6 rounded-[2px] object-cover" emojiClassName="text-base leading-none" />
+              <span>{tB.code}</span>
+            </div>
           </div>
           {rows.map(([label, va, vb, dir]) => {
             const na = parseFloat(String(va).replace(/[^\d.-]/g, ""));
@@ -89,9 +96,15 @@ function TeamPicker({ value, onChange, accent }: { value: string; onChange: (v: 
   const t = teams.find(team => team.code === value) || teams[0];
   const ring = accent === "neon" ? "ring-neon/40" : "ring-[var(--color-neon-2)]/40";
   return (
-    <div className={`rounded-2xl bg-white/5 p-3 ring-1 ${ring}`}>
+      <div className={`rounded-2xl bg-white/5 p-3 ring-1 ${ring}`}>
       <div className="flex items-center gap-3">
-        <div className="text-3xl">{t.flag}</div>
+        <CountryFlag
+          code={t.code}
+          flag={t.flag}
+          name={t.name}
+          className="h-8 w-10 shrink-0 rounded object-cover"
+          emojiClassName="text-3xl leading-none"
+        />
         <div className="min-w-0 flex-1">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">#{t.rank}</div>
           <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full bg-transparent text-base font-semibold outline-none">

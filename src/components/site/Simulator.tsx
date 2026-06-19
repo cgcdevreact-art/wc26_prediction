@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTeams } from "@/components/TeamsProvider";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 
 function simulateTournament(teams: any[], seed = Math.random()) {
   const total = teams.reduce((s, t) => s + (t.prob?.champion || 0), 0);
@@ -65,7 +66,7 @@ export function Simulator({ compact = false }: { compact?: boolean }) {
             <div>
               <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Most Likely Champion</div>
               <div className="mt-1 flex items-center gap-3">
-                <span className="text-4xl">{champ.flag}</span>
+                <CountryFlag code={champ.code} flag={champ.flag} name={champ.name} className="h-10 w-14" emojiClassName="text-4xl" />
                 <div>
                   <div className="font-display text-2xl font-semibold">{champ.name}</div>
                   <div className="text-xs text-muted-foreground">
@@ -90,7 +91,7 @@ export function Simulator({ compact = false }: { compact?: boolean }) {
                 <div key={r.team.code} className="grid grid-cols-[28px_120px_1fr_60px] items-center gap-3">
                   <div className="text-xs text-muted-foreground tabular-nums">#{i + 1}</div>
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{r.team.flag}</span>
+                    <CountryFlag code={r.team.code} flag={r.team.flag} name={r.team.name} className="h-5 w-7" emojiClassName="text-lg" />
                     <span className="text-sm font-medium truncate">{r.team.name}</span>
                   </div>
                   <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
@@ -104,10 +105,42 @@ export function Simulator({ compact = false }: { compact?: boolean }) {
         </div>
 
         <div className="grid gap-3">
-          <InsightCard label="Most Likely Final" value={results ? `${results[0].team.flag} ${results[0].team.code} vs ${results[1].team.flag} ${results[1].team.code}` : "—"} sub="Based on simulated brackets" />
+          <InsightCard
+            label="Most Likely Final"
+            value={
+              results ? (
+                <span className="inline-flex items-center gap-2">
+                  <CountryFlag code={results[0].team.code} flag={results[0].team.flag} name={results[0].team.name} className="h-4 w-6" emojiClassName="text-base" />
+                  <span>{results[0].team.code}</span>
+                  <span>vs</span>
+                  <CountryFlag code={results[1].team.code} flag={results[1].team.flag} name={results[1].team.name} className="h-4 w-6" emojiClassName="text-base" />
+                  <span>{results[1].team.code}</span>
+                </span>
+              ) : "—"
+            }
+            sub="Based on simulated brackets"
+          />
           <InsightCard label="Golden Boot" value={`🇫🇷 K. Mbappé · 7 goals`} sub="Avg leading scorer" />
-          <InsightCard label="Surprise Team" value={`${teams.find(t=>t.code==="MAR")?.flag || ""} Morocco · SF`} sub="Outperforms ranking by 12 places" />
-          <InsightCard label="Dark Horse Rank" value="🇳🇴 Norway · #5 rising" sub="+8 spots vs preseason" />
+          <InsightCard
+            label="Surprise Team"
+            value={
+              <span className="inline-flex items-center gap-2">
+                <CountryFlag code="MAR" flag={teams.find((t) => t.code === "MAR")?.flag} name="Morocco" className="h-4 w-6" emojiClassName="text-base" />
+                <span>Morocco · SF</span>
+              </span>
+            }
+            sub="Outperforms ranking by 12 places"
+          />
+          <InsightCard
+            label="Dark Horse Rank"
+            value={
+              <span className="inline-flex items-center gap-2">
+                <CountryFlag code="NOR" flag={teams.find((t) => t.code === "NOR")?.flag} name="Norway" className="h-4 w-6" emojiClassName="text-base" />
+                <span>Norway · #5 rising</span>
+              </span>
+            }
+            sub="+8 spots vs preseason"
+          />
           <div className="glass rounded-2xl p-4 text-xs text-muted-foreground">
             <Sparkles className="mb-1 h-4 w-4 text-neon" />
             Simulations use weighted Elo + champion priors. Toy model for entertainment.
@@ -131,7 +164,7 @@ function SimBtn({ label, onClick, disabled, primary, icon: Icon, spin }: { label
   );
 }
 
-function InsightCard({ label, value, sub }: { label: string; value: string; sub: string }) {
+function InsightCard({ label, value, sub }: { label: string; value: React.ReactNode; sub: string }) {
   return (
     <div className="glass rounded-2xl p-4">
       <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{label}</div>

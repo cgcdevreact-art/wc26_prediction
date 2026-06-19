@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
@@ -716,9 +717,13 @@ export default function CountryPredictionsClient({
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-cyan-500 to-fuchsia-500 dark:from-neon dark:to-neon-2" />
                         )}
                         <div className="flex items-center gap-3 min-w-0 z-10">
-                          <span className="text-2xl shrink-0 drop-shadow-md group-hover:scale-110 transition-transform duration-300 select-none">
-                            {t.flag}
-                          </span>
+                          <CountryFlag
+                            code={t.code}
+                            flag={t.flag}
+                            name={t.name}
+                            className="h-7 w-9 shrink-0 drop-shadow-md group-hover:scale-110 transition-transform duration-300"
+                            emojiClassName="text-2xl shrink-0 drop-shadow-md group-hover:scale-110 transition-transform duration-300 select-none"
+                          />
                           <span className="truncate tracking-wide">{t.name}</span>
                         </div>
                         <div className="text-xs font-mono font-bold text-fuchsia-600 text-right z-10 opacity-90 dark:text-neon-2">
@@ -762,8 +767,14 @@ export default function CountryPredictionsClient({
               <div className="flex flex-col justify-between flex-grow gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
                   <div className="flex items-center gap-5">
-                    <div className="text-7xl drop-shadow-lg leading-none select-none filter hover:scale-105 transition-transform duration-300">
-                      {selectedTeam.flag}
+                    <div className="filter transition-transform duration-300 hover:scale-105">
+                      <CountryFlag
+                        code={selectedTeam.code}
+                        flag={selectedTeam.flag}
+                        name={selectedTeam.name}
+                        className="h-16 w-20 drop-shadow-lg"
+                        emojiClassName="text-7xl drop-shadow-lg leading-none select-none"
+                      />
                     </div>
                     <div>
                       <div className="text-[10px] uppercase tracking-[0.25em] text-slate-600 dark:text-muted-foreground font-extrabold flex items-center gap-1.5">
@@ -1075,9 +1086,13 @@ export default function CountryPredictionsClient({
                 <div className="flex items-stretch gap-4 min-w-max py-2 px-1">
                   {/* Start Node */}
                   <div className="flex flex-col justify-center items-center bg-gradient-to-br from-cyan-50 to-fuchsia-50 border border-cyan-200 rounded-[1.75rem] px-5 py-4 min-w-[140px] shadow-sm relative overflow-hidden group dark:from-neon/20 dark:to-neon-2/10 dark:border-neon/40 dark:shadow-glass">
-                    <span className="text-4xl leading-none filter drop-shadow-md select-none transform group-hover:scale-110 transition-transform duration-300">
-                      {selectedTeam.flag}
-                    </span>
+                    <CountryFlag
+                      code={selectedTeam.code}
+                      flag={selectedTeam.flag}
+                      name={selectedTeam.name}
+                      className="h-10 w-14 drop-shadow-md transform transition-transform duration-300 group-hover:scale-110"
+                      emojiClassName="text-4xl leading-none filter drop-shadow-md select-none transform group-hover:scale-110 transition-transform duration-300"
+                    />
                     <span className="text-sm font-extrabold mt-2 text-foreground">{selectedTeam.name}</span>
                     <span className="text-[9px] uppercase tracking-[0.2em] font-extrabold text-cyan-700 mt-1 dark:text-neon">Start</span>
                   </div>
@@ -1107,7 +1122,13 @@ export default function CountryPredictionsClient({
                           </span>
                           
                           <div className="flex items-center gap-3 mb-3">
-                            <span className="text-3xl leading-none filter drop-shadow-sm transform group-hover:scale-105 transition-transform">{p.opponent.flag}</span>
+                            <CountryFlag
+                              code={p.opponent.code}
+                              flag={p.opponent.flag}
+                              name={p.opponent.name}
+                              className="h-8 w-10 drop-shadow-sm transform transition-transform group-hover:scale-105"
+                              emojiClassName="text-3xl leading-none filter drop-shadow-sm transform group-hover:scale-105 transition-transform"
+                            />
                             <div className="min-w-0">
                               <span className="text-sm font-extrabold text-foreground block truncate">{p.opponent.name}</span>
                               <span className="text-[10px] font-mono text-muted-foreground">Elo {Math.round(p.opponent.elo)}</span>
@@ -1171,7 +1192,7 @@ export default function CountryPredictionsClient({
                             <div className="flex flex-col p-1 gap-1">
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
-                                     <span className="text-sm drop-shadow-md select-none">{home.flag}</span>
+                                     <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
@@ -1179,7 +1200,7 @@ export default function CountryPredictionsClient({
                                </div>
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
-                                     <span className="text-sm drop-shadow-md select-none">{away.flag}</span>
+                                     <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
@@ -1219,7 +1240,7 @@ export default function CountryPredictionsClient({
                             <div className="flex flex-col p-1 gap-1">
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
-                                     <span className="text-sm drop-shadow-md select-none">{home.flag}</span>
+                                     <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
@@ -1227,7 +1248,7 @@ export default function CountryPredictionsClient({
                                </div>
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
-                                     <span className="text-sm drop-shadow-md select-none">{away.flag}</span>
+                                     <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
@@ -1267,7 +1288,7 @@ export default function CountryPredictionsClient({
                             <div className="flex flex-col p-1 gap-1">
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
-                                     <span className="text-sm drop-shadow-md select-none">{home.flag}</span>
+                                     <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
@@ -1275,7 +1296,7 @@ export default function CountryPredictionsClient({
                                </div>
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
-                                     <span className="text-sm drop-shadow-md select-none">{away.flag}</span>
+                                     <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
@@ -1315,7 +1336,7 @@ export default function CountryPredictionsClient({
                             <div className="flex flex-col p-1 gap-1">
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
-                                     <span className="text-sm drop-shadow-md select-none">{home.flag}</span>
+                                     <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
@@ -1323,7 +1344,7 @@ export default function CountryPredictionsClient({
                                </div>
                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
                                   <div className="flex items-center gap-2 overflow-hidden">
-                                     <span className="text-sm drop-shadow-md select-none">{away.flag}</span>
+                                     <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                   </div>
@@ -1352,7 +1373,13 @@ export default function CountryPredictionsClient({
                      <Trophy className="w-20 h-20 text-yellow-500 dark:text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.5)] mb-4 animate-float" />
                      <div className="text-[10px] font-bold text-yellow-600 dark:text-yellow-500 tracking-widest uppercase mb-2">World Cup Champion</div>
                      <div className="flex items-center gap-3 mt-2">
-                        <span className="text-4xl drop-shadow-md select-none">{getTeam(simResults.mockTournament.final.winner).flag}</span>
+                        <CountryFlag
+                          code={getTeam(simResults.mockTournament.final.winner).code}
+                          flag={getTeam(simResults.mockTournament.final.winner).flag}
+                          name={getTeam(simResults.mockTournament.final.winner).name}
+                          className="h-10 w-14 drop-shadow-md"
+                          emojiClassName="text-4xl drop-shadow-md select-none"
+                        />
                         <span className="text-2xl font-black text-foreground dark:text-white tracking-tight">{getTeam(simResults.mockTournament.final.winner).name}</span>
                      </div>
                   </div>
@@ -1368,7 +1395,7 @@ export default function CountryPredictionsClient({
                         <div className="flex flex-col p-1 gap-1">
                            <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.home, simResults.mockTournament.final.winner === simResults.mockTournament.final.home, "gold")}`}>
                               <div className="flex items-center gap-2 overflow-hidden">
-                                 <span className="text-sm drop-shadow-md select-none">{getTeam(simResults.mockTournament.final.home).flag}</span>
+                                 <CountryFlag code={getTeam(simResults.mockTournament.final.home).code} flag={getTeam(simResults.mockTournament.final.home).flag} name={getTeam(simResults.mockTournament.final.home).name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
                                  <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.home).name}</span>
                                  {simResults.mockTournament.final.winner === simResults.mockTournament.final.home && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
                               </div>
@@ -1376,7 +1403,7 @@ export default function CountryPredictionsClient({
                            </div>
                            <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.away, simResults.mockTournament.final.winner === simResults.mockTournament.final.away, "gold")}`}>
                               <div className="flex items-center gap-2 overflow-hidden">
-                                 <span className="text-sm drop-shadow-md select-none">{getTeam(simResults.mockTournament.final.away).flag}</span>
+                                 <CountryFlag code={getTeam(simResults.mockTournament.final.away).code} flag={getTeam(simResults.mockTournament.final.away).flag} name={getTeam(simResults.mockTournament.final.away).name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
                                  <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.away).name}</span>
                                  {simResults.mockTournament.final.winner === simResults.mockTournament.final.away && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
                               </div>

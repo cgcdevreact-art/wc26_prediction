@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { Search, Calendar, MapPin, Trophy } from "lucide-react";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 
 const isNumericString = (val: any) => /^\d+$/.test(String(val));
 
@@ -335,7 +336,13 @@ export function FixturesExplorer() {
                         <div className="flex items-center justify-center gap-4 text-center max-w-sm mx-auto">
                           <div className="flex-1 flex items-center justify-end gap-2 min-w-0">
                             <span className="truncate text-sm font-semibold text-foreground">{teamMatchup[0].name}</span>
-                            <span className="text-xl leading-none">{teamMatchup[0].flag}</span>
+                            <CountryFlag
+                              code={teamMatchup[0].code}
+                              flag={teamMatchup[0].flag}
+                              name={teamMatchup[0].name}
+                              className="h-5 w-7"
+                              emojiClassName="text-xl leading-none"
+                            />
                           </div>
                           
                           {/* Score / Status Display */}
@@ -366,7 +373,13 @@ export function FixturesExplorer() {
                           )}
 
                           <div className="flex-1 flex items-center justify-start gap-2 min-w-0">
-                            <span className="text-xl leading-none">{teamMatchup[1]?.flag || "🏳️"}</span>
+                            <CountryFlag
+                              code={teamMatchup[1]?.code}
+                              flag={teamMatchup[1]?.flag}
+                              name={teamMatchup[1]?.name}
+                              className="h-5 w-7"
+                              emojiClassName="text-xl leading-none"
+                            />
                             <span className="truncate text-sm font-semibold text-foreground">{teamMatchup[1]?.name || "TBD"}</span>
                           </div>
                         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useTeams } from "@/components/TeamsProvider";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import { Brain, MapPin, Calendar } from "lucide-react";
 import { SectionHeader } from "./ProbabilityExplorer";
 import { useState } from "react";
@@ -64,8 +65,10 @@ function MatchCard({ fixture }: { fixture: typeof SAMPLE_FIXTURES[number] }) {
 
 function TeamSide({ team, align }: { team: any; align: "left" | "right" }) {
   return (
-    <div className={`flex items-center gap-3 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-      <div className="grid h-12 w-12 place-items-center rounded-xl bg-white/5 text-2xl">{team.flag}</div>
+      <div className={`flex items-center gap-3 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
+      <div className="grid h-12 w-12 place-items-center rounded-xl bg-white/5">
+        <CountryFlag code={team.code} flag={team.flag} name={team.name} className="h-7 w-9" emojiClassName="text-2xl" />
+      </div>
       <div>
         <div className="font-display font-semibold sm:text-lg">{team.code}</div>
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Elo {team.elo} · #{team.rank}</div>

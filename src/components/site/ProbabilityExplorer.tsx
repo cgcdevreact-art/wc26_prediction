@@ -5,6 +5,7 @@ import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { AuthModal } from "./AuthModal";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 
 const PATH_TO_FINAL = [
   { stage: "Group Stage", opp: "Switzerland", winPct: 78 },
@@ -164,7 +165,13 @@ export function ProbabilityExplorer() {
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-neon to-neon-2" />
                   )}
                   <span className="flex items-center gap-2 truncate z-10">
-                    <span className="text-lg shrink-0 select-none group-hover:scale-110 transition-transform duration-300">{t.flag}</span>
+                    <CountryFlag
+                      code={t.code}
+                      flag={t.flag}
+                      name={t.name}
+                      className="h-6 w-8 shrink-0 group-hover:scale-110 transition-transform duration-300"
+                      emojiClassName="text-lg shrink-0 select-none group-hover:scale-110 transition-transform duration-300"
+                    />
                     <span className="hidden truncate lg:inline tracking-wide">{t.name}</span>
                     <span className="lg:hidden">{t.code}</span>
                   </span>
@@ -185,8 +192,14 @@ export function ProbabilityExplorer() {
               <div className="flex flex-col justify-between flex-grow gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
                   <div className="flex items-center gap-5">
-                    <div className="text-7xl drop-shadow-lg leading-none select-none filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:scale-105 transition-transform duration-300">
-                      {team.flag}
+                    <div className="filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:scale-105 transition-transform duration-300">
+                      <CountryFlag
+                        code={team.code}
+                        flag={team.flag}
+                        name={team.name}
+                        className="h-16 w-20 drop-shadow-lg"
+                        emojiClassName="text-7xl drop-shadow-lg leading-none select-none"
+                      />
                     </div>
                     <div>
                       <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-extrabold flex items-center gap-1.5">
@@ -396,7 +409,7 @@ export function ProbabilityExplorer() {
             </div>
             <div className="mt-4 overflow-x-auto">
               <div className="flex items-stretch gap-2 min-w-max">
-                <PathNode flag={team.flag} label={team.name} highlight />
+                <PathNode code={team.code} flag={team.flag} label={team.name} highlight />
                 {PATH_TO_FINAL.map((p, i) => (
                   <PathStep key={i} stage={p.stage} opp={p.opp} winPct={p.winPct} />
                 ))}
@@ -420,10 +433,10 @@ export function SectionHeader({ eyebrow, title, sub }: { eyebrow: string; title:
   );
 }
 
-function PathNode({ flag, label, highlight }: { flag: string; label: string; highlight?: boolean }) {
+function PathNode({ code, flag, label, highlight }: { code?: string; flag: string; label: string; highlight?: boolean }) {
   return (
     <div className={`flex min-w-[140px] flex-col items-center justify-center gap-1 rounded-xl px-4 py-3 ${highlight ? "bg-gradient-to-br from-neon/25 to-neon-2/15 neon-border" : "bg-white/5"}`}>
-      <span className="text-2xl">{flag}</span>
+      <CountryFlag code={code} flag={flag} name={label} className="h-8 w-10" emojiClassName="text-2xl" />
       <span className="text-xs font-semibold">{label}</span>
     </div>
   );

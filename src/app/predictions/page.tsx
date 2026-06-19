@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 
 function intToTeamCode(val: number): string {
   if (val <= 0) return "";
@@ -197,7 +198,13 @@ export default async function PredictionsPage() {
                               {homeTeam ? (
                                 <div className="flex items-center gap-1.5 justify-end">
                                   <span>{homeTeam.name}</span>
-                                  <span className="text-lg shrink-0 leading-none">{homeTeam.flag}</span>
+                                  <CountryFlag
+                                    code={homeTeam.code}
+                                    flag={homeTeam.flag}
+                                    name={homeTeam.name}
+                                    className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                    emojiClassName="text-lg shrink-0 leading-none"
+                                  />
                                 </div>
                               ) : (
                                 homeCode || "-"
@@ -211,7 +218,13 @@ export default async function PredictionsPage() {
                             <TableCell className="font-medium text-xs">
                               {awayTeam ? (
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-lg shrink-0 leading-none">{awayTeam.flag}</span>
+                                  <CountryFlag
+                                    code={awayTeam.code}
+                                    flag={awayTeam.flag}
+                                    name={awayTeam.name}
+                                    className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                    emojiClassName="text-lg shrink-0 leading-none"
+                                  />
                                   <span>{awayTeam.name}</span>
                                 </div>
                               ) : (
@@ -221,7 +234,13 @@ export default async function PredictionsPage() {
                             <TableCell className="text-xs">
                               {winnerTeam ? (
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-lg shrink-0 leading-none">{winnerTeam.flag}</span>
+                                  <CountryFlag
+                                    code={winnerTeam.code}
+                                    flag={winnerTeam.flag}
+                                    name={winnerTeam.name}
+                                    className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                    emojiClassName="text-lg shrink-0 leading-none"
+                                  />
                                   <span className="font-display font-extrabold text-gradient">{winnerTeam.name}</span>
                                 </div>
                               ) : (
@@ -279,7 +298,13 @@ export default async function PredictionsPage() {
                           <TableRow key={p.id} className="border-white/10 hover:bg-white/5 transition-colors">
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
-                                <span className="text-2xl">{data.flag}</span>
+                                <CountryFlag
+                                  code={data.code}
+                                  flag={data.flag}
+                                  name={data.name}
+                                  className="h-6 w-8 shrink-0 rounded object-cover"
+                                  emojiClassName="text-2xl leading-none"
+                                />
                                 <span className="font-display font-bold text-gradient">{data.name}</span>
                               </div>
                             </TableCell>
