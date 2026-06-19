@@ -22,17 +22,20 @@ export function Countdown() {
   return (
     <div className="grid grid-cols-4 gap-2 sm:gap-3">
       {items.map(([label, v]) => (
-        <div key={label} className="glass rounded-xl px-3 py-3 text-center">
+        <div
+          key={label}
+          className="rounded-xl border border-slate-200/80 bg-white/85 px-3 py-3 text-center shadow-[0_10px_24px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_12px_28px_rgba(0,0,0,0.22)]"
+        >
           <div
             suppressHydrationWarning
-            className="font-display text-2xl sm:text-3xl font-black tabular-nums leading-none text-foreground"
+            className="font-display text-2xl sm:text-3xl font-black tabular-nums leading-none text-rose-700 dark:text-rose-500"
             style={{
-              textShadow: "0 0 16px rgba(255,255,255,0.15), 0 2px 6px rgba(0,0,0,0.2)",
+              textShadow: "0 0 14px rgba(190,24,93,0.12), 0 2px 8px rgba(15,23,42,0.12)",
             }}
           >
             {String(v).padStart(2, "0")}
           </div>
-          <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
+          <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">{label}</div>
         </div>
       ))}
     </div>

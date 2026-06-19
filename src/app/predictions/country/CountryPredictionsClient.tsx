@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
@@ -66,6 +66,7 @@ export default function CountryPredictionsClient({
   const [isSimulating, setIsSimulating] = useState(false);
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
+  const hasSeenSelectionChange = useRef(false);
   const formattedModelName = selectedModel ? selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1) : "";
 
   const openAuthModal = (mode: "signin" | "signup" = "signin") => {
@@ -480,6 +481,19 @@ export default function CountryPredictionsClient({
     }
   }, [selectedCode, selectedModel, mounted]);
 
+  useEffect(() => {
+    if (!mounted || !isInitialized) return;
+
+    if (!hasSeenSelectionChange.current) {
+      hasSeenSelectionChange.current = true;
+      return;
+    }
+
+    if (session) {
+      setShowConfirmPopup(true);
+    }
+  }, [selectedCode, selectedModel, mounted, isInitialized, session]);
+
   // Sort and filter teams list in sidebar
   const sortedTeams = useMemo(() => {
     return [...appTeams].sort((a, b) => b.elo - a.elo);
@@ -639,7 +653,7 @@ export default function CountryPredictionsClient({
   if (!mounted) return null;
 
   return (
-    <div className="mx-auto max-w-[1600px] w-full px-4 py-8 md:px-8 animate-in fade-in duration-700">
+    <div className="mx-auto container mx-auto px-4 w-full  py-8   animate-in fade-in duration-700">
       {/* Premium Dashboard Header */}
       <div className="relative mb-10 overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900">
         <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-emerald-100/70 blur-3xl pointer-events-none dark:bg-neon/10" />
@@ -688,7 +702,7 @@ export default function CountryPredictionsClient({
                 <div className="text-xs text-muted-foreground mt-0.5">Browse and simulate every national team</div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="min-h-0 flex-col px-5 pb-5 data-[state=open]:flex data-[state=open]:flex-1">
+            <AccordionContent className="min-h-0 px-5 pb-5 data-[state=open]:flex data-[state=open]:flex-1 [&>div]:flex [&>div]:h-full [&>div]:min-h-0 [&>div]:flex-1 [&>div]:flex-col [&>div]:pb-0">
               <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="relative mb-5 group">
                   <Search className="absolute inset-y-0 left-3.5 h-4 w-4 my-auto text-muted-foreground group-focus-within:text-neon transition-colors" />
@@ -700,7 +714,7 @@ export default function CountryPredictionsClient({
                   />
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1.5 scrollbar-custom pb-16">
+                <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-custom ">
                   {filteredTeams.map((t) => {
                     const active = t.code === selectedCode;
                     return (
@@ -1476,7 +1490,7 @@ export default function CountryPredictionsClient({
                         runSimulations();
                       }}
                       disabled={isSimulating}
-                      className="px-5 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] text-slate-950 hover:scale-[1.02] active:scale-95 transition-all shadow-md disabled:opacity-50"
+                      className="px-5 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] text-white hover:scale-[1.02] active:scale-95 transition-all shadow-md disabled:opacity-50"
                     >
                       Run Simulation
                     </button>

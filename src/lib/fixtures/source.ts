@@ -16,6 +16,7 @@ type StadiumApiRecord = {
   name_en?: string;
   fifa_name?: string;
   city_en?: string;
+  region?: string;
 };
 
 type GameApiRecord = {
@@ -49,6 +50,9 @@ export type FixturesSource = {
 export type FixtureView = {
   match_no: number;
   date: string;
+  kickoffTime: string;
+  kickoffAtIso: string;
+  timezoneLabel: string;
   group: string;
   homeTeamObj: {
     name: string;
@@ -74,7 +78,42 @@ type TeamView = FixtureView["homeTeamObj"];
 type StadiumView = {
   venue: string;
   city: string;
+  region: string;
 };
+
+function getRegionTimezoneMeta(region?: string) {
+  const normalizedRegion = String(region || "").toLowerCase();
+
+  if (normalizedRegion.includes("eastern")) {
+    return {
+      utcOffsetHours: 4,
+      shortLabel: "EDT",
+      fullLabel: "Eastern Time",
+    };
+  }
+
+  if (normalizedRegion.includes("central")) {
+    return {
+      utcOffsetHours: 5,
+      shortLabel: "CDT",
+      fullLabel: "Central Time",
+    };
+  }
+
+  if (normalizedRegion.includes("western")) {
+    return {
+      utcOffsetHours: 7,
+      shortLabel: "PDT",
+      fullLabel: "Pacific Time",
+    };
+  }
+
+  return {
+    utcOffsetHours: 4,
+    shortLabel: "EDT",
+    fullLabel: "Eastern Time",
+  };
+}
 
 function getFlagEmoji(countryCode: string) {
   if (!countryCode || countryCode.length !== 2) return "🏳️";
@@ -97,15 +136,6 @@ function getStageName(type: string | undefined) {
   return "Knockout Stage";
 }
 
-function getTodayDate() {
-  const today = new Date().toISOString().split("T")[0];
-  if (today.startsWith("2026-06") || today.startsWith("2026-07")) {
-    return today;
-  }
-
-  return "2026-06-17";
-}
-
 function formatMatchDate(localDate?: string) {
   if (!localDate) return "";
 
@@ -120,6 +150,73 @@ function formatMatchDate(localDate?: string) {
     console.error("Error parsing game date:", localDate, error);
     return "";
   }
+}
+
+function formatMatchTime(localDate?: string) {
+  if (!localDate) return "";
+
+  try {
+    const [, timePart = ""] = localDate.trim().split(/\s+/);
+    return timePart;
+  } catch (error) {
+    console.error("Error parsing game time:", localDate, error);
+    return "";
+  }
+}
+
+function parseMatchDateTime(localDate?: string, region?: string) {
+  if (!localDate) return null;
+
+  try {
+    const [datePart, timePart] = localDate.trim().split(/\s+/);
+    if (!datePart) return null;
+
+    const dateParts = datePart.split("/");
+    if (dateParts.length !== 3) return null;
+
+    const [month, day, year] = dateParts;
+    const [hours = "0", minutes = "0"] = (timePart || "00:00").split(":");
+    const { utcOffsetHours } = getRegionTimezoneMeta(region);
+    const parsed = new Date(
+      Date.UTC(
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        Number(hours) + utcOffsetHours,
+        Number(minutes),
+        0,
+        0
+      )
+    );
+
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  } catch (error) {
+    console.error("Error parsing game date time:", localDate, error);
+    return null;
+  }
+}
+
+function hasLiveElapsedSignal(rawElapsed: string) {
+  const elapsed = rawElapsed.trim().toLowerCase();
+  if (!elapsed || elapsed === "notstarted") return false;
+  if (elapsed === "finished" || elapsed === "ft" || elapsed === "fulltime") return false;
+  if (/^\d+$/.test(elapsed)) return true;
+
+  return [
+    "live",
+    "half",
+    "break",
+    "injury",
+    "extra",
+    "pen",
+    "2nd",
+    "1st",
+  ].some((token) => elapsed.includes(token));
+}
+
+function getDerivedLiveMinute(kickoffAt: Date, now: Date) {
+  const elapsedMinutes = Math.max(1, Math.floor((now.getTime() - kickoffAt.getTime()) / 60000));
+  return String(Math.min(elapsedMinutes, 120));
 }
 
 function buildTeamsMap(teamsData: TeamsPayload) {
@@ -144,6 +241,7 @@ function buildStadiumsMap(stadiumsData: StadiumsPayload) {
     stadiumsMap[String(stadium.id)] = {
       venue: stadium.name_en || stadium.fifa_name || "TBD",
       city: stadium.city_en || "TBD",
+      region: stadium.region || "",
     };
   }
 
@@ -159,9 +257,9 @@ function normalizeScore(value: string | number | null | undefined, fallback: str
 }
 
 export function mapFixtures({ gamesData, teamsData, stadiumsData }: FixturesSource): FixtureView[] {
-  const today = getTodayDate();
   const teamsMap = buildTeamsMap(teamsData);
   const stadiumsMap = buildStadiumsMap(stadiumsData);
+  const now = new Date();
 
   return (gamesData.games || [])
     .map((game, index) => {
@@ -183,24 +281,39 @@ export function mapFixtures({ gamesData, teamsData, stadiumsData }: FixturesSour
       const stadium = stadiumsMap[String(game.stadium_id)] || {
         venue: "TBD",
         city: "TBD",
+        region: "",
       };
+      const timezoneMeta = getRegionTimezoneMeta(stadium.region);
 
       const formattedDate = formatMatchDate(game.local_date);
-      const elapsed = String(game.time_elapsed || "").toLowerCase();
+      const kickoffAt = parseMatchDateTime(game.local_date, stadium.region);
+      const rawElapsed = String(game.time_elapsed || "");
+      const elapsed = rawElapsed.toLowerCase();
       const isFinished =
-        String(game.finished || "").toUpperCase() === "TRUE" || elapsed === "finished";
+        String(game.finished || "").toUpperCase() === "TRUE" ||
+        elapsed === "finished" ||
+        elapsed === "ft" ||
+        elapsed === "fulltime";
+      const isWithinLiveWindow =
+        kickoffAt !== null &&
+        now >= kickoffAt &&
+        now < new Date(kickoffAt.getTime() + 3 * 60 * 60 * 1000);
+      const isLive = !isFinished && isWithinLiveWindow;
 
       let status = "UPCOMING";
-      let timeElapsed = String(game.time_elapsed || "notstarted");
+      let timeElapsed = "notstarted";
 
-      if (isFinished || (formattedDate && formattedDate < today)) {
+      if (isFinished) {
         status = "COMPLETED";
         timeElapsed = "finished";
-      } else if (formattedDate === today) {
+      } else if (isLive) {
         status = "LIVE";
-        timeElapsed = elapsed && elapsed !== "notstarted" ? String(game.time_elapsed) : "44";
-      } else {
-        timeElapsed = "notstarted";
+        timeElapsed =
+          rawElapsed && rawElapsed.toLowerCase() !== "notstarted" && hasLiveElapsedSignal(rawElapsed)
+            ? rawElapsed
+            : kickoffAt
+              ? getDerivedLiveMinute(kickoffAt, now)
+              : "LIVE";
       }
 
       const matchNo = Number.parseInt(String(game.id || index + 1), 10);
@@ -208,6 +321,9 @@ export function mapFixtures({ gamesData, teamsData, stadiumsData }: FixturesSour
       return {
         match_no: Number.isNaN(matchNo) ? index + 1 : matchNo,
         date: formattedDate,
+        kickoffTime: formatMatchTime(game.local_date),
+        kickoffAtIso: kickoffAt ? kickoffAt.toISOString() : "",
+        timezoneLabel: timezoneMeta.shortLabel,
         group: game.group || "",
         homeTeamObj: homeTeam,
         awayTeamObj: awayTeam,
@@ -217,15 +333,11 @@ export function mapFixtures({ gamesData, teamsData, stadiumsData }: FixturesSour
         homeScore:
           status === "UPCOMING"
             ? "-"
-            : status === "COMPLETED"
-            ? normalizeScore(game.home_score, "2")
-            : normalizeScore(game.home_score, "0"),
+            : normalizeScore(game.home_score, status === "LIVE" ? "0" : "-"),
         awayScore:
           status === "UPCOMING"
             ? "-"
-            : status === "COMPLETED"
-            ? normalizeScore(game.away_score, "0")
-            : normalizeScore(game.away_score, "0"),
+            : normalizeScore(game.away_score, status === "LIVE" ? "0" : "-"),
         time_elapsed: timeElapsed,
         isKnockout: game.type !== "group",
         stageName: getStageName(game.type),

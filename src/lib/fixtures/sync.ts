@@ -60,6 +60,9 @@ export async function readFixturesFromDb() {
     fixtures: rows.map((row) => ({
       match_no: row.matchNo,
       date: row.date,
+      kickoffTime: "",
+      kickoffAtIso: "",
+      timezoneLabel: "",
       group: row.group,
       homeTeamObj: {
         name: row.homeTeamName,

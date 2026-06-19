@@ -5,7 +5,7 @@ import { Trophy } from "lucide-react";
 export function Footer() {
   return (
     <footer className="border-t border-white/5 mt-10">
-      <div className="mx-auto max-w-7xl px-4 py-10 md:px-6 grid gap-6 md:grid-cols-4">
+      <div className="mx-auto container mx-auto px-4 py-10   grid gap-6 md:grid-cols-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="grid h-8 w-8 place-items-center rounded-md bg-gradient-to-br from-neon to-neon-2 text-background"><Trophy className="h-4 w-4" /></span>

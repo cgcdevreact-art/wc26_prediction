@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Search, Calendar, MapPin, Trophy } from "lucide-react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
+import { EmptyFixturesState } from "./EmptyFixturesState";
 
 const isNumericString = (val: any) => /^\d+$/.test(String(val));
 
@@ -17,6 +18,7 @@ export function FixturesExplorer() {
   const [fixtures, setFixtures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [now, setNow] = useState(() => Date.now());
 
   const groups = ["ALL", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
 
@@ -58,6 +60,11 @@ export function FixturesExplorer() {
       active = false;
       clearInterval(interval);
     };
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
   }, []);
 
   // Flatten and prepare fixtures data (filter by stage)
@@ -146,8 +153,28 @@ export function FixturesExplorer() {
     setSelectedLocation("");
   };
 
+  const formatCountdown = (kickoffAtIso?: string, status?: string) => {
+    if (status === "COMPLETED") return "FT";
+    if (status === "LIVE") return "Live now";
+    if (!kickoffAtIso) return "TBD";
+
+    const diffMs = new Date(kickoffAtIso).getTime() - now;
+    if (diffMs <= 0) return "Starting now";
+
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (days > 0) return `In ${days}d ${hours}h`;
+    if (hours > 0) return `In ${hours}h ${minutes}m`;
+    if (minutes > 0) return `In ${minutes}m ${seconds}s`;
+    return `In ${seconds}s`;
+  };
+
   return (
-    <section className="mx-auto max-w-7xl px-4 py-16 md:px-6">
+    <section className="container mx-auto px-4 py-16  ">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
         <div>
           <div className="text-xs uppercase tracking-[0.25em] text-neon">Tournament Schedule</div>
@@ -281,7 +308,8 @@ export function FixturesExplorer() {
       </div>
 
       {/* Fixtures display list / table */}
-      <div className="glass overflow-x-auto rounded-2xl border border-border dark:border-white/10 shadow-xl max-h-[600px] overflow-y-auto scrollbar-custom">
+      <div className="glass rounded-2xl border border-border dark:border-white/10 shadow-xl overflow-hidden">
+        <div className="max-h-[600px] overflow-y-auto overflow-x-auto scrollbar-custom">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-muted-foreground">
             <div className="h-10 w-10 border-4 border-neon border-t-transparent rounded-full animate-spin"></div>
@@ -297,8 +325,8 @@ export function FixturesExplorer() {
               <thead className="sticky top-0 z-10 text-[10px] uppercase tracking-wider bg-muted dark:bg-[#090e1c] border-b border-border dark:border-white/10 text-muted-foreground">
                 <tr>
                   <th className="px-5 py-3.5 font-medium w-16 text-center">Match</th>
-                  <th className="px-5 py-3.5 font-medium w-36">Date</th>
-                  {activeStage === "group" && <th className="px-5 py-3.5 font-medium w-16 text-center">Gp</th>}
+                  <th className="px-5 py-3.5 font-medium w-48">Date & Time</th>
+                  {activeStage === "group" && <th className="px-5 py-3.5 font-medium w-16 text-center">Group</th>}
                   <th className="px-5 py-3.5 font-medium text-center">Matchup</th>
                   <th className="px-5 py-3.5 font-medium">Venue & City</th>
                 </tr>
@@ -320,9 +348,32 @@ export function FixturesExplorer() {
                         #{f.match_no || i + 1}
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-3.5 w-3.5 text-muted-foreground/60" />
-                          <span className="font-semibold text-foreground">{formatDateLabel(f.date)}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5 text-foreground">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground/60" />
+                            <span className="text-sm font-bold">{formatDateLabel(f.date)}</span>
+                          </div>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-xs font-medium text-muted-foreground tabular-nums">
+                              {f.kickoffTime || "TBD"}
+                            </span>
+                            {f.timezoneLabel ? (
+                              <span className="text-[10px] font-medium text-muted-foreground/70">
+                                {f.timezoneLabel}
+                              </span>
+                            ) : null}
+                          </div>
+                          <span
+                            className={`text-[10px] font-bold mt-1 ${
+                              f.status === "LIVE"
+                                ? "text-red-500"
+                                : f.status === "COMPLETED"
+                                  ? "text-muted-foreground"
+                                  : "text-cyan-700 dark:text-neon"
+                            }`}
+                          >
+                            {formatCountdown(f.kickoffAtIso, f.status)}
+                          </span>
                         </div>
                       </td>
                       {activeStage === "group" && (
@@ -348,12 +399,12 @@ export function FixturesExplorer() {
                           {/* Score / Status Display */}
                           {isLive ? (
                             <div className="flex flex-col items-center shrink-0 min-w-[80px]">
-                              <span className="text-sm font-black font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)] animate-pulse">
-                                VS
+                              <span className="text-sm font-black font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                                {score.homeGoals} - {score.awayGoals}
                               </span>
                               <span className="text-[9px] uppercase tracking-wider font-extrabold text-red-500 mt-1 flex items-center gap-1">
                                 <span className="h-1 w-1 rounded-full bg-red-500 animate-ping" />
-                                LIVE {f.time_elapsed && isNumericString(f.time_elapsed) ? f.time_elapsed + "'" : (f.time_elapsed || "")}
+                                LIVE {f.time_elapsed && isNumericString(f.time_elapsed) ? `${f.time_elapsed}'` : f.time_elapsed === "LIVE" ? "NOW" : (f.time_elapsed || "")}
                               </span>
                             </div>
                           ) : f.status === "COMPLETED" ? (
@@ -396,15 +447,18 @@ export function FixturesExplorer() {
                     </tr>
                   );
                 })}
+                {filteredFixtures.length === 0 && (
+                  <tr>
+                    <td colSpan={activeStage === "group" ? 5 : 4} className="p-0">
+                      <EmptyFixturesState onReset={handleReset} />
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
-            {filteredFixtures.length === 0 && (
-              <div className="text-center py-20 text-muted-foreground">
-                No fixtures match the selected filters.
-              </div>
-            )}
           </>
         )}
+        </div>
       </div>
     </section>
   );

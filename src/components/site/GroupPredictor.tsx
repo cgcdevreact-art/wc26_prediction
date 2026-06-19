@@ -1703,8 +1703,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     }
   }, [selectedModel, isInitialized]);
 
+  const toolbarButtonClass =
+    "inline-flex min-h-[56px] min-w-[156px] items-center justify-center gap-2 rounded-[1.2rem] border border-slate-300 bg-white px-4 py-2.5 text-center text-sm font-black text-slate-950 shadow-sm transition-all duration-200 hover:border-transparent hover:bg-gradient-to-r hover:from-[#0a8a45] hover:via-[#2c7c87] hover:to-[#af3fd1] hover:text-white hover:shadow-[0_16px_35px_rgba(44,124,135,0.22)] active:scale-[0.98] dark:border-white/10 dark:bg-slate-900 dark:text-white dark:hover:border-transparent";
+  const primaryToolbarButtonClass =
+    "inline-flex min-h-[56px] min-w-[156px] items-center justify-center gap-2 rounded-[1.2rem] border border-transparent bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] px-4 py-2.5 text-center text-sm font-black text-white shadow-[0_16px_35px_rgba(44,124,135,0.22)] transition-all duration-200 hover:opacity-95 hover:shadow-[0_20px_40px_rgba(44,124,135,0.28)] active:scale-[0.98]";
+
   return (
-    <div className={`mx-auto px-2 py-8 md:px-4 transition-all duration-300 ${fullWidth || activeTab === "knockout" ? "max-w-none w-full" : "max-w-7xl"}`}>
+    <div className={`container mx-auto px-4  py-8  transition-all duration-300 ${fullWidth || activeTab === "knockout" ? "container" : "container"}`}>
       {/* Guest Warnings Banner */}
       {!session && (
         <div className="mb-6 p-4 rounded-xl border border-green-600/30 dark:border-green-500/30 bg-green-100/50 dark:bg-green-900/20 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -1734,7 +1739,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               {onlyKnockout ? "Knockout Bracket Builder" : "World Cup 2026 Simulator"}
             </h1>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 max-w-[450px] text-sm text-muted-foreground">
             {onlyKnockout 
               ? "Build your knockout bracket from the Round of 32 down to the Champion."
               : "Fully interactive 48-team tournament predictor. Set scores, qualify third-places, and build your knockout bracket."
@@ -1757,7 +1762,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           <button
             onClick={handleSaveProgress}
             disabled={isSaving}
-            className="flex items-center gap-2 rounded-lg bg-indigo-600 dark:bg-indigo-500 text-white px-4 py-2 text-sm font-bold hover:bg-indigo-700 dark:hover:bg-indigo-400 transition shadow-[0_0_15px_rgba(79,70,229,0.3)] disabled:opacity-50"
+            className={`${toolbarButtonClass} disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-slate-300 disabled:hover:bg-white disabled:hover:text-slate-950 dark:disabled:hover:border-white/10 dark:disabled:hover:bg-slate-900 dark:disabled:hover:text-white`}
           >
             {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
             Save Progress
@@ -1766,14 +1771,14 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             <>
               <button
                 onClick={handleAiPredictKnockoutsWithCredits}
-                className="flex items-center gap-2 rounded-lg bg-neon text-black px-4 py-2 text-sm font-bold hover:bg-neon/90 transition"
+                className={primaryToolbarButtonClass}
               >
                 <Sparkles className="h-4 w-4" />
                 Simulate Bracket
               </button>
               <button
                 onClick={handleReset}
-                className="flex items-center gap-2 rounded-lg bg-muted dark:bg-zinc-800 text-foreground dark:text-white px-4 py-2 text-sm font-bold border border-border dark:border-zinc-700 hover:bg-muted/85 dark:hover:bg-zinc-700 transition"
+                className={toolbarButtonClass}
               >
                 <RefreshCw className="h-4 w-4" />
                 Reset
@@ -1789,22 +1794,22 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                     setSelectedGroups(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"]);
                   }
                 }}
-                className="flex items-center gap-2 rounded-lg bg-muted dark:bg-zinc-800 text-foreground dark:text-white border border-border dark:border-zinc-700 px-4 py-2 text-sm font-bold hover:bg-muted/85 dark:hover:bg-zinc-700 transition"
+                className={toolbarButtonClass}
               >
                 {selectedGroups.length === 12 ? "Deselect All" : "Select All"}
               </button>
               <button
                 onClick={handleAiPredictWithCredits}
-                className="flex items-center gap-2 rounded-lg bg-neon text-black px-4 py-2 text-sm font-bold hover:bg-neon/90 transition shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                className={primaryToolbarButtonClass}
               >
                 <Sparkles className="h-4 w-4" />
                 {selectedGroups.length > 0 ? `Simulate Selected` : "Simulate All"}
               </button>
               <button
                 onClick={handleReset}
-                className="flex items-center gap-2 rounded-lg bg-muted dark:bg-zinc-800 text-foreground dark:text-white border border-border dark:border-zinc-700 px-4 py-2 text-sm font-bold hover:bg-muted/85 dark:hover:bg-zinc-700 transition"
+                className={toolbarButtonClass}
               >
-                <RefreshCw className="h-4 w-4 text-red-500" />
+                <RefreshCw className="h-4 w-4" />
                 Reset
               </button>
             </>

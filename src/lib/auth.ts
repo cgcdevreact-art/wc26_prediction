@@ -14,6 +14,7 @@ declare module "next-auth" {
       id: string;
       subscriptionTier: string;
       freeModelUsageCount: number;
+      role: string;
     } & DefaultSession["user"]
   }
 }
@@ -57,6 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           email: user.email,
           image: user.image,
+          role: user.role,
         };
       },
     }),
@@ -77,6 +79,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.role = (user as any).role || "user";
       }
       return token;
     },
@@ -91,6 +94,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             subscriptionTier: true,
             freeModelUsageCount: true,
             stripeCurrentPeriodEnd: true,
+            role: true,
           }
         });
 
@@ -111,9 +115,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
           session.user.subscriptionTier = tier;
           session.user.freeModelUsageCount = dbUser.freeModelUsageCount;
+          session.user.role = dbUser.role;
         } else {
           session.user.subscriptionTier = "free";
           session.user.freeModelUsageCount = 0;
+          session.user.role = "user";
         }
       }
       return session;

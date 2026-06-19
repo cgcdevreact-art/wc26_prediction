@@ -19,7 +19,7 @@ export function LiveStats() {
   ];
   return (
     <section className="border-y border-white/5 bg-gradient-to-b from-transparent to-white/[0.02]">
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
+      <div className="container mx-auto px-4 py-6 ">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           {items.map((it) => (
             <div key={it.label} className="glass rounded-xl p-3">

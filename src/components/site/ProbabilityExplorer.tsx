@@ -129,7 +129,7 @@ export function ProbabilityExplorer() {
   };
 
   return (
-    <section id="predict" className="mx-auto max-w-7xl px-4 py-16 md:px-6">
+    <section id="predict" className="container mx-auto px-4 py-16  ">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-white/5 pb-6">
         <SectionHeader
           eyebrow="Team Probability Explorer"

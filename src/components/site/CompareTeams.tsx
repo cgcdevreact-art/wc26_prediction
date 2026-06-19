@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTheme } from "@/components/ThemeProvider";
 import { useTeams } from "@/components/TeamsProvider";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, Legend } from "recharts";
 import { SectionHeader } from "./ProbabilityExplorer";
@@ -9,10 +10,25 @@ import { CountryFlag } from "@/components/ui/CountryFlag";
 
 export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
   const teams = useTeams();
+  const { theme } = useTheme();
   const [a, setA] = useState("ARG");
   const [b, setB] = useState("BRA");
   const tA = teams.find(t => t.code === a) || teams[0];
   const tB = teams.find(t => t.code === b) || teams[0];
+
+  const activeTheme = useMemo(() => {
+    if (theme === "system") {
+      if (typeof window !== "undefined") {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      return "dark";
+    }
+    return theme;
+  }, [theme]);
+
+  const radarGridStroke = activeTheme === "light" ? "rgba(71,85,105,0.28)" : "rgba(255,255,255,0.18)";
+  const radarAxisFill = activeTheme === "light" ? "rgba(15,23,42,0.78)" : "rgba(255,255,255,0.72)";
+  const radarLegendColor = activeTheme === "light" ? "rgba(51,65,85,0.9)" : "rgba(226,232,240,0.9)";
 
   const data = [
     { axis: "Attack", a: tA.attack, b: tB.attack },
@@ -51,11 +67,11 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
           <div className="mt-4 h-72">
             <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
               <RadarChart data={data} outerRadius={80}>
-                <PolarGrid stroke="rgba(255,255,255,0.1)" />
-                <PolarAngleAxis dataKey="axis" tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }} />
+                <PolarGrid stroke={radarGridStroke} />
+                <PolarAngleAxis dataKey="axis" tick={{ fill: radarAxisFill, fontSize: 11, fontWeight: 600 }} />
                 <Radar name={tA.code} dataKey="a" stroke="var(--color-neon)" fill="var(--color-neon)" fillOpacity={0.3} />
                 <Radar name={tB.code} dataKey="b" stroke="var(--color-neon-2)" fill="var(--color-neon-2)" fillOpacity={0.3} />
-                <Legend wrapperStyle={{ fontSize: 12, color: "var(--color-muted-foreground)" }} />
+                <Legend wrapperStyle={{ fontSize: 12, color: radarLegendColor }} />
               </RadarChart>
             </ResponsiveContainer>
           </div>

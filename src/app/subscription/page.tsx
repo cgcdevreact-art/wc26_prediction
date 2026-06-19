@@ -112,7 +112,7 @@ export default function SubscriptionPage() {
     <div className="min-h-screen bg-hero text-foreground">
       <Header />
       
-      <main className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-24">
+      <main className="container mx-auto px-4 py-16  md:py-24">
         {/* Page Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="inline-flex items-center gap-2 rounded-full glass px-3.5 py-1 text-xs uppercase tracking-[0.25em] text-neon mb-4">

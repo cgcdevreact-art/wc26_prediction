@@ -17,7 +17,7 @@ const SAMPLE_FIXTURES = [
 
 export function MatchCenter() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-16 md:px-6">
+    <section className="container mx-auto px-4 py-16  ">
       <SectionHeader eyebrow="Match Prediction Center" title="Predict every match. Earn every point." sub="Win % splits, AI analysis and head-to-head — all in one place." />
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         {SAMPLE_FIXTURES.map((f) => <MatchCard key={f.id} fixture={f} />)}

@@ -31,6 +31,7 @@ model User {
   stripeCurrentPeriodEnd DateTime?
   subscriptionTier      String    @default("free")
   freeModelUsageCount   Int       @default(0)
+  role                  String    @default("user")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

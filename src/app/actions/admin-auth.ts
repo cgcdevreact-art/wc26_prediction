@@ -4,21 +4,22 @@ import { signIn } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AuthError } from "next-auth";
 
-export async function loginAction(email: string, password: string, callbackUrl: string) {
+export async function adminLoginAction(email: string, password: string) {
   try {
-    // Check if user is admin — redirect to admin dashboard
+    // First verify the user is an admin before attempting sign in
     const user = await prisma.user.findUnique({
       where: { email },
       select: { role: true },
     });
 
-    const isAdmin = user?.role === "admin";
-    const finalRedirect = isAdmin ? "/admin" : callbackUrl;
+    if (!user || user.role !== "admin") {
+      return { error: "Access denied. Admin privileges required." };
+    }
 
     await signIn("credentials", {
       email,
       password,
-      redirectTo: finalRedirect,
+      redirectTo: "/admin",
     });
   } catch (error) {
     if (error instanceof AuthError) {

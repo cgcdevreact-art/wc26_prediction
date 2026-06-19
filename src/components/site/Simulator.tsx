@@ -52,7 +52,7 @@ export function Simulator({ compact = false }: { compact?: boolean }) {
   const champ = results?.[0]?.team ?? teams[0];
 
   return (
-    <section id="simulator" className="mx-auto max-w-7xl px-4 py-16 md:px-6">
+    <section id="simulator" className="container mx-auto px-4 py-16 ">
       {!compact && (
         <SectionHeader
           eyebrow="Tournament Simulator"

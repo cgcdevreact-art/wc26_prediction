@@ -21,7 +21,7 @@ export function BracketPreview() {
   const finalists = [sf[0][0], sf[1][0]];
   const champ = "ARG";
   return (
-    <section className="mx-auto max-w-7xl px-4 py-16 md:px-6">
+    <section className="container mx-auto px-4 py-16 ">
       <SectionHeader eyebrow="Knockout Bracket" title="Build your bracket. Share your champion." sub="Drag-and-drop your way through QF, SF and Final. Lock in your winner and share a card with friends." />
       <div className="mt-8 glass-strong rounded-2xl p-6 overflow-x-auto">
         <div className="grid min-w-[820px] grid-cols-[1fr_1fr_1fr_1fr] gap-6 items-center">

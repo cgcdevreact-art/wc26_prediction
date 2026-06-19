@@ -32,7 +32,7 @@ export function Hero() {
         <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-neon-2/20 blur-3xl" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-neon/60 to-transparent" />
       </div>
-      <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-16 md:px-6 md:py-24 lg:grid-cols-2 lg:items-center">
+      <div className="relative mx-auto grid container mx-auto px-4 gap-10  py-16 md:px-6 md:py-24 lg:grid-cols-2 lg:items-center">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-xs uppercase tracking-[0.25em] text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-neon" /> FIFA World Cup 2026 · USA · Canada · Mexico

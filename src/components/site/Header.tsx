@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Trophy, Menu, LogOut, Sun, Moon, ChevronDown, Check, Sparkles, Brain, Cpu, LayoutGrid, FolderKanban } from "lucide-react";
+import { Trophy, Menu, LogOut, Sun, Moon, ChevronDown, Check, Sparkles, Brain, Cpu, LayoutGrid, FolderKanban, UserCircle2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "@/components/ThemeProvider";
@@ -112,7 +112,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 glass">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6">
+      <div className="container mx-auto flex px-4 items-center justify-between py-3">
         <Link href="/" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-neon to-neon-2 text-background">
             <Trophy className="h-5 w-5" strokeWidth={2.4} />
@@ -285,6 +285,14 @@ export function Header() {
               {profileMenuOpen && (
                 <div className="absolute right-0 mt-2 w-52 rounded-xl border border-border dark:border-white/10 bg-white/95 dark:bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
                   <Link
+                    href="/profile"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
+                  >
+                    <UserCircle2 className="h-4 w-4 shrink-0" />
+                    <span>Profile</span>
+                  </Link>
+                  <Link
                     href="/predictions"
                     onClick={() => setProfileMenuOpen(false)}
                     className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
@@ -403,6 +411,14 @@ export function Header() {
                     </span>
                   )}
                 </div>
+                <Link
+                  href="/profile"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <UserCircle2 className="h-3.5 w-3.5" />
+                  <span>Profile</span>
+                </Link>
                 <Link
                   href="/predictions"
                   onClick={() => setOpen(false)}
