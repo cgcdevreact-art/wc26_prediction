@@ -62,7 +62,7 @@ export function getFlagImageSrc(teamCode?: string | null) {
   return `https://flagcdn.com/w80/${asset}.png`;
 }
 
-export function isFlagImage(value?: string | null) {
+export function isFlagImage(value?: string | null): value is string {
   return typeof value === "string" && /^https?:\/\//.test(value);
 }
 
