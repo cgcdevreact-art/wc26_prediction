@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTeams } from "@/components/TeamsProvider";
 import { UpgradeModal } from "@/components/site/UpgradeModal";
-import { PlayersRankingsTable } from "@/components/site/PlayersRankingsTable";
 import { useSimulationStore, TeamStats, PlayerStats } from "@/lib/store/simulationStore";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 
@@ -35,7 +34,7 @@ type RankingSortKey =
   | "playersCount"
   | "eliteCount"
   | "strongCount"
-  // | "winProbability"
+  | "winProbability"
   | "rank"
   | "elo"
   | "attack"
@@ -62,12 +61,10 @@ export default function TeamsClient({
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalReason, setModalReason] = useState<"plus" | "pro" | "credits" | "guest">("plus");
-  const [activeTab, setActiveTab] = useState("list");
   const [rankingSearch, setRankingSearch] = useState("");
-  const [rankingTeamFilter, setRankingTeamFilter] = useState("ALL");
   const [rankingSort, setRankingSort] = useState<{ key: RankingSortKey; direction: "asc" | "desc" }>({
-    key: "rank",
-    direction: "asc",
+    key: "winProbability",
+    direction: "desc",
   });
 
   const subTier = session?.user?.subscriptionTier || "free";
@@ -151,35 +148,21 @@ export default function TeamsClient({
   const filteredRankingTeams = useMemo(() => {
     if (!rankingSearch) return rankingTeams;
     const lowerSearch = rankingSearch.toLowerCase();
-    return rankingTeams.filter((team) =>
-      team.name.toLowerCase().includes(lowerSearch) ||
-      team.code.toLowerCase().includes(lowerSearch),
+    return rankingTeams.filter(
+      (team) =>
+        team.name.toLowerCase().includes(lowerSearch) ||
+        team.code.toLowerCase().includes(lowerSearch),
     );
   }, [rankingSearch, rankingTeams]);
 
-  const rankingTeamOptions = useMemo(
-    () => [
-      { code: "ALL", name: "All Teams" },
-      ...rankingTeams
-        .map((team) => ({ code: team.code, name: team.name }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    ],
-    [rankingTeams],
-  );
-
-  const visibleRankingTeams = useMemo(() => {
-    if (rankingTeamFilter === "ALL") return filteredRankingTeams;
-    return filteredRankingTeams.filter((team) => team.code === rankingTeamFilter);
-  }, [filteredRankingTeams, rankingTeamFilter]);
-
   const sortedRankingTeams = useMemo(() => {
-    return [...visibleRankingTeams].sort((a, b) => {
+    return [...filteredRankingTeams].sort((a, b) => {
       const direction = rankingSort.direction === "asc" ? 1 : -1;
       const aValue = a[rankingSort.key];
       const bValue = b[rankingSort.key];
       return (aValue > bValue ? 1 : aValue < bValue ? -1 : 0) * direction;
     });
-  }, [visibleRankingTeams, rankingSort]);
+  }, [filteredRankingTeams, rankingSort]);
 
   const rankingColumns: {
     key: RankingSortKey;
@@ -190,13 +173,14 @@ export default function TeamsClient({
     { key: "playersCount", label: "Players", render: (team) => String(team.playersCount) },
     { key: "eliteCount", label: "Elite", render: (team) => String(team.eliteCount) },
     { key: "strongCount", label: "Strong", render: (team) => String(team.strongCount) },
-    { key: "rank", label: "FIFA Rank", render: (team) => `#${team.rank}` },
-    { key: "elo", label: "Elo", render: (team) => team.elo.toFixed(2) },
-    { key: "attack", label: "Attack", render: (team) => String(team.attack) },
-    { key: "defense", label: "Defense", render: (team) => String(team.defense) },
+    { key: "winProbability", label: "Win Probability", render: (team) => `${team.winProbability.toFixed(1)}%` },
+    { key: "rank", label: "FIFA Ranking", render: (team) => `#${team.rank}` },
+    { key: "elo", label: "Elo Rating", render: (team) => team.elo.toFixed(2) },
+    { key: "attack", label: "Attack Rating", render: (team) => String(team.attack) },
+    { key: "defense", label: "Defense Rating", render: (team) => String(team.defense) },
     { key: "squadValueM", label: "Squad Value", render: (team) => `€${Math.round(team.squadValueM)}M` },
-    { key: "avgAge", label: "Avg Age", render: (team) => team.avgAge.toFixed(1) },
-    { key: "goalsPerMatch", label: "Goals/Match", render: (team) => team.goalsPerMatch.toFixed(2) },
+    { key: "avgAge", label: "Average Age", render: (team) => team.avgAge.toFixed(1) },
+    { key: "goalsPerMatch", label: "Goals / Match", render: (team) => team.goalsPerMatch.toFixed(2) },
   ];
 
   const toggleRankingSort = (key: RankingSortKey) => {
@@ -227,16 +211,6 @@ export default function TeamsClient({
     router.push(`/teams/${teamCode}`);
   };
 
-  const handleTabChange = (value: string) => {
-    if (value !== "list" && subTier === "free") {
-      setModalReason("plus");
-      setModalOpen(true);
-      setActiveTab("list");
-      return;
-    }
-    setActiveTab(value);
-  };
-
   if (!mounted || !isInitialized) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -247,7 +221,7 @@ export default function TeamsClient({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+      <Tabs defaultValue="list" className="space-y-6">
         <TabsList className="h-auto rounded-full border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
           <TabsTrigger
             value="list"
@@ -260,12 +234,6 @@ export default function TeamsClient({
             className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
           >
             Team Rankings
-          </TabsTrigger>
-          <TabsTrigger
-            value="players"
-            className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
-          >
-            Player Rankings
           </TabsTrigger>
         </TabsList>
 
@@ -287,19 +255,19 @@ export default function TeamsClient({
             <table className="w-full whitespace-nowrap text-left text-sm">
               <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[11px] uppercase tracking-[0.16em] text-slate-600 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-300">
                 <tr>
-                  <th className="w-14 rounded-tl-[1.75rem] px-4 py-3.5 text-left font-semibold whitespace-nowrap">Rk</th>
-                  <th className="px-4 py-3.5 font-semibold whitespace-nowrap">Team</th>
-                  <th className="px-3 py-3.5 text-center font-semibold whitespace-nowrap">Players</th>
+                  <th className="w-16 rounded-tl-[1.75rem] px-5 py-4 text-left font-semibold whitespace-nowrap">Rk</th>
+                  <th className="px-5 py-4 font-semibold whitespace-nowrap">Team</th>
+                  <th className="px-4 py-4 text-center font-semibold whitespace-nowrap">Players</th>
                   {subTier !== "free" && (
                     <>
-                      <th className="px-3 py-3.5 text-center font-semibold whitespace-nowrap">Elite</th>
-                      <th className="px-3 py-3.5 text-center font-semibold whitespace-nowrap">Strong</th>
+                      <th className="px-4 py-4 text-center font-semibold whitespace-nowrap">Elite</th>
+                      <th className="px-4 py-4 text-center font-semibold whitespace-nowrap">Strong</th>
                     </>
                   )}
-                  <th className="w-16 px-3 py-3.5 text-center font-semibold whitespace-nowrap">Elo</th>
-                  <th className="w-14 px-3 py-3.5 text-center font-semibold whitespace-nowrap">Att</th>
-                  <th className="w-14 px-3 py-3.5 text-center font-semibold whitespace-nowrap">Def</th>
-                  <th className="w-44 rounded-tr-[1.75rem] px-4 py-3.5 text-right font-semibold whitespace-nowrap">Top Player</th>
+                  <th className="w-20 px-4 py-4 text-center font-semibold whitespace-nowrap">Elo</th>
+                  <th className="w-16 px-4 py-4 text-center font-semibold whitespace-nowrap">Att</th>
+                  <th className="w-16 px-4 py-4 text-center font-semibold whitespace-nowrap">Def</th>
+                  <th className="w-56 rounded-tr-[1.75rem] px-5 py-4 text-right font-semibold whitespace-nowrap">Top Player</th>
                 </tr>
               </thead>
               <tbody>
@@ -316,18 +284,18 @@ export default function TeamsClient({
                       onClick={() => openTeam(team["Team Code"])}
                       className="group cursor-pointer border-b border-slate-100 transition-colors hover:bg-gradient-to-r hover:from-cyan-50/50 hover:to-fuchsia-50/40 dark:border-white/5 dark:hover:bg-[linear-gradient(90deg,rgba(6,182,212,0.08),rgba(217,70,239,0.05))]"
                     >
-                      <td className="px-4 py-3.5">
-                        <span className="inline-flex min-w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
+                      <td className="px-5 py-4">
+                        <span className="inline-flex min-w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
                           {index + 1}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <CountryFlag
                             code={team["Team Code"]}
                             flag={flagMap[team["Team Code"]] || appTeam?.flag}
                             name={team.Team}
-                            className="h-6 w-8 shrink-0 rounded object-cover drop-shadow-md"
+                            className="h-7 w-9 shrink-0 rounded object-cover drop-shadow-md"
                             emojiClassName="text-2xl leading-none drop-shadow-md"
                           />
                           <div className="flex min-w-0 flex-col">
@@ -338,42 +306,42 @@ export default function TeamsClient({
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3.5 text-center">
-                        <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-slate-100 px-2.5 py-0.5 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
                           {team.Players}
                         </span>
                       </td>
                       {subTier !== "free" && (
                         <>
-                          <td className="px-3 py-3.5 text-center">
-                            <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-slate-100 px-2.5 py-0.5 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
+                          <td className="px-4 py-3 text-center">
+                            <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
                               {team.Elite || "0"}
                             </span>
                           </td>
-                          <td className="px-3 py-3.5 text-center">
-                            <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-slate-100 px-2.5 py-0.5 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
+                          <td className="px-4 py-3 text-center">
+                            <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
                               {team["Very Strong"] || "0"}
                             </span>
                           </td>
                         </>
                       )}
-                      <td className="px-3 py-3.5 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
+                      <td className="px-3 py-3 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
                         <span className="font-semibold text-slate-800 dark:text-slate-100">
                           {appTeam?.elo ? Math.round(appTeam.elo) : "-"}
                         </span>
                       </td>
-                      <td className="px-3 py-3.5 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
-                        <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-fuchsia-50 px-2.5 py-0.5 font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:ring-fuchsia-500/20">
+                      <td className="px-3 py-3 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
+                        <span className="inline-flex min-w-14 items-center justify-center rounded-full bg-fuchsia-50 px-3 py-1 font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:ring-fuchsia-500/20">
                           {formatRating(appTeam?.attack)}
                         </span>
                       </td>
-                      <td className="px-3 py-3.5 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
-                        <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-fuchsia-50 px-2.5 py-0.5 font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:ring-fuchsia-500/20">
+                      <td className="px-3 py-3 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
+                        <span className="inline-flex min-w-14 items-center justify-center rounded-full bg-fuchsia-50 px-3 py-1 font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:ring-fuchsia-500/20">
                           {formatRating(appTeam?.defense)}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-right">
-                        <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-50 to-cyan-50 px-2.5 py-1 ring-1 ring-emerald-200 dark:from-emerald-500/10 dark:to-cyan-500/10 dark:ring-emerald-500/20">
+                      <td className="px-5 py-4 text-right">
+                        <div className="inline-flex max-w-full items-center gap-2 rounded-full bg-gradient-to-r from-emerald-50 to-cyan-50 px-3 py-1.5 ring-1 ring-emerald-200 dark:from-emerald-500/10 dark:to-cyan-500/10 dark:ring-emerald-500/20">
                           <span className="truncate font-semibold text-emerald-700 dark:text-neon">
                             {topPlayerName || "N/A"}
                           </span>
@@ -399,51 +367,37 @@ export default function TeamsClient({
 
         <TabsContent value="rankings" className="space-y-6">
           <div className="space-y-5">
-            <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] md:grid-cols-2 xl:grid-cols-4 dark:border-white/10 dark:bg-slate-950">
-              <div className="relative xl:col-span-2">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <Search className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <Input
-                  type="text"
-                  placeholder="Search rankings..."
-                  value={rankingSearch}
-                  onChange={(e) => setRankingSearch(e.target.value)}
-                  className="h-12 rounded-xl border-slate-200 bg-white pl-10 text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-cyan-500 dark:border-white/10 dark:bg-white/[0.04] dark:focus-visible:ring-neon"
-                />
+            <div className="relative max-w-md">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <Search className="h-5 w-5 text-muted-foreground" />
               </div>
-
-              <select
-                value={rankingTeamFilter}
-                onChange={(e) => setRankingTeamFilter(e.target.value)}
-                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm text-foreground shadow-sm outline-none focus:border-cyan-500 dark:border-white/10 dark:bg-white/[0.04]"
-              >
-                {rankingTeamOptions.map((team) => (
-                  <option key={team.code} value={team.code}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
+              <Input
+                type="text"
+                placeholder="Search rankings..."
+                value={rankingSearch}
+                onChange={(e) => setRankingSearch(e.target.value)}
+                className="h-12 rounded-xl border-slate-200 bg-white pl-10 text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-cyan-500 dark:border-white/10 dark:bg-white/[0.04] dark:focus-visible:ring-neon"
+              />
             </div>
 
             <div className="overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
-              <table className="w-full text-left text-[13px]">
-                <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[10px] uppercase tracking-[0.14em] text-slate-600 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-300">
+              <table className="w-full min-w-[1450px] text-left text-sm">
+                <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[11px] uppercase tracking-[0.16em] text-slate-600 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-300">
                   <tr>
-                    <th className="w-12 px-3 py-3 font-semibold whitespace-nowrap">#</th>
-                    <th className="w-[180px] px-3 py-3 font-semibold whitespace-nowrap">Team</th>
+                    <th className="w-16 px-5 py-4 font-semibold whitespace-nowrap">#</th>
+                    <th className="min-w-[220px] px-5 py-4 font-semibold whitespace-nowrap">Team</th>
                     {rankingColumns.map((column) => (
-                      <th key={column.key} className="px-2.5 py-3 font-semibold whitespace-nowrap">
+                      <th key={column.key} className="px-4 py-4 font-semibold whitespace-nowrap">
                         <button
                           onClick={() => toggleRankingSort(column.key)}
-                          className="flex items-center gap-1 whitespace-nowrap text-left transition hover:text-slate-950 dark:hover:text-white"
+                          className="flex items-center gap-2 whitespace-nowrap text-left transition hover:text-slate-950 dark:hover:text-white"
                         >
                           <span>{column.label}</span>
                           {renderSortIcon(column.key)}
                         </button>
                       </th>
                     ))}
-                    <th className="w-[170px] px-3 py-3 text-right font-semibold whitespace-nowrap">Top Player</th>
+                    <th className="min-w-[220px] px-5 py-4 text-right font-semibold whitespace-nowrap">Top Player</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -453,43 +407,47 @@ export default function TeamsClient({
                       onClick={() => openTeam(team.code)}
                       className="group cursor-pointer border-b border-slate-100 transition-colors hover:bg-gradient-to-r hover:from-cyan-50/50 hover:to-fuchsia-50/40 dark:border-white/5 dark:hover:bg-[linear-gradient(90deg,rgba(6,182,212,0.08),rgba(217,70,239,0.05))]"
                     >
-                      <td className="px-3 py-3">
-                        <span className="inline-flex min-w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
+                      <td className="px-5 py-4">
+                        <span className="inline-flex min-w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
                           {index + 1}
                         </span>
                       </td>
-                      <td className="px-3 py-3">
-                        <div className="flex items-center gap-2">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
                           <CountryFlag
                             code={team.code}
                             flag={team.flag}
                             name={team.name}
-                            className="h-5 w-7 shrink-0 rounded object-cover"
-                            emojiClassName="text-xl leading-none"
+                            className="h-7 w-9 shrink-0 rounded object-cover"
+                            emojiClassName="text-2xl leading-none"
                           />
                           <div className="min-w-0">
-                            <div className="truncate text-[15px] font-semibold text-slate-950 group-hover:text-cyan-700 dark:text-white dark:group-hover:text-neon">
+                            <div className="truncate font-semibold text-slate-950 group-hover:text-cyan-700 dark:text-white dark:group-hover:text-neon">
                               {team.name}
                             </div>
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">{team.code}</div>
+                            <div className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">{team.code}</div>
                           </div>
                         </div>
                       </td>
                       {rankingColumns.map((column) => (
                         <td
                           key={column.key}
-                          className="px-2.5 py-3 font-mono tabular-nums text-slate-800 dark:text-slate-100"
+                          className="px-4 py-4 font-mono tabular-nums text-slate-800 dark:text-slate-100"
                         >
-                          {column.key === "rank" ? (
-                            <span className="inline-flex rounded-full bg-sky-50 px-2.5 py-0.5 font-semibold text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20">
+                          {column.key === "winProbability" ? (
+                            <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
+                              {column.render(team)}
+                            </span>
+                          ) : column.key === "rank" ? (
+                            <span className="inline-flex rounded-full bg-sky-50 px-3 py-1 font-semibold text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20">
                               {column.render(team)}
                             </span>
                           ) : column.key === "attack" || column.key === "defense" ? (
-                            <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-fuchsia-50 px-2 py-0.5 font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:ring-fuchsia-500/20">
+                            <span className="inline-flex min-w-14 items-center justify-center rounded-full bg-fuchsia-50 px-3 py-1 font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:ring-fuchsia-500/20">
                               {column.render(team)}
                             </span>
                           ) : column.key === "playersCount" || column.key === "eliteCount" || column.key === "strongCount" ? (
-                            <span className="inline-flex min-w-9 items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
+                            <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
                               {column.render(team)}
                             </span>
                           ) : (
@@ -497,13 +455,13 @@ export default function TeamsClient({
                           )}
                         </td>
                       ))}
-                      <td className="px-3 py-3 text-right">
-                        <div className="inline-flex max-w-full items-center gap-1 rounded-full bg-gradient-to-r from-emerald-50 to-cyan-50 px-2 py-0.5 ring-1 ring-emerald-200 dark:from-emerald-500/10 dark:to-cyan-500/10 dark:ring-emerald-500/20">
-                          <span className="truncate text-[13px] font-semibold text-emerald-700 dark:text-neon">
+                      <td className="px-5 py-4 text-right">
+                        <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-50 to-cyan-50 px-3 py-1.5 ring-1 ring-emerald-200 dark:from-emerald-500/10 dark:to-cyan-500/10 dark:ring-emerald-500/20">
+                          <span className="font-semibold text-emerald-700 dark:text-neon">
                             {team.topPlayerName}
                           </span>
                           {team.topPlayerRating && (
-                            <span className="shrink-0 text-[10px] text-slate-500 dark:text-slate-300">
+                            <span className="text-[11px] text-slate-500 dark:text-slate-300">
                               ({team.topPlayerRating})
                             </span>
                           )}
@@ -515,15 +473,11 @@ export default function TeamsClient({
               </table>
               {sortedRankingTeams.length === 0 && (
                 <div className="py-20 text-center text-muted-foreground">
-                  No ranked teams found for the current filters.
+                  No ranked teams found matching "{rankingSearch}"
                 </div>
               )}
             </div>
           </div>
-        </TabsContent>
-
-        <TabsContent value="players" className="space-y-6">
-          <PlayersRankingsTable initialPlayers={initialPlayers} flagMap={flagMap} />
         </TabsContent>
       </Tabs>
 

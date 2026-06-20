@@ -41,7 +41,7 @@ export function Hero() {
             Who Will Win the <span className="text-gradient">World Cup 2026</span>?
           </h1>
           <p className="mt-4 max-w-xl text-base text-muted-foreground sm:text-lg">
-            Run simulations, predict every match, build your bracket and compete with millions. Real probabilities. Real glory. No gambling — just bragging rights.
+            Run simulations, predict every match, build your bracket and compete with millions. Real probabilities. Real glory.
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <button
