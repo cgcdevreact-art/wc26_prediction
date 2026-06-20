@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useSimulationStore, PlayerStats, TeamStats } from "@/lib/store/simulationStore";
 import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
 import { getMatchExpectedGoals, SimTeam } from "@/lib/simulation/model";
-import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check } from "lucide-react";
+import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check, PencilLine, Lock, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
@@ -17,6 +17,7 @@ import { UpgradeModal } from "@/components/site/UpgradeModal";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
+import { CustomCountry } from "@/components/site/WildcardCountrySection";
 
 // Poisson score generator
 function getPoisson(lambda: number) {
@@ -28,6 +29,23 @@ function getPoisson(lambda: number) {
     p *= Math.random();
   } while (p > L);
   return k - 1;
+}
+
+function formatTeamScaleRating(value: number | undefined | null) {
+  if (value === undefined || value === null) return 75;
+  if (value < 10) {
+    const minM = 0.75;
+    const maxM = 1.1;
+    const minR = 50;
+    const maxR = 95;
+    const rating = ((value - minM) / (maxM - minM)) * (maxR - minR) + minR;
+    return Math.max(15, Math.min(99, Math.round(rating)));
+  }
+  return Math.max(15, Math.min(99, Math.round(value)));
+}
+
+function clampRating(value: number, min = 1, max = 99) {
+  return Math.max(min, Math.min(max, Math.round(value)));
 }
 
 export default function CountryPredictionsClient({
@@ -107,7 +125,7 @@ export default function CountryPredictionsClient({
     try {
       const res = await fetch("/api/user/credits", { method: "POST" });
       const data = await res.json();
-      
+
       if (res.status === 403) {
         setUpgradeModalReason("credits");
         setUpgradeModalOpen(true);
@@ -145,7 +163,13 @@ export default function CountryPredictionsClient({
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
   const hasSeenSelectionChange = useRef(false);
+  const hasAppliedSearchSelection = useRef(false);
+  const hasInitializedCustomizer = useRef(false);
   const formattedModelName = selectedModel ? selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1) : "";
+  const activePlan = (subscriptionTier || session?.user?.subscriptionTier || "free").toLowerCase();
+  const canEditTeamCore = true;
+  const canEditPlayerRatings = activePlan === "plus" || activePlan === "pro";
+  const canEditPlayerAvailability = activePlan === "pro";
 
   const openAuthModal = (mode: "signin" | "signup" = "signin") => {
     router.push(buildAuthModalHref({
@@ -163,21 +187,111 @@ export default function CountryPredictionsClient({
     mockTournament?: any;
   } | null>(null);
 
+  const [customCountries, setCustomCountries] = useState<CustomCountry[]>([]);
+
   useEffect(() => {
     setMounted(true);
     initializeData(initialTeams, initialPlayers);
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("wc26_custom_countries");
+        if (stored) {
+          setCustomCountries(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.error("Failed to load custom countries", e);
+      }
+    }
   }, [initializeData, initialTeams, initialPlayers]);
 
+  const handleDeleteCustomCountry = (code: string) => {
+    if (!confirm("Are you sure you want to delete this custom country?")) {
+      return;
+    }
+    const updated = customCountries.filter((c) => c.code !== code);
+    localStorage.setItem("wc26_custom_countries", JSON.stringify(updated));
+    setCustomCountries(updated);
+    if (selectedCode === code) {
+      setSelectedCode("ARG");
+      // Update URL query parameters
+      const params = new URLSearchParams(window.location.search);
+      params.set("team", "ARG");
+      window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+    }
+  };
+
+  useEffect(() => {
+    if (hasAppliedSearchSelection.current || appTeams.length === 0) return;
+
+    const requestedTeam = searchParams.get("team") || searchParams.get("country");
+    if (!requestedTeam) {
+      hasAppliedSearchSelection.current = true;
+      return;
+    }
+
+    const normalizedCode = requestedTeam.trim().toUpperCase();
+    const isCustom = normalizedCode.startsWith("CC_") || customCountries.some(cc => cc.code === normalizedCode);
+    const teamExists = isCustom || appTeams.some((team) => team.code === normalizedCode);
+
+    hasAppliedSearchSelection.current = true;
+
+    if (!teamExists || normalizedCode === selectedCode) return;
+
+    hasSeenSelectionChange.current = false;
+    setSelectedCode(normalizedCode);
+    setSearchQuery("");
+  }, [appTeams, searchParams, selectedCode, customCountries]);
+
+  const activeCustomCountry = useMemo(() => {
+    return customCountries.find((cc) => cc.code === selectedCode);
+  }, [selectedCode, customCountries]);
+
+  const effectiveCode = useMemo(() => {
+    return activeCustomCountry ? activeCustomCountry.replacedCode : selectedCode;
+  }, [activeCustomCountry, selectedCode]);
+
+  const selectedTeam = useMemo(() => {
+    if (activeCustomCountry) {
+      const origTeam = appTeams.find((t) => t.code === activeCustomCountry.replacedCode) || appTeams[0];
+      return {
+        code: activeCustomCountry.code,
+        name: activeCustomCountry.name,
+        flag: activeCustomCountry.flag,
+        rank: origTeam?.rank || 99,
+        elo: activeCustomCountry.elo,
+        attack: activeCustomCountry.attack,
+        defense: activeCustomCountry.defense,
+        power: origTeam?.power || 75,
+        squadValueM: origTeam?.squadValueM || 100,
+      };
+    }
+    return appTeams.find((t) => t.code === selectedCode) || appTeams[0];
+  }, [selectedCode, activeCustomCountry, appTeams]);
+
   const getTeam = (code: string): SimTeam => {
+    const custom = customCountries.find((cc) => cc.replacedCode === code || cc.code === code);
+    if (custom) {
+      const isSelected = (custom.replacedCode === effectiveCode) || (custom.code === effectiveCode);
+      return {
+        code: custom.replacedCode,
+        name: custom.name,
+        flag: custom.flag,
+        elo: isSelected ? customElo : custom.elo,
+        attack: isSelected ? customAttack : custom.attack,
+        defense: isSelected ? customDefense : custom.defense,
+        power: appTeams.find((t) => t.code === custom.baselineCode)?.power || 75,
+      };
+    }
     const appTeam = appTeams.find((t) => t.code === code);
     if (appTeam) {
+      const isSelected = code === effectiveCode;
       return {
         code: appTeam.code,
         name: appTeam.name,
         flag: appTeam.flag,
-        elo: appTeam.elo,
-        attack: appTeam.attack,
-        defense: appTeam.defense,
+        elo: isSelected ? customElo : appTeam.elo,
+        attack: isSelected ? customAttack : appTeam.attack,
+        defense: isSelected ? customDefense : appTeam.defense,
         power: appTeam.power,
       };
     }
@@ -191,14 +305,117 @@ export default function CountryPredictionsClient({
     };
   };
 
+  const [customElo, setCustomElo] = useState<number>(selectedTeam?.elo || 1500);
+  const [customAttack, setCustomAttack] = useState<number>(formatTeamScaleRating(selectedTeam?.attack));
+  const [customDefense, setCustomDefense] = useState<number>(formatTeamScaleRating(selectedTeam?.defense));
+  const [customPlayerRatingDelta, setCustomPlayerRatingDelta] = useState<number>(0);
+  const [playersIn, setPlayersIn] = useState<string[]>([]);
+  const [playersOut, setPlayersOut] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!selectedTeam) return;
+    setCustomElo(Math.round(selectedTeam.elo));
+    setCustomAttack(formatTeamScaleRating(selectedTeam.attack));
+    setCustomDefense(formatTeamScaleRating(selectedTeam.defense));
+    setCustomPlayerRatingDelta(0);
+    setPlayersIn([]);
+    setPlayersOut([]);
+    setSimResults(null);
+  }, [selectedCode, selectedTeam]);
+
+  useEffect(() => {
+    if (!hasInitializedCustomizer.current) {
+      hasInitializedCustomizer.current = true;
+      return;
+    }
+    setSimResults(null);
+  }, [customElo, customAttack, customDefense, customPlayerRatingDelta, playersIn, playersOut]);
+
+  const togglePlayerSelection = (bucket: "in" | "out", playerId: string) => {
+    if (!canEditPlayerAvailability) {
+      setUpgradeModalReason("pro");
+      setUpgradeModalOpen(true);
+      return;
+    }
+
+    if (bucket === "in") {
+      setPlayersIn((prev) => {
+        const next = prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId];
+        return next;
+      });
+      setPlayersOut((prev) => prev.filter((id) => id !== playerId));
+      return;
+    }
+
+    setPlayersOut((prev) => {
+      const next = prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId];
+      return next;
+    });
+    setPlayersIn((prev) => prev.filter((id) => id !== playerId));
+  };
+
+  const customizedPlayers = useMemo(() => {
+    if (!selectedCode) return players;
+
+    const nextPlayers = { ...players };
+
+    Object.entries(players).forEach(([playerId, player]) => {
+      const targetTeamCode = activeCustomCountry ? activeCustomCountry.baselineCode : selectedCode;
+      if (player["Team Code"] !== targetTeamCode) return;
+
+      const currentOverall = parseInt(player["Overall Rating"]?.replace("%", "") || "75", 10);
+      const currentForm = parseInt(player["Recent Form"]?.replace("%", "") || "70", 10);
+      const currentFitness = parseInt(player["Fitness / Availability"]?.replace("%", "") || "80", 10);
+
+      let ratingDelta = canEditPlayerRatings ? customPlayerRatingDelta : 0;
+      let formDelta = 0;
+      let fitnessValue = currentFitness;
+
+      if (canEditPlayerAvailability && playersIn.includes(playerId)) {
+        ratingDelta += 4;
+        formDelta += 8;
+        fitnessValue = 99;
+      }
+
+      if (canEditPlayerAvailability && playersOut.includes(playerId)) {
+        ratingDelta -= 18;
+        formDelta -= 18;
+        fitnessValue = 25;
+      }
+
+      nextPlayers[playerId] = {
+        ...player,
+        "Overall Rating": String(clampRating(currentOverall + ratingDelta)),
+        "Recent Form": String(clampRating(currentForm + formDelta)),
+        "Fitness / Availability": String(clampRating(fitnessValue)),
+      };
+    });
+
+    return nextPlayers;
+  }, [players, selectedCode, customPlayerRatingDelta, playersIn, playersOut, canEditPlayerRatings, canEditPlayerAvailability, activeCustomCountry]);
+
   const getTeamPlayers = (teamCode: string) => {
-    return Object.values(players)
-      .filter((p) => p["Team Code"] === teamCode)
-      .sort((a, b) => {
+    const custom = customCountries.find((cc) => cc.code === teamCode || cc.replacedCode === teamCode);
+    const sourceCode = custom ? custom.baselineCode : teamCode;
+    const rawPlayers = Object.values(customizedPlayers)
+      .filter((p) => p["Team Code"] === sourceCode);
+
+    if (custom) {
+      return rawPlayers.map((p) => ({
+        ...p,
+        "Team Code": teamCode,
+      })).sort((a, b) => {
         const ratingA = parseInt(a["Overall Rating"]?.replace("%", "") || "0", 10);
         const ratingB = parseInt(b["Overall Rating"]?.replace("%", "") || "0", 10);
         return ratingB - ratingA;
       });
+    }
+
+    return rawPlayers.sort((a, b) => {
+      const ratingA = parseInt(a["Overall Rating"]?.replace("%", "") || "0", 10);
+      const ratingB = parseInt(b["Overall Rating"]?.replace("%", "") || "0", 10);
+      return ratingB - ratingA;
+    });
   };
 
   const getTopPlayer = (teamCode: string) => {
@@ -238,7 +455,7 @@ export default function CountryPredictionsClient({
     };
 
     const trackMatch = (stage: string, team: string, opponent: string, gf: number, ga: number, won: boolean) => {
-      if (team !== selectedCode) return;
+      if (team !== effectiveCode) return;
       if (!stageOpponents[stage][opponent]) {
         stageOpponents[stage][opponent] = { count: 0, gfSum: 0, gaSum: 0, wins: 0 };
       }
@@ -251,7 +468,7 @@ export default function CountryPredictionsClient({
     const simulateKo = (home: string, away: string) => {
       const homeTeam = getTeam(home);
       const awayTeam = getTeam(away);
-      const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, players, selectedModel);
+      const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, customizedPlayers, selectedModel);
       let hs = getPoisson(homeLambda);
       let as = getPoisson(awayLambda);
       if (hs === as) {
@@ -296,7 +513,7 @@ export default function CountryPredictionsClient({
               const playMatch = (t1Idx: number, t2Idx: number) => {
                 const t1 = getTeam(standings[t1Idx].code);
                 const t2 = getTeam(standings[t2Idx].code);
-                const { homeLambda, awayLambda } = getMatchExpectedGoals(t1, t2, players, selectedModel);
+                const { homeLambda, awayLambda } = getMatchExpectedGoals(t1, t2, customizedPlayers, selectedModel);
                 const hs = getPoisson(homeLambda);
                 const as = getPoisson(awayLambda);
 
@@ -413,7 +630,7 @@ export default function CountryPredictionsClient({
             }).filter((pair) => pair.home && pair.away && pair.home !== pair.away);
 
             // Check if selected country is in R32
-            const inR32 = r32Pairings.some(p => p.home === selectedCode || p.away === selectedCode);
+            const inR32 = r32Pairings.some(p => p.home === effectiveCode || p.away === effectiveCode);
             if (inR32) currentScore = 1;
             if (inR32) stageCounts.r32 += 1;
 
@@ -430,7 +647,7 @@ export default function CountryPredictionsClient({
             });
 
             // Check if selected country is in R16
-            const inR16 = r16Teams.includes(selectedCode);
+            const inR16 = r16Teams.includes(effectiveCode);
             if (inR16) currentScore = 2;
             if (inR16) stageCounts.r16 += 1;
 
@@ -449,7 +666,7 @@ export default function CountryPredictionsClient({
             }
 
             // Check QF
-            const inQF = qfTeams.includes(selectedCode);
+            const inQF = qfTeams.includes(effectiveCode);
             if (inQF) currentScore = 3;
             if (inQF) stageCounts.qf += 1;
 
@@ -468,7 +685,7 @@ export default function CountryPredictionsClient({
             }
 
             // Check SF
-            const inSF = sfTeams.includes(selectedCode);
+            const inSF = sfTeams.includes(effectiveCode);
             if (inSF) currentScore = 4;
             if (inSF) stageCounts.sf += 1;
 
@@ -487,7 +704,7 @@ export default function CountryPredictionsClient({
             }
 
             // Check Final
-            const inFinal = finalTeams.includes(selectedCode);
+            const inFinal = finalTeams.includes(effectiveCode);
             if (inFinal) currentScore = 5;
             if (inFinal) stageCounts.final += 1;
 
@@ -501,7 +718,7 @@ export default function CountryPredictionsClient({
               trackMatch("final", awayTeam, homeTeam, as, hs, winner === awayTeam);
             }
 
-            if (winner === selectedCode) {
+            if (winner === effectiveCode) {
               stageCounts.champion += 1;
               currentScore = 6;
             }
@@ -595,23 +812,49 @@ export default function CountryPredictionsClient({
     }
   }, [selectedCode, selectedModel, mounted]);
 
+  // Auto-run simulation if autorun=true is present in the URL
   useEffect(() => {
     if (!mounted || !isInitialized) return;
 
-    if (!hasSeenSelectionChange.current) {
-      hasSeenSelectionChange.current = true;
-      return;
-    }
+    const autorun = searchParams.get("autorun") === "true";
+    if (autorun) {
+      // Clear autorun from the URL so it doesn't re-run on subsequent page loads/refreshes
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("autorun");
+      const cleanUrl = `${pathname}?${params.toString()}`;
+      window.history.replaceState(null, "", cleanUrl);
 
-    if (session) {
-      setShowConfirmPopup(true);
+      // Execute simulation automatically
+      const executeAutoSim = async () => {
+        const allowed = await consumeCredit();
+        if (allowed) {
+          runSimulations();
+        }
+      };
+      executeAutoSim();
     }
-  }, [selectedCode, selectedModel, mounted, isInitialized, session]);
+  }, [mounted, isInitialized, searchParams, pathname]);
 
   // Sort and filter teams list in sidebar
   const sortedTeams = useMemo(() => {
-    return [...appTeams].sort((a, b) => b.elo - a.elo);
-  }, [appTeams]);
+    const baseList = [...appTeams].sort((a, b) => b.elo - a.elo);
+    const customList = customCountries.map((cc) => {
+      const orig = appTeams.find((t) => t.code === cc.replacedCode);
+      return {
+        code: cc.code,
+        name: cc.name,
+        flag: cc.flag,
+        elo: cc.elo,
+        rank: orig?.rank || 99,
+        power: orig?.power || 75,
+        attack: cc.attack,
+        defense: cc.defense,
+        squadValueM: orig?.squadValueM || 100,
+        confederation: orig?.confederation || "UEFA",
+      } as any;
+    });
+    return [...customList, ...baseList];
+  }, [appTeams, customCountries]);
 
   const filteredTeams = useMemo(() => {
     if (!searchQuery) return sortedTeams;
@@ -619,20 +862,18 @@ export default function CountryPredictionsClient({
     return sortedTeams.filter(t => t.name.toLowerCase().includes(q) || t.code.toLowerCase().includes(q));
   }, [searchQuery, sortedTeams]);
 
-  const selectedTeam = appTeams.find((t) => t.code === selectedCode) || appTeams[0];
-
   // Dynamic calculations for Radar chart
   const radarData = useMemo(() => {
     if (!selectedTeam) return [];
     return [
-      { axis: "Attack", v: selectedTeam.attack > 10 ? selectedTeam.attack : Math.round(selectedTeam.attack * 80) },
-      { axis: "Defense", v: selectedTeam.defense > 10 ? selectedTeam.defense : Math.round(selectedTeam.defense * 80) },
+      { axis: "Attack", v: formatTeamScaleRating(customAttack) },
+      { axis: "Defense", v: formatTeamScaleRating(customDefense) },
       { axis: "Power", v: selectedTeam.power || 70 },
       { axis: "Form", v: Math.min(99, (selectedTeam.power || 70) + 4) },
       { axis: "Squad", v: Math.min(99, 50 + (selectedTeam.squadValueM || 500) / 15) },
-      { axis: "Elo", v: Math.round(((selectedTeam.elo || 1500) - 1300) / 6) },
+      { axis: "Elo", v: Math.round(((customElo || 1500) - 1300) / 6) },
     ];
-  }, [selectedTeam]);
+  }, [selectedTeam, customAttack, customDefense, customElo]);
 
   // Dynamic calculations for squad stats
   const squadStats = useMemo(() => {
@@ -669,7 +910,7 @@ export default function CountryPredictionsClient({
       average,
       weak,
     };
-  }, [selectedCode, players, selectedTeam]);
+  }, [selectedCode, customizedPlayers, selectedTeam]);
 
   const squadTiers = useMemo(() => ([
     { label: "Elite", count: squadStats.elite, color: "from-amber-400 via-yellow-400 to-lime-300" },
@@ -693,7 +934,7 @@ export default function CountryPredictionsClient({
       { key: "final", label: "Final" }
     ] as const;
 
-    let currentCode = selectedCode;
+    let currentCode = effectiveCode;
 
     return stagesOrdered.flatMap((stage) => {
       const stageMatches =
@@ -731,9 +972,9 @@ export default function CountryPredictionsClient({
       currentCode = match.winner;
       return [step];
     });
-  }, [selectedCode, simResults]);
+  }, [effectiveCode, simResults]);
 
-  const selectedGroup = Object.entries(GROUPS_CONFIG).find(([_, list]) => list.includes(selectedCode))?.[0] || "-";
+  const selectedGroup = Object.entries(GROUPS_CONFIG).find(([_, list]) => list.includes(effectiveCode))?.[0] || "-";
   const championProbability = simResults ? (simResults.stages.champion / 1000) * 100 : 0;
   const stageCards = [
     { key: "group", label: "Group Stage", icon: "G" },
@@ -746,7 +987,7 @@ export default function CountryPredictionsClient({
   ] as const;
 
   const getBracketRowClasses = (teamCode: string, isWinner: boolean, accent: "blue" | "gold" = "blue") => {
-    const isSelected = teamCode === selectedCode;
+    const isSelected = teamCode === effectiveCode;
     if (isSelected) {
       return "bg-gradient-to-r from-amber-100 to-yellow-50 border border-amber-300 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.12)] dark:from-amber-500/25 dark:to-yellow-400/10 dark:border-amber-400/40";
     }
@@ -760,7 +1001,7 @@ export default function CountryPredictionsClient({
   };
 
   const getBracketScoreClasses = (teamCode: string) =>
-    teamCode === selectedCode
+    teamCode === effectiveCode
       ? "bg-amber-50 text-amber-900 dark:bg-amber-300/15 dark:text-amber-100"
       : "bg-white/75 text-slate-700 dark:bg-black/50 dark:text-white";
 
@@ -782,7 +1023,7 @@ export default function CountryPredictionsClient({
               Path to Glory Explorer
             </h1>
             <p className="mt-2 text-muted-foreground text-sm max-w-2xl leading-relaxed">
-              Simulate the entire tournament 1,000 times dynamically based on the active model. 
+              Simulate the entire tournament 1,000 times dynamically based on the active model.
               {selectedModel === "base" && " Uses Elo / Att / Def stats."}
               {selectedModel === "advanced" && " Includes Squad value & stats."}
               {selectedModel === "pro" && " Incorporates Player aspects & form."}
@@ -806,72 +1047,259 @@ export default function CountryPredictionsClient({
       </div>
 
       <div className="mb-6 grid items-start gap-6 lg:grid-cols-[320px_1fr]">
-        {/* Left list of countries: Futuristic Sidebar Control */}
-        <Accordion
-          type="multiple"
-          defaultValue={["country-list"]}
-          className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900"
-        >
-          <AccordionItem value="country-list" className="border-none data-[state=open]:flex data-[state=open]:flex-col data-[state=open]:lg:h-[920px]">
-            <AccordionTrigger className="shrink-0 px-5 pt-5 pb-3 hover:no-underline">
-              <div>
-                <div className="font-display text-lg font-bold text-foreground">Country Rankings</div>
-                <div className="text-xs text-muted-foreground mt-0.5">Browse and simulate every national team</div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="min-h-0 px-5 pb-5 data-[state=open]:flex data-[state=open]:flex-1 [&>div]:flex [&>div]:h-full [&>div]:min-h-0 [&>div]:flex-1 [&>div]:flex-col [&>div]:pb-0">
-              <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="relative mb-5 group">
-                  <Search className="absolute inset-y-0 left-3.5 h-4 w-4 my-auto text-muted-foreground group-focus-within:text-neon transition-colors" />
-                  <Input
-                    placeholder="Search country..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-11 border-slate-200 bg-slate-50 text-foreground text-sm focus-visible:ring-cyan-500 focus-visible:border-cyan-500 rounded-xl h-11 transition-all dark:border-white/10 dark:bg-white/5 dark:focus-visible:ring-neon dark:focus-visible:border-neon dark:focus-visible:bg-white/[0.08]"
-                  />
+        {/* Left Column: Stacked Sidebar */}
+        <div className="space-y-6 lg:w-[320px] shrink-0">
+          {/* Left list of countries: Futuristic Sidebar Control */}
+          <Accordion
+            type="multiple"
+            defaultValue={["country-list"]}
+            className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900"
+          >
+            <AccordionItem value="country-list" className="border-none data-[state=open]:flex data-[state=open]:flex-col data-[state=open]:lg:h-[920px]">
+              <AccordionTrigger className="shrink-0 px-5 pt-5 pb-3 hover:no-underline">
+                <div>
+                  <div className="font-display text-lg font-bold text-foreground">Country Rankings</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Browse and simulate every national team</div>
                 </div>
+              </AccordionTrigger>
+              <AccordionContent className="min-h-0 px-5 pb-5 data-[state=open]:flex data-[state=open]:flex-1 [&>div]:flex [&>div]:h-full [&>div]:min-h-0 [&>div]:flex-1 [&>div]:flex-col [&>div]:pb-0">
+                <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <div className="relative mb-5 group">
+                    <Search className="absolute inset-y-0 left-3.5 h-4 w-4 my-auto text-muted-foreground group-focus-within:text-neon transition-colors" />
+                    <Input
+                      placeholder="Search country..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-11 border-slate-200 bg-slate-50 text-foreground text-sm focus-visible:ring-cyan-500 focus-visible:border-cyan-500 rounded-xl h-11 transition-all dark:border-white/10 dark:bg-white/5 dark:focus-visible:ring-neon dark:focus-visible:border-neon dark:focus-visible:bg-white/[0.08]"
+                    />
+                  </div>
 
-                <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-custom ">
-                  {filteredTeams.map((t) => {
-                    const active = t.code === selectedCode;
-                    return (
-                      <button
-                        key={t.code}
-                        onClick={() => setSelectedCode(t.code)}
-                        className={`w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${active
-                          ? "bg-gradient-to-r from-cyan-50 to-fuchsia-50 border-cyan-300 text-slate-950 shadow-[0_12px_30px_rgba(14,165,233,0.12)] font-bold dark:from-neon/10 dark:to-neon-2/10 dark:border-neon/30 dark:text-white dark:shadow-[0_0_15px_rgba(6,182,212,0.1)]"
-                          : "border-slate-200 bg-slate-50 text-muted-foreground hover:bg-slate-100 hover:text-slate-950 dark:border-white/5 dark:bg-white/[0.01] dark:hover:bg-white/5 dark:hover:text-white"
-                          }`}
-                      >
-                        {active && (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-cyan-500 to-fuchsia-500 dark:from-neon dark:to-neon-2" />
-                        )}
-                        <div className="flex items-center gap-3 min-w-0 z-10">
-                          <CountryFlag
-                            code={t.code}
-                            flag={t.flag}
-                            name={t.name}
-                            className="h-7 w-9 shrink-0 drop-shadow-md group-hover:scale-110 transition-transform duration-300"
-                            emojiClassName="text-2xl shrink-0 drop-shadow-md group-hover:scale-110 transition-transform duration-300 select-none"
-                          />
-                          <span className="truncate tracking-wide">{t.name}</span>
+                  <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-custom ">
+                    {filteredTeams.map((t) => {
+                      const active = t.code === selectedCode;
+                      return (
+                        <div
+                          key={t.code}
+                          onClick={() => setSelectedCode(t.code)}
+                          className={`w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition-all duration-300 border relative overflow-hidden group cursor-pointer ${active
+                            ? "bg-gradient-to-r from-cyan-50 to-fuchsia-50 border-cyan-300 text-slate-950 shadow-[0_12px_30px_rgba(14,165,233,0.12)] font-bold dark:from-neon/10 dark:to-neon-2/10 dark:border-neon/30 dark:text-white dark:shadow-[0_0_15px_rgba(6,182,212,0.1)]"
+                            : "border-slate-200 bg-slate-50 text-muted-foreground hover:bg-slate-100 hover:text-slate-950 dark:border-white/5 dark:bg-white/[0.01] dark:hover:bg-white/5 dark:hover:text-white"
+                            }`}
+                        >
+                          {active && (
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-gradient-to-b from-cyan-500 to-fuchsia-500 dark:from-neon dark:to-neon-2" />
+                          )}
+                          <div className="flex items-center gap-2.5 min-w-0 z-10">
+                            <CountryFlag
+                              code={t.code}
+                              flag={t.flag}
+                              name={t.name}
+                              className="h-6 w-8 shrink-0 drop-shadow-md group-hover:scale-105 transition-transform duration-300 object-cover rounded"
+                              emojiClassName="text-xl shrink-0 drop-shadow-md group-hover:scale-105 transition-transform duration-300 select-none"
+                            />
+                            <span className="truncate tracking-wide">{t.name}</span>
+                            {active && (
+                              <PencilLine className="w-3.5 h-3.5 text-cyan-600 dark:text-neon shrink-0 animate-pulse" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2.5 z-10">
+                            <div className="text-xs font-mono font-bold text-fuchsia-600 text-right opacity-90 dark:text-neon-2">
+                              {Math.round(t.elo)}
+                            </div>
+                            {t.code.startsWith("CC_") && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteCustomCountry(t.code);
+                                }}
+                                className="p-1 rounded-md text-muted-foreground hover:text-red-500 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors cursor-pointer animate-in fade-in"
+                                title="Delete custom country"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-xs font-mono font-bold text-fuchsia-600 text-right z-10 opacity-90 dark:text-neon-2">
-                          {Math.round(t.elo)}
-                        </div>
-                      </button>
-                    );
-                  })}
-                  {filteredTeams.length === 0 && (
-                    <div className="text-center py-12 text-xs text-muted-foreground">
-                      No country matches &quot;{searchQuery}&quot;
-                    </div>
-                  )}
+                      );
+                    })}
+                    {filteredTeams.length === 0 && (
+                      <div className="text-center py-12 text-xs text-muted-foreground">
+                        No country matches &quot;{searchQuery}&quot;
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+
+          {/* Simulation Lab Accordion */}
+          <Accordion
+            id="country-simulation-lab"
+            type="multiple"
+            defaultValue={["simulation-lab"]}
+            className="rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] relative dark:border-white/10 dark:bg-slate-900"
+          >
+            <AccordionItem value="simulation-lab" className="border-none">
+              <AccordionTrigger className="px-5 pt-5 pb-3 hover:no-underline">
+                <div className="flex items-center justify-between w-full pr-4">
+                  <div>
+                    <div className="font-display font-bold text-lg text-foreground">Simulation Lab</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Tune strength, rating, and availability.</div>
+                  </div>
+                  <span className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full border ${activePlan === "pro"
+                    ? "bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20"
+                    : activePlan === "plus"
+                      ? "bg-cyan-500/10 text-cyan-500 border-cyan-500/20"
+                      : "bg-slate-500/10 text-slate-500 border-slate-500/20"
+                    }`}>
+                    {activePlan === "pro" ? "Pro" : activePlan === "plus" ? "Plus" : "Free"}
+                  </span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-white/5">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70">Elo Rating</span>
+                      <input
+                        type="number"
+                        min={1200}
+                        max={2200}
+                        value={customElo}
+                        disabled={!canEditTeamCore}
+                        onChange={(e) => setCustomElo(clampRating(Number(e.target.value || 1200), 1200, 2200))}
+                        className="w-24 h-9 rounded-lg border border-slate-200 bg-white text-center text-sm font-mono font-bold text-slate-950 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-white/5">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70">Attack Power</span>
+                      <input
+                        type="number"
+                        min={15}
+                        max={99}
+                        value={customAttack}
+                        disabled={!canEditTeamCore}
+                        onChange={(e) => setCustomAttack(clampRating(Number(e.target.value || 15), 15, 99))}
+                        className="w-24 h-9 rounded-lg border border-slate-200 bg-white text-center text-sm font-mono font-bold text-slate-950 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-white/5">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70">Defense Strength</span>
+                      <input
+                        type="number"
+                        min={15}
+                        max={99}
+                        value={customDefense}
+                        disabled={!canEditTeamCore}
+                        onChange={(e) => setCustomDefense(clampRating(Number(e.target.value || 15), 15, 99))}
+                        className="w-24 h-9 rounded-lg border border-slate-200 bg-white text-center text-sm font-mono font-bold text-slate-950 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="py-2.5 border-b border-slate-100 dark:border-white/5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70">Player Rating Boost</span>
+                      <div className="flex items-center gap-1.5">
+                        {!canEditPlayerRatings && <Lock className="w-3 h-3 text-amber-500" />}
+                        <span className="text-xs font-mono font-bold text-cyan-600 dark:text-neon">
+                          {customPlayerRatingDelta > 0 ? `+${customPlayerRatingDelta}` : customPlayerRatingDelta}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min={-10}
+                        max={10}
+                        value={customPlayerRatingDelta}
+                        disabled={!canEditPlayerRatings}
+                        onChange={(e) => setCustomPlayerRatingDelta(Number(e.target.value))}
+                        className="w-full accent-cyan-600 disabled:opacity-45"
+                        onClick={() => {
+                          if (!canEditPlayerRatings) {
+                            setUpgradeModalReason("plus");
+                            setUpgradeModalOpen(true);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="players-in" className="border-b border-slate-100 dark:border-white/5">
+                      <AccordionTrigger className="py-2.5 text-xs font-semibold text-slate-700 dark:text-white/70 hover:no-underline">
+                        <span className="flex items-center justify-between w-full pr-4">
+                          <span className="flex items-center gap-2">
+                            Players In
+                            {playersIn.length > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-cyan-100 text-cyan-800 text-[10px] font-bold dark:bg-neon/20 dark:text-neon">
+                                {playersIn.length}
+                              </span>
+                            )}
+                          </span>
+                          {!canEditPlayerAvailability && <Lock className="w-3 h-3 text-amber-500" />}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-2 pb-3">
+                        <PlayerBucketCompact
+                          players={getTeamPlayers(selectedTeam.code).slice(0, 12)}
+                          activeIds={playersIn}
+                          disabled={!canEditPlayerAvailability}
+                          onToggle={(playerId) => togglePlayerSelection("in", playerId)}
+                          onLockedClick={() => {
+                            setUpgradeModalReason("pro");
+                            setUpgradeModalOpen(true);
+                          }}
+                        />
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="players-out" className="border-none">
+                      <AccordionTrigger className="py-2.5 text-xs font-semibold text-slate-700 dark:text-white/70 hover:no-underline">
+                        <span className="flex items-center justify-between w-full pr-4">
+                          <span className="flex items-center gap-2">
+                            Players Out
+                            {playersOut.length > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold dark:bg-rose-500/20 dark:text-rose-400">
+                                {playersOut.length}
+                              </span>
+                            )}
+                          </span>
+                          {!canEditPlayerAvailability && <Lock className="w-3 h-3 text-amber-500" />}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-2 pb-3">
+                        <PlayerBucketCompact
+                          players={getTeamPlayers(selectedTeam.code).slice(0, 12)}
+                          activeIds={playersOut}
+                          disabled={!canEditPlayerAvailability}
+                          onToggle={(playerId) => togglePlayerSelection("out", playerId)}
+                          onLockedClick={() => {
+                            setUpgradeModalReason("pro");
+                            setUpgradeModalOpen(true);
+                          }}
+                        />
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+
+                  <button
+                    type="button"
+                    onClick={handleRunSimulationClick}
+                    disabled={isSimulating || !isInitialized}
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] px-5 text-sm font-black text-white shadow-[0_10px_25px_rgba(44,124,135,0.2)] transition hover:opacity-95 active:scale-[0.98] disabled:opacity-50 mt-3"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Run Customized Simulation
+                  </button>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
 
         {/* Right main analysis panel */}
         <div className="space-y-6 min-w-0">
@@ -912,9 +1340,19 @@ export default function CountryPredictionsClient({
                               <span className="text-slate-300 dark:text-white/20">&bull;</span>
                               <span className="text-fuchsia-600 dark:text-neon-2">Group {selectedGroup}</span>
                             </div>
-                            <h2 className="text-4xl font-extrabold font-display text-slate-950 dark:text-foreground mt-1 tracking-tight">
-                              {selectedTeam.name}
-                            </h2>
+                            <div className="mt-1 flex items-center gap-2">
+                              <h2 className="text-4xl font-extrabold font-display text-slate-950 dark:text-foreground tracking-tight">
+                                {selectedTeam.name}
+                              </h2>
+                              <button
+                                type="button"
+                                onClick={() => document.getElementById("country-simulation-lab")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:border-cyan-400 hover:text-cyan-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:border-neon dark:hover:text-neon"
+                                title="Edit simulation settings"
+                              >
+                                <PencilLine className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
 
@@ -961,10 +1399,10 @@ export default function CountryPredictionsClient({
                       </div>
 
                       {/* Core Attributes Mini Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+                      <div className="grid grid-cols-2 gap-3 mt-2 xl:grid-cols-5">
                         <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">FIFA Elo Rating</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{Math.round(selectedTeam.elo)}</span>
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Elo Rating</span>
+                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{Math.round(customElo)}</span>
                         </div>
                         <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
                           <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Power Index</span>
@@ -975,6 +1413,10 @@ export default function CountryPredictionsClient({
                           <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">
                             {selectedTeam.squadValueM ? `€${selectedTeam.squadValueM}M` : "N/A"}
                           </span>
+                        </div>
+                        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Attack / Defense</span>
+                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{customAttack} / {customDefense}</span>
                         </div>
                         <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
                           <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Top Player</span>
@@ -1650,6 +2092,154 @@ export default function CountryPredictionsClient({
         onClose={() => setUpgradeModalOpen(false)}
         reason={upgradeModalReason}
       />
+    </div>
+  );
+}
+
+function LabField({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  disabled,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={`rounded-[1.25rem] border p-3 ${disabled ? "border-slate-200/70 bg-slate-100/70 opacity-70 dark:border-white/10 dark:bg-white/[0.03]" : "border-slate-200 bg-slate-50/80 dark:border-white/10 dark:bg-white/[0.03]"}`}>
+      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-bold text-center">{label}</div>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(clampRating(Number(e.target.value || min), min, max))}
+        className="mt-2 h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-mono font-bold text-slate-950 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+      />
+    </div>
+  );
+}
+
+function PlayerBucket({
+  title,
+  description,
+  players,
+  activeIds,
+  disabled,
+  onToggle,
+  onLockedClick,
+}: {
+  title: string;
+  description: string;
+  players: PlayerStats[];
+  activeIds: string[];
+  disabled?: boolean;
+  onToggle: (playerId: string) => void;
+  onLockedClick: () => void;
+}) {
+  return (
+    <div className={`rounded-[1.4rem] border p-4 ${disabled ? "border-amber-200 bg-amber-50/60 dark:border-amber-500/20 dark:bg-amber-500/5" : "border-slate-200 bg-slate-50/80 dark:border-white/10 dark:bg-white/[0.03]"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-bold text-slate-950 dark:text-white">{title}</div>
+          <div className="text-xs text-slate-500 dark:text-white/55">{description}</div>
+        </div>
+        {disabled ? (
+          <button
+            type="button"
+            onClick={onLockedClick}
+            className="rounded-full border border-amber-300 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700 dark:border-amber-500/30 dark:text-amber-300"
+          >
+            Pro
+          </button>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex max-h-[220px] flex-wrap gap-2 overflow-y-auto pr-1 scrollbar-custom">
+        {players.map((player) => {
+          const playerId = `${player["Team Code"]}-${player["Player Name"]}`;
+          const active = activeIds.includes(playerId);
+
+          return (
+            <button
+              key={playerId}
+              type="button"
+              disabled={disabled}
+              onClick={() => onToggle(playerId)}
+              className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${active
+                ? "border-cyan-400 bg-cyan-500/10 text-cyan-700 dark:text-neon"
+                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:hover:border-white/20"
+                }`}
+            >
+              {player["Name on Shirt"] || player["Player Name"]}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function cleanPlayerName(name: string) {
+  if (!name) return "";
+  return name
+    .replace(/MARTNEZ/g, "MARTÍNEZ")
+    .replace(/ALVAREZ/g, "ÁLVAREZ")
+    .replace(/GONZALEZ/g, "GONZÁLEZ")
+    .replace(/DI MARA/g, "DI MARÍA")
+    .replace(/FERNANDEZ/g, "FERNÁNDEZ");
+}
+
+function PlayerBucketCompact({
+  players,
+  activeIds,
+  disabled,
+  onToggle,
+  onLockedClick,
+}: {
+  players: PlayerStats[];
+  activeIds: string[];
+  disabled?: boolean;
+  onToggle: (playerId: string) => void;
+  onLockedClick: () => void;
+}) {
+  return (
+    <div
+      className="flex max-h-[160px] flex-wrap gap-1.5 overflow-y-auto pr-1 scrollbar-custom"
+      onClick={() => {
+        if (disabled) onLockedClick();
+      }}
+    >
+      {players.map((player) => {
+        const playerId = `${player["Team Code"]}-${player["Player Name"]}`;
+        const active = activeIds.includes(playerId);
+        const name = cleanPlayerName(player["Name on Shirt"] || player["Player Name"] || "");
+
+        return (
+          <button
+            key={playerId}
+            type="button"
+            disabled={disabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(playerId);
+            }}
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition cursor-pointer select-none ${active
+              ? "border-cyan-400 bg-cyan-500/10 text-cyan-700 dark:text-neon"
+              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:hover:border-white/20"
+              } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            {name}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -169,11 +169,10 @@ export function ProbabilityExplorer() {
                       <button
                         key={t.code}
                         onClick={() => setCode(t.code)}
-                        className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${
-                          active
-                            ? "bg-gradient-to-r from-neon/10 to-neon-2/10 border-neon/25 text-foreground font-bold shadow-[0_10px_30px_-20px_color-mix(in_oklab,var(--color-neon)_65%,transparent)]"
-                            : "border-transparent bg-transparent text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
-                        }`}
+                        className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${active
+                          ? "bg-gradient-to-r from-neon/10 to-neon-2/10 border-neon/25 text-foreground font-bold shadow-[0_10px_30px_-20px_color-mix(in_oklab,var(--color-neon)_65%,transparent)]"
+                          : "border-transparent bg-transparent text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
+                          }`}
                       >
                         {active && (
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-neon to-neon-2" />
@@ -214,105 +213,105 @@ export function ProbabilityExplorer() {
                   <div className="absolute -right-16 -top-16 w-56 h-56 bg-neon/10 rounded-full filter blur-3xl pointer-events-none" />
                   <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-neon-2/10 rounded-full filter blur-3xl pointer-events-none" />
                   <div className="flex flex-col lg:flex-row justify-between items-stretch gap-6 border-b border-white/5 pb-6 mb-6">
-              {/* Team Profile Basic Details */}
-              <div className="flex flex-col justify-between flex-grow gap-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-                  <div className="flex items-center gap-5">
-                    <div className="filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:scale-105 transition-transform duration-300">
-                      <CountryFlag
-                        code={team.code}
-                        flag={team.flag}
-                        name={team.name}
-                        className="h-16 w-20 drop-shadow-lg"
-                        emojiClassName="text-7xl drop-shadow-lg leading-none select-none"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-extrabold flex items-center gap-1.5">
-                        <span>FIFA Rank #{team.rank}</span>
-                        <span className="text-white/20">&bull;</span>
-                        <span className="text-neon-2">Group {teamGroup}</span>
+                    {/* Team Profile Basic Details */}
+                    <div className="flex flex-col justify-between flex-grow gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                        <div className="flex items-center gap-5">
+                          <div className="filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:scale-105 transition-transform duration-300">
+                            <CountryFlag
+                              code={team.code}
+                              flag={team.flag}
+                              name={team.name}
+                              className="h-16 w-20 drop-shadow-lg"
+                              emojiClassName="text-7xl drop-shadow-lg leading-none select-none"
+                            />
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-extrabold flex items-center gap-1.5">
+                              <span>FIFA Rank #{team.rank}</span>
+                              <span className="text-white/20">&bull;</span>
+                              <span className="text-neon-2">Group {teamGroup}</span>
+                            </div>
+                            <h2 className="text-4xl font-extrabold font-display text-foreground mt-1 tracking-tight">
+                              {team.name}
+                            </h2>
+                          </div>
+                        </div>
                       </div>
-                      <h2 className="text-4xl font-extrabold font-display text-foreground mt-1 tracking-tight">
-                        {team.name}
-                      </h2>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Core Attributes Mini Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-                  <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">FIFA Elo Rating</span>
-                    <span className="text-xl font-bold font-mono text-foreground mt-1 block">{Math.round(team.elo)}</span>
-                  </div>
-                  <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Power Index</span>
-                    <span className="text-xl font-bold font-mono text-foreground mt-1 block">{team.power || 70}</span>
-                  </div>
-                  <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Squad Value</span>
-                    <span className="text-xl font-bold font-mono text-foreground mt-1 block">
-                      {team.squadValueM ? `€${team.squadValueM}M` : "N/A"}
-                    </span>
-                  </div>
-                  <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Top Player</span>
-                    <span className="text-xs font-bold text-neon mt-1.5 block truncate" title={getTopPlayer(team.code)}>
-                      {getTopPlayer(team.code)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Circular Gauge for Champion Probability */}
-              <div className="flex flex-col items-center justify-center bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/10 rounded-2xl p-6 min-w-[200px] text-center shadow-glass relative group overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-neon/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-extrabold relative z-10">
-                  Championship Prob
-                </span>
-                
-                <div className="relative flex items-center justify-center my-4 z-10">
-                  <svg className="w-28 h-28 transform -rotate-90">
-                    <circle
-                      cx="56"
-                      cy="56"
-                      r="46"
-                      stroke="var(--color-border)"
-                      strokeWidth="8"
-                      fill="transparent"
-                    />
-                    <circle
-                      cx="56"
-                      cy="56"
-                      r="46"
-                      stroke="url(#neonGradient)"
-                      strokeWidth="8"
-                      fill="transparent"
-                      strokeDasharray="289"
-                      strokeDashoffset={289 - (289 * (team.prob.champion / 100))}
-                      className="transition-all duration-1000 ease-out"
-                      strokeLinecap="round"
-                    />
-                    <defs>
-                      <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="var(--color-neon)" />
-                        <stop offset="100%" stopColor="var(--color-neon-2)" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="absolute text-center">
-                    <div className="text-2xl font-black font-mono text-foreground leading-none">
-                      {team.prob.champion.toFixed(1)}%
+                      {/* Core Attributes Mini Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+                        <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Elo Rating</span>
+                          <span className="text-xl font-bold font-mono text-foreground mt-1 block">{Math.round(team.elo)}</span>
+                        </div>
+                        <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Power Index</span>
+                          <span className="text-xl font-bold font-mono text-foreground mt-1 block">{team.power || 70}</span>
+                        </div>
+                        <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Squad Value</span>
+                          <span className="text-xl font-bold font-mono text-foreground mt-1 block">
+                            {team.squadValueM ? `€${team.squadValueM}M` : "N/A"}
+                          </span>
+                        </div>
+                        <div className="bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/8 rounded-2xl p-4 hover:border-neon/20 transition-colors">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Top Player</span>
+                          <span className="text-xs font-bold text-neon mt-1.5 block truncate" title={getTopPlayer(team.code)}>
+                            {getTopPlayer(team.code)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                
-                <span className="text-[11px] font-bold text-neon relative z-10 uppercase tracking-wider">
-                  {team.prob.champion > 12 ? "Contender" : 
-                   team.prob.champion > 4 ? "Dark Horse" : "Underdog"}
-                </span>
-              </div>
+
+                    {/* Circular Gauge for Champion Probability */}
+                    <div className="flex flex-col items-center justify-center bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/10 rounded-2xl p-6 min-w-[200px] text-center shadow-glass relative group overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-neon/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-extrabold relative z-10">
+                        Championship Prob
+                      </span>
+
+                      <div className="relative flex items-center justify-center my-4 z-10">
+                        <svg className="w-28 h-28 transform -rotate-90">
+                          <circle
+                            cx="56"
+                            cy="56"
+                            r="46"
+                            stroke="var(--color-border)"
+                            strokeWidth="8"
+                            fill="transparent"
+                          />
+                          <circle
+                            cx="56"
+                            cy="56"
+                            r="46"
+                            stroke="url(#neonGradient)"
+                            strokeWidth="8"
+                            fill="transparent"
+                            strokeDasharray="289"
+                            strokeDashoffset={289 - (289 * (team.prob.champion / 100))}
+                            className="transition-all duration-1000 ease-out"
+                            strokeLinecap="round"
+                          />
+                          <defs>
+                            <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="var(--color-neon)" />
+                              <stop offset="100%" stopColor="var(--color-neon-2)" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+                        <div className="absolute text-center">
+                          <div className="text-2xl font-black font-mono text-foreground leading-none">
+                            {team.prob.champion.toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className="text-[11px] font-bold text-neon relative z-10 uppercase tracking-wider">
+                        {team.prob.champion > 12 ? "Contender" :
+                          team.prob.champion > 4 ? "Dark Horse" : "Underdog"}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
@@ -322,11 +321,10 @@ export function ProbabilityExplorer() {
                       return (
                         <div
                           key={s.key}
-                          className={`border rounded-2xl p-3.5 transition-all duration-300 relative overflow-hidden group ${
-                            active
-                              ? "bg-muted/60 dark:bg-white/[0.04] border-border dark:border-white/10 hover:border-neon/30 hover:bg-muted dark:hover:bg-white/[0.06]"
-                              : "bg-muted/30 dark:bg-black/[0.1] border-border/50 dark:border-white/5 opacity-40"
-                          }`}
+                          className={`border rounded-2xl p-3.5 transition-all duration-300 relative overflow-hidden group ${active
+                            ? "bg-muted/60 dark:bg-white/[0.04] border-border dark:border-white/10 hover:border-neon/30 hover:bg-muted dark:hover:bg-white/[0.06]"
+                            : "bg-muted/30 dark:bg-black/[0.1] border-border/50 dark:border-white/5 opacity-40"
+                            }`}
                         >
                           <div className="absolute top-0 right-0 w-8 h-8 -mr-2 -mt-2 bg-gradient-to-br from-neon/10 to-transparent rounded-full filter blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
 

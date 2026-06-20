@@ -2,6 +2,7 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { Hero } from "@/components/site/Hero";
 import { LiveStats } from "@/components/site/LiveStats";
+import { WildcardCountrySection } from "@/components/site/WildcardCountrySection";
 import { ProbabilityExplorer } from "@/components/site/ProbabilityExplorer";
 import { FixturesExplorer } from "@/components/site/FixturesExplorer";
 import { GroupPredictor } from "@/components/site/GroupPredictor";
@@ -22,6 +23,7 @@ export default function Page() {
       <main>
         <Hero />
         <LiveStats />
+        <WildcardCountrySection />
         <ProbabilityExplorer />
         <FixturesExplorer />
         {/* <GroupPredictor /> */}
