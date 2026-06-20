@@ -13,32 +13,32 @@ export function Footer() {
           </div>
           <p className="mt-3 text-xs text-muted-foreground">The most engaging way to predict World Cup 2026. Probabilities. Picks. Glory.</p>
         </div>
-        <FooterCol 
-          title="Predict" 
+        <FooterCol
+          title="Predict"
           items={[
             { label: "Simulator", href: "/simulator" },
             { label: "Compare", href: "/compare" },
             { label: "Bracket", href: "/bracket" },
             { label: "Home", href: "/" }
-          ]} 
+          ]}
         />
-        <FooterCol 
-          title="Compete" 
+        <FooterCol
+          title="Compete"
           items={[
             { label: "My Predictions", href: "/predictions" },
             { label: "Daily Challenges", href: "/predictions" },
             { label: "Badges", href: "/predictions" },
             { label: "Pricing", href: "/subscription" }
-          ]} 
+          ]}
         />
-        <FooterCol 
-          title="Data" 
+        <FooterCol
+          title="Data"
           items={[
-            { label: "FIFA Rankings", href: "/teams" },
+            { label: "Rankings", href: "/teams" },
             { label: "Elo Ratings", href: "/teams" },
             { label: "Country Predict", href: "/predictions/country" },
             { label: "Teams Info", href: "/teams" }
-          ]} 
+          ]}
         />
       </div>
       <div className="border-t border-white/5 py-4 text-center text-xs text-muted-foreground">© 2026 WC26 Predict · Built for fans.</div>
