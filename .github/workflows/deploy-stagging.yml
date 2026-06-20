@@ -140,6 +140,14 @@ jobs:
             pwd
             echo '================================='
 
+            echo ''
+            echo 'Verifying Prisma datasource provider...'
+            if ! grep -q 'provider = \"sqlite\"' prisma/schema.prisma; then
+              echo 'ERROR: Expected Prisma datasource provider sqlite, but server schema is different:'
+              sed -n '1,12p' prisma/schema.prisma
+              exit 1
+            fi
+
             if [ ! -f .env ]; then
               echo 'ERROR: .env file is missing at $SERVER_DIR/.env'
               echo 'Create it on the server before deploying.'
@@ -202,7 +210,7 @@ jobs:
 
             echo ''
             echo 'Building Docker image...'
-            DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain docker compose -p '$COMPOSE_PROJECT' build --pull --progress=plain
+            DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain docker compose -p '$COMPOSE_PROJECT' build --pull --no-cache --progress=plain
 
             echo ''
             echo 'Starting fresh wc26 staging containers...'

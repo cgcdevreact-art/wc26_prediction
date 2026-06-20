@@ -2,6 +2,9 @@
 set -e
 
 if [ -n "$DATABASE_URL" ]; then
+  echo "Generating Prisma client from mounted schema..."
+  npx prisma generate
+
   case "$DATABASE_URL" in
     file:*)
       mkdir -p /app/prisma
@@ -19,14 +22,21 @@ if [ -n "$DATABASE_URL" ]; then
       ;;
   esac
 
-  if [ "${RUN_PRISMA_DB_PUSH:-}" = "true" ]; then
-    echo "RUN_PRISMA_DB_PUSH=true; applying Prisma schema..."
-    npx prisma db push
-  elif [ -n "${sqlite_path:-}" ] && [ ! -f "$sqlite_path" ]; then
-    echo "SQLite database not found at $sqlite_path; creating schema..."
-    npx prisma db push
+  if [ "${RUN_PRISMA_DB_PUSH:-}" = "false" ]; then
+    echo "RUN_PRISMA_DB_PUSH=false; skipping Prisma db push."
   else
-    echo "Existing database detected; skipping Prisma db push to avoid data loss."
+    if [ -n "${sqlite_path:-}" ] && [ -f "$sqlite_path" ]; then
+      backup_path="${sqlite_path}.backup-$(date +%Y%m%d-%H%M%S)"
+      cp "$sqlite_path" "$backup_path"
+      echo "SQLite backup created before schema sync: $backup_path"
+    fi
+
+    echo "Syncing Prisma schema without accepting data loss..."
+    if npx prisma db push; then
+      echo "Prisma schema sync completed."
+    else
+      echo "Prisma schema sync failed. Continuing without --accept-data-loss to preserve existing data."
+    fi
   fi
 fi
 

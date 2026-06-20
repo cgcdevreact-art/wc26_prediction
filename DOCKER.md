@@ -37,15 +37,22 @@ docker compose up -d --build
 
 The app will be available on `http://localhost:4000`.
 
-On first boot, the app container uses `.env`, ensures `/app/prisma` exists, and creates the schema only if the SQLite database file does not already exist:
+On startup, the app container uses `.env`, ensures `/app/prisma` exists, generates Prisma Client, and tries to sync the Prisma schema:
 
 ```bash
+npx prisma generate
 npx prisma db push
 ```
 
-That creates the SQLite tables from `prisma/schema.prisma` for a fresh DB.
+That creates missing SQLite tables from `prisma/schema.prisma`, such as `FixtureCache`.
 
-If `prisma/dev.db` already exists, startup skips `prisma db push` to avoid destructive schema changes such as dropping non-empty tables that are not present in the current Prisma schema.
+Before schema sync, an existing SQLite DB is copied to a timestamped backup next to the DB file, for example:
+
+```txt
+prisma/dev.db.backup-20260620-120000
+```
+
+The entrypoint does not use `--accept-data-loss`. Additive changes such as new tables or nullable columns are applied automatically. If Prisma detects a destructive change, schema sync fails, the app continues to start, and existing data is preserved. To skip schema sync entirely, set `RUN_PRISMA_DB_PUSH=false`.
 
 ## Required `.env`
 
@@ -93,7 +100,7 @@ Optional features need these only if you use them:
 
 Note: the Docker build stage sets a dummy `STRIPE_SECRET_KEY` only so Next.js can compile API routes that import Stripe. At runtime, the real value still comes from `.env`.
 
-The final runtime image also runs `npx prisma generate` after copying `prisma/schema.prisma`. This is required because production dependencies are installed before the schema is copied, and `@prisma/client` must be generated inside the final image.
+The final runtime image also runs `npx prisma generate` after copying `prisma/schema.prisma`. The entrypoint runs `npx prisma generate` again on startup so the generated client always matches the bind-mounted server schema under `./prisma`.
 
 ## Database Notes
 
