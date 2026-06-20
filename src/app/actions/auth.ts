@@ -9,7 +9,6 @@ export async function loginAction(email: string, password: string, callbackUrl: 
     // Check if user is admin — redirect to admin dashboard
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { role: true },
     });
 
     const isAdmin = user?.role === "admin";

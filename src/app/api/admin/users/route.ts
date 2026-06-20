@@ -30,14 +30,7 @@ export async function GET(request: Request) {
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
-          role: true,
-          subscriptionTier: true,
-          createdAt: true,
+        include: {
           _count: {
             select: { predictions: true },
           },
@@ -80,13 +73,6 @@ export async function PATCH(request: Request) {
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: updateData,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        subscriptionTier: true,
-      },
     });
 
     return NextResponse.json({ user: updatedUser });

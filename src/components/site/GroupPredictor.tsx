@@ -24,6 +24,14 @@ interface PredictorMatch {
   awayScore: number | "";
 }
 
+function clearPredictorMatchScores(match: PredictorMatch): PredictorMatch {
+  return {
+    ...match,
+    homeScore: "",
+    awayScore: "",
+  };
+}
+
 interface TeamStanding {
   code: string;
   team: any;
@@ -467,13 +475,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   };
 
   const resetGroup = (groupName: string) => {
-    const resetMatches = matches.map((m) => {
+    const resetMatches = matches.map((m): PredictorMatch => {
       if (m.group !== groupName) return m;
-      return {
-        ...m,
-        homeScore: "",
-        awayScore: "",
-      };
+      return clearPredictorMatchScores(m);
     });
     setMatches(resetMatches);
 
@@ -1781,13 +1785,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   // Clear Board
   const handleReset = () => {
-    const resetMatches = matches.map((m) => {
-      return {
-        ...m,
-        homeScore: "",
-        awayScore: "",
-      };
-    });
+    const resetMatches = matches.map(clearPredictorMatchScores);
     setMatches(resetMatches);
 
     const clearedWinners = {

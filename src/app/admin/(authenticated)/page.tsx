@@ -17,7 +17,6 @@ export default async function AdminDashboard() {
       prisma.user.findMany({
         orderBy: { createdAt: "desc" },
         take: 5,
-        select: { id: true, name: true, email: true, createdAt: true, role: true },
       }),
       prisma.prediction.findMany({
         orderBy: { createdAt: "desc" },
