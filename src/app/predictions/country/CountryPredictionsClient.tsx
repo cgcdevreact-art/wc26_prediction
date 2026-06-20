@@ -192,17 +192,53 @@ export default function CountryPredictionsClient({
   useEffect(() => {
     setMounted(true);
     initializeData(initialTeams, initialPlayers);
+    let localList: CustomCountry[] = [];
     if (typeof window !== "undefined") {
       try {
         const stored = localStorage.getItem("wc26_custom_countries");
         if (stored) {
-          setCustomCountries(JSON.parse(stored));
+          localList = JSON.parse(stored);
+          setCustomCountries(localList);
         }
       } catch (e) {
         console.error("Failed to load custom countries", e);
       }
     }
-  }, [initializeData, initialTeams, initialPlayers]);
+
+    if (session?.user?.id) {
+      fetch("/api/user/custom-countries")
+        .then((res) => res.json())
+        .then(async (data) => {
+          if (data.success && Array.isArray(data.customCountries)) {
+            const dbList = data.customCountries;
+            const merged = [...dbList];
+            const uploadPromises = [];
+
+            for (const localTeam of localList) {
+              const existsInDb = dbList.some((dbTeam: any) => dbTeam.code === localTeam.code);
+              if (!existsInDb) {
+                merged.push(localTeam);
+                uploadPromises.push(
+                  fetch("/api/user/custom-countries", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(localTeam),
+                  }).catch((err) => console.error("Error uploading custom team:", err))
+                );
+              }
+            }
+
+            if (uploadPromises.length > 0) {
+              await Promise.all(uploadPromises);
+            }
+
+            setCustomCountries(merged);
+            localStorage.setItem("wc26_custom_countries", JSON.stringify(merged));
+          }
+        })
+        .catch((err) => console.error("Error fetching custom countries from DB:", err));
+    }
+  }, [initializeData, initialTeams, initialPlayers, session]);
 
   const handleDeleteCustomCountry = (code: string) => {
     if (!confirm("Are you sure you want to delete this custom country?")) {
@@ -217,6 +253,14 @@ export default function CountryPredictionsClient({
       const params = new URLSearchParams(window.location.search);
       params.set("team", "ARG");
       window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+    }
+
+    if (session?.user?.id) {
+      fetch("/api/user/custom-countries", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      }).catch((err) => console.error("Error deleting custom country from DB:", err));
     }
   };
 

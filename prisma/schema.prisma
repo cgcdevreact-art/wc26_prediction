@@ -24,6 +24,7 @@ model User {
   leaderboard       Leaderboard?
   teamOverrides     UserTeamOverride[]
   playerOverrides   UserPlayerOverride[]
+  customCountries   UserCustomCountry[]
 
   stripeCustomerId       String?   @unique
   stripeSubscriptionId  String?   @unique
@@ -432,4 +433,25 @@ model FixtureCache {
   @@index([status])
   @@index([isKnockout])
   @@index([updatedAt])
+}
+
+model UserCustomCountry {
+  id           String   @id @default(cuid())
+  userId       String
+  code         String   // E.g., "CC_NIG"
+  name         String
+  flag         String
+  baselineCode String
+  elo          Float
+  attack       Float
+  defense      Float
+  replacedCode String
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, code])
+  @@index([userId])
 }
