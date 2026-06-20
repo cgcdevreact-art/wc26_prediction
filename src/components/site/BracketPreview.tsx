@@ -4,6 +4,7 @@ import { useTeams } from "@/components/TeamsProvider";
 import { SectionHeader } from "./ProbabilityExplorer";
 import Link from "next/link";
 import { ArrowRight, Trophy } from "lucide-react";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 
 const QF = [
   ["ARG", "GER"],
@@ -20,7 +21,7 @@ export function BracketPreview() {
   const finalists = [sf[0][0], sf[1][0]];
   const champ = "ARG";
   return (
-    <section className="mx-auto max-w-7xl px-4 py-16 md:px-6">
+    <section className="container mx-auto px-4 py-16 ">
       <SectionHeader eyebrow="Knockout Bracket" title="Build your bracket. Share your champion." sub="Drag-and-drop your way through QF, SF and Final. Lock in your winner and share a card with friends." />
       <div className="mt-8 glass-strong rounded-2xl p-6 overflow-x-auto">
         <div className="grid min-w-[820px] grid-cols-[1fr_1fr_1fr_1fr] gap-6 items-center">
@@ -76,7 +77,7 @@ function Row({ team, winner }: { team: any; winner: boolean }) {
   return (
     <div className={`flex items-center justify-between gap-2 rounded-md px-2 py-1.5 ${winner ? "bg-gradient-to-r from-neon/20 to-transparent text-foreground" : "text-muted-foreground"}`}>
       <span className="flex items-center gap-2 text-sm font-medium">
-        <span>{team.flag}</span>
+        <CountryFlag code={team.code} flag={team.flag} name={team.name} className="h-4 w-6 rounded-[2px] object-cover" emojiClassName="text-sm leading-none" />
         <span className="truncate">{team.code}</span>
       </span>
       {winner && <span className="h-2 w-2 rounded-full bg-neon shadow-[0_0_8px] shadow-neon/80" />}
@@ -89,7 +90,7 @@ function ChampionNode({ code }: { code: string }) {
   const team = teams.find(t => t.code === code) || teams[0];
   return (
     <>
-      <div className="mt-3 text-3xl">{team.flag}</div>
+      <CountryFlag code={team.code} flag={team.flag} name={team.name} className="mt-3 h-8 w-10 rounded object-cover" emojiClassName="mt-3 text-3xl leading-none" />
       <div className="mt-1 font-display text-lg font-bold">{team.name}</div>
       <div className="text-xs text-muted-foreground">World Champion 2026</div>
     </>

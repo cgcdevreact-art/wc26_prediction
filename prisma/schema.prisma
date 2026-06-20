@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -31,6 +31,7 @@ model User {
   stripeCurrentPeriodEnd DateTime?
   subscriptionTier      String    @default("free")
   freeModelUsageCount   Int       @default(0)
+  role                  String    @default("user")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -405,3 +406,30 @@ model UserPlayerOverride {
   @@index([userId])
 }
 
+model FixtureCache {
+  matchNo       Int      @id
+  date          String
+  group         String
+  homeTeamName  String
+  homeTeamFlag  String
+  homeTeamCode  String
+  awayTeamName  String
+  awayTeamFlag  String
+  awayTeamCode  String
+  venue         String
+  city          String
+  status        String
+  homeScore     String
+  awayScore     String
+  timeElapsed   String
+  isKnockout    Boolean
+  stageName     String
+  source        String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([date])
+  @@index([status])
+  @@index([isKnockout])
+  @@index([updatedAt])
+}

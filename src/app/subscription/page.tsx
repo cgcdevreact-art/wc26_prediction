@@ -1,14 +1,19 @@
 "use client";
 
 import React, { useState } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { Check, Sparkles, Trophy, Shield, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { buildAuthModalHref } from "@/lib/auth-modal";
 
 export default function SubscriptionPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
 
   const currentTier = session?.user?.subscriptionTier || "free";
@@ -16,7 +21,12 @@ export default function SubscriptionPage() {
   const handleSubscribe = async (tier: "plus" | "pro") => {
     if (!session) {
       toast.error("Please sign in to choose a subscription plan");
-      signIn();
+      router.push(buildAuthModalHref({
+        pathname,
+        search: searchParams.toString(),
+        mode: "signin",
+        callbackUrl: pathname,
+      }));
       return;
     }
 
@@ -102,7 +112,7 @@ export default function SubscriptionPage() {
     <div className="min-h-screen bg-hero text-foreground">
       <Header />
       
-      <main className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-24">
+      <main className="container mx-auto px-4 py-16  md:py-24">
         {/* Page Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="inline-flex items-center gap-2 rounded-full glass px-3.5 py-1 text-xs uppercase tracking-[0.25em] text-neon mb-4">

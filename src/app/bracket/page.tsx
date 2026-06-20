@@ -4,7 +4,7 @@ import { GroupPredictor } from "@/components/site/GroupPredictor";
 
 export const metadata = {
   title: "Bracket Builder — WC26 Predict",
-  description: "Build your own World Cup 2026 bracket and share it.",
+  description: "Build your own World Cup 2026 bracket.",
 };
 
 export default function Page() {
@@ -12,7 +12,7 @@ export default function Page() {
     <div className="min-h-screen bg-hero">
       <Header />
       <main>
-        <section className="mx-auto max-w-7xl px-4 pt-8 md:px-6">
+        <section className="container mx-auto px-4  pt-8">
           <div className="rounded-[2rem] border border-border bg-white/80 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/80">
             <div className="max-w-2xl">
               <div className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-600 dark:text-neon">

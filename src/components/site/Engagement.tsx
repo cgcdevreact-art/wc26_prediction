@@ -28,7 +28,7 @@ const CHALLENGES = [
 
 export function Engagement() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-16 md:px-6">
+    <section className="container mx-auto px-4 py-16 ">
       <SectionHeader eyebrow="Compete · Earn · Share" title="Glory has a leaderboard." sub="Daily challenges, badges that show off your call, and a global ranking you can climb." />
       <div className="mt-8 grid gap-5 lg:grid-cols-3">
         <div className="glass-strong rounded-2xl p-5 lg:col-span-2">

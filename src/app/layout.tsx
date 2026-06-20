@@ -18,6 +18,7 @@ import { getTeams, getGroupsConfig, getCupResults } from "@/lib/data";
 import { TeamsProvider } from "@/components/TeamsProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
+import { GlobalAuthModal } from "@/components/site/GlobalAuthModal";
 
 export const metadata: Metadata = {
   title: "WC26 Predict",
@@ -64,6 +65,7 @@ export default async function RootLayout({
           <ThemeProvider>
             <TeamsProvider teams={teams} groupsConfig={groupsConfig} results={cupResults}>
               {children}
+              <GlobalAuthModal />
               <Toaster />
             </TeamsProvider>
           </ThemeProvider>

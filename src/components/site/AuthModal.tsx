@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Trophy, ArrowRight, Loader2, Mail, Lock, User } from "lucide-react";
 import { signIn } from "next-auth/react";
@@ -10,23 +10,28 @@ import { loginAction } from "@/app/actions/auth";
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialMode?: "signin" | "signup";
+  callbackUrl?: string;
 }
 
-export function AuthModal({ isOpen, onClose }: AuthModalProps) {
-  const [mounted, setMounted] = useState(false);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+export function AuthModal({
+  isOpen,
+  onClose,
+  initialMode = "signin",
+  callbackUrl = "/predictions/country",
+}: AuthModalProps) {
+  const [mode, setMode] = useState<"signin" | "signup">(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const callbackUrl = "/predictions/country";
+  const reloadAfterAuth = () => {
+    if (typeof window === "undefined") return;
+    window.location.assign(callbackUrl || window.location.pathname);
+  };
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!isOpen || !mounted) return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,12 +63,13 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         toast.error(signInRes.error || "Authentication failed. Please check your credentials.");
       } else {
         toast.success("Signed in successfully!");
-        onClose();
+        reloadAfterAuth();
+        return;
       }
     } catch (error) {
-      if ((error as any).message === "NEXT_REDIRECT") {
-        // This is expected during successful signIn redirect in Next.js
-        onClose();
+      if (error instanceof Error && error.message === "NEXT_REDIRECT") {
+        // Successful server-side auth can surface as NEXT_REDIRECT in client-invoked actions.
+        reloadAfterAuth();
         return;
       }
       toast.error("Something went wrong. Please try again.");

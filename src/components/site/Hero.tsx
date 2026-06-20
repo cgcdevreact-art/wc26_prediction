@@ -1,6 +1,7 @@
 "use client";
 
 import { useTeams } from "@/components/TeamsProvider";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import { Countdown } from "./Countdown";
 import { Trophy, Sparkles, ArrowRight } from "lucide-react";
 import { BarChart, Bar, ResponsiveContainer, XAxis, Cell, Tooltip } from "recharts";
@@ -31,7 +32,7 @@ export function Hero() {
         <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-neon-2/20 blur-3xl" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-neon/60 to-transparent" />
       </div>
-      <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-16 md:px-6 md:py-24 lg:grid-cols-2 lg:items-center">
+      <div className="relative mx-auto grid container mx-auto px-4 gap-10  py-16 md:px-6 md:py-24 lg:grid-cols-2 lg:items-center">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-xs uppercase tracking-[0.25em] text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-neon" /> FIFA World Cup 2026 · USA · Canada · Mexico
@@ -40,7 +41,7 @@ export function Hero() {
             Who Will Win the <span className="text-gradient">World Cup 2026</span>?
           </h1>
           <p className="mt-4 max-w-xl text-base text-muted-foreground sm:text-lg">
-            Run simulations, predict every match, build your bracket and compete with millions. Real probabilities. Real glory. No gambling — just bragging rights.
+            Run simulations, predict every match, build your bracket and compete with millions. Real probabilities. Real glory.
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <button
@@ -100,7 +101,9 @@ export function Hero() {
             <div className="mt-4 grid grid-cols-4 gap-2 text-center">
               {top.slice(0, 4).map((t) => (
                 <div key={t.code} className="rounded-lg bg-white/5 p-2">
-                  <div className="text-xl">{t.flag}</div>
+                  <div className="flex justify-center">
+                    <CountryFlag code={t.code} flag={t.flag} name={t.name} className="h-6 w-8" emojiClassName="text-xl" />
+                  </div>
                   <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{t.code}</div>
                   <div className="text-sm font-semibold text-neon">{t.prob.champion.toFixed(1)}%</div>
                 </div>
