@@ -5,7 +5,33 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
-import { ArrowRight, Sparkles, Plus, X } from "lucide-react";
+import { ArrowRight, Sparkles, Plus, X, Info } from "lucide-react";
+import { ALL_COUNTRIES } from "@/lib/countries-data";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+
+function InfoTooltip({ content }: { content: string }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button 
+            type="button"
+            onClick={(e) => e.stopPropagation()} 
+            className="inline-block ml-1.5 align-middle cursor-help select-none bg-transparent border-none p-0 outline-none focus:outline-none"
+          >
+            <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-slate-900 dark:hover:text-white transition-colors" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent 
+          side="top" 
+          className="max-w-[200px] bg-slate-950 text-white border border-white/10 px-2.5 py-1.5 text-[11px] font-medium normal-case tracking-normal leading-normal text-center shadow-xl rounded-lg z-50"
+        >
+          {content}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 const FEATURED_CODES = ["NOR", "ITA", "CHL", "NGA", "IND", "RSA"];
 
@@ -38,6 +64,35 @@ export function WildcardCountrySection() {
   const [customElo, setCustomElo] = useState(1650);
   const [customAttack, setCustomAttack] = useState(78);
   const [customDefense, setCustomDefense] = useState(78);
+
+  const [flagSearch, setFlagSearch] = useState("");
+  const [isFlagDropdownOpen, setIsFlagDropdownOpen] = useState(false);
+  const [countriesList, setCountriesList] = useState<any[]>(ALL_COUNTRIES);
+
+  useEffect(() => {
+    fetch("https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/index.json")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const cleaned = data.map((c: any) => ({
+            name: c.name,
+            code: c.code,
+            emoji: c.emoji,
+          }));
+          setCountriesList(cleaned);
+        }
+      })
+      .catch((err) => console.warn("Failed to fetch country flag JSON from CDN, using static fallback:", err));
+  }, []);
+
+  const filteredCountries = useMemo(() => {
+    const search = flagSearch.trim().toLowerCase();
+    const list = [...countriesList].sort((a, b) => a.name.localeCompare(b.name));
+    if (!search) return list;
+    return list.filter((c) =>
+      c.name.toLowerCase().includes(search)
+    );
+  }, [flagSearch, countriesList]);
 
   const worldCupCodes = useMemo(() => {
     return Object.values(groupsConfig).flat();
@@ -339,7 +394,13 @@ export function WildcardCountrySection() {
                           : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.02] dark:text-muted-foreground dark:hover:bg-white/5 dark:hover:text-white"
                       }`}
                     >
-                      <span className="text-lg leading-none">{cc.flag}</span>
+                      <CountryFlag
+                        code={cc.code}
+                        flag={cc.flag}
+                        name={cc.name}
+                        className="h-4.5 w-6 rounded object-cover"
+                        emojiClassName="text-lg leading-none"
+                      />
                       <span>{cc.name}</span>
                       <span className="text-[8px] tracking-wider uppercase bg-neon-2/20 text-neon-2 font-bold px-1.5 py-0.5 rounded">Custom</span>
                       <button
@@ -511,11 +572,11 @@ export function WildcardCountrySection() {
                     Cancel
                   </button>
                 </div>
-
-                {/* Country Name */}
+                     {/* Country Name */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
-                    Country Name
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block flex items-center">
+                    <span>Country Name</span>
+                    <InfoTooltip content="The name of your custom wildcard country (e.g. Italy, Nigeria)." />
                   </label>
                   <input
                     type="text"
@@ -526,38 +587,106 @@ export function WildcardCountrySection() {
                   />
                 </div>
 
-                {/* Flag Emoji */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
-                    Flag Emoji
-                  </label>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={customFlag}
-                      onChange={(e) => setCustomFlag(e.target.value)}
-                      className="h-10 w-12 rounded-xl border border-slate-200 bg-white text-center text-lg font-semibold text-slate-900 outline-none transition focus:border-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
-                    />
-                    <div className="flex flex-wrap gap-1">
-                      {["🇳🇬", "🇳🇴", "🇮🇹", "🇨🇱", "🇮🇳", "🇿🇦", "🇪🇬", "🇸🇪"].map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => setCustomFlag(emoji)}
-                          className={`w-8 h-8 rounded-lg text-lg flex items-center justify-center border hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer ${customFlag === emoji ? "border-neon bg-neon/10 text-slate-950 dark:text-white font-bold" : "border-slate-200 text-slate-500 dark:border-white/10 dark:text-muted-foreground"
-                            }`}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
+                 {/* Flag & Country Picker */}
+                <div className="space-y-2 relative">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block flex items-center">
+                      <span>Flag & Country Profile</span>
+                      <InfoTooltip content="Search and select any flag image, or click on a quick select shortcut." />
+                    </label>
+                  </div>
+                  
+                  <div className="relative">
+                    <div className="flex gap-2 items-center">
+                      <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-950 px-3 h-10 flex-1">
+                        <CountryFlag flag={customFlag} className="h-5 w-7 rounded object-cover shrink-0" />
+                        <input
+                          type="text"
+                          placeholder="Search country flag (e.g. Italy, Nigeria...)"
+                          value={flagSearch}
+                          onChange={(e) => {
+                            setFlagSearch(e.target.value);
+                            setIsFlagDropdownOpen(true);
+                          }}
+                          onFocus={() => setIsFlagDropdownOpen(true)}
+                          className="w-full text-sm font-semibold text-slate-900 dark:text-white outline-none bg-transparent"
+                        />
+                        {flagSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setFlagSearch("")}
+                            className="text-xs text-muted-foreground hover:text-slate-950 dark:hover:text-white shrink-0 cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {isFlagDropdownOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-30"
+                          onClick={() => setIsFlagDropdownOpen(false)}
+                        />
+                        <div className="absolute z-40 left-0 right-0 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-white/10 dark:bg-slate-950 scrollbar-custom">
+                          {filteredCountries.length > 0 ? (
+                            filteredCountries.map((c) => (
+                              <button
+                                key={c.code}
+                                type="button"
+                                onClick={() => {
+                                  setCustomFlag(c.emoji);
+                                  if (!customName.trim() || countriesList.some(ac => ac.name.toLowerCase() === customName.trim().toLowerCase())) {
+                                    setCustomName(c.name);
+                                  }
+                                  setFlagSearch("");
+                                  setIsFlagDropdownOpen(false);
+                                }}
+                                className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer text-slate-900 dark:text-white"
+                              >
+                                <CountryFlag flag={c.emoji} className="h-4.5 w-6 rounded object-cover shrink-0" />
+                                <span className="font-semibold">{c.name}</span>
+                                <span className="text-[10px] text-muted-foreground ml-auto uppercase font-mono">{c.code}</span>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-xs text-muted-foreground">
+                              No countries found
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Quick Select Row */}
+                  <div className="flex flex-wrap gap-1.5 items-center pt-0.5">
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mr-1">Quick Select:</span>
+                    {countriesList.filter(c => ["NG", "NO", "IT", "CL", "IN", "ZA", "EG", "SE"].includes(c.code)).map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => {
+                          setCustomFlag(c.emoji);
+                          if (!customName.trim() || countriesList.some(ac => ac.name.toLowerCase() === customName.trim().toLowerCase())) {
+                            setCustomName(c.name);
+                          }
+                        }}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center border hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer ${customFlag === c.emoji ? "border-neon bg-neon/10" : "border-slate-200 dark:border-white/10"
+                          }`}
+                        title={c.name}
+                      >
+                        <CountryFlag flag={c.emoji} className="h-4.5 w-6 rounded object-cover" emojiClassName="text-lg" />
+                      </button>
+                    ))}
                   </div>
                 </div>
-
-                {/* Clone Baseline */}
+                     {/* Clone Baseline */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
-                    Clone Baseline Squad
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block flex items-center">
+                    <span>Clone Baseline Squad</span>
+                    <InfoTooltip content="Clones the selected country's real player names, statistics, and value to use as the base for this team." />
                   </label>
                   <select
                     value={baselineCode}
@@ -574,8 +703,9 @@ export function WildcardCountrySection() {
 
                 {/* Replacement Choice */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-neon-2 uppercase tracking-widest block">
-                    Replacement Team (Slots in)
+                  <label className="text-[10px] font-bold text-neon-2 uppercase tracking-widest block flex items-center">
+                    <span>Replacement Team (Slots in)</span>
+                    <InfoTooltip content="The original tournament team that will be replaced by your custom country in the final brackets." />
                   </label>
                   <select
                     value={replacedCode}
@@ -601,12 +731,14 @@ export function WildcardCountrySection() {
                     </optgroup>
                   </select>
                 </div>
-
-                {/* Ratings Sliders (Elo, Att, Def) */}
+                     {/* Ratings Sliders (Elo, Att, Def) */}
                 <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-white/5">
                   <div>
-                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
-                      <span>Elo Rating</span>
+                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 items-center">
+                      <span className="flex items-center">
+                        <span>Elo Rating</span>
+                        <InfoTooltip content="Overall skill rating of the country. Higher ELO increases the probability of winning matches." />
+                      </span>
                       <span className="text-neon font-mono font-bold">{customElo}</span>
                     </div>
                     <input
@@ -619,8 +751,11 @@ export function WildcardCountrySection() {
                     />
                   </div>
                   <div>
-                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
-                      <span>Attack Power</span>
+                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 items-center">
+                      <span className="flex items-center">
+                        <span>Attack Power</span>
+                        <InfoTooltip content="Influences the average number of goals scored per match by this team." />
+                      </span>
                       <span className="text-neon font-mono font-bold">{customAttack}</span>
                     </div>
                     <input
@@ -633,8 +768,11 @@ export function WildcardCountrySection() {
                     />
                   </div>
                   <div>
-                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">
-                      <span>Defense Strength</span>
+                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 items-center">
+                      <span className="flex items-center">
+                        <span>Defense Strength</span>
+                        <InfoTooltip content="Influences the average number of goals conceded per match by this team." />
+                      </span>
                       <span className="text-neon font-mono font-bold">{customDefense}</span>
                     </div>
                     <input
