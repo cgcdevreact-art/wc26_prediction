@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useSimulationStore, PlayerStats, TeamStats } from "@/lib/store/simulationStore";
 import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
 import { getMatchExpectedGoals, SimTeam } from "@/lib/simulation/model";
-import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check, PencilLine, Lock, Trash2, X } from "lucide-react";
+import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check, PencilLine, Lock, Trash2, X, Info, Minus, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
@@ -18,6 +18,7 @@ import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } fro
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
 import { CustomCountry } from "@/components/site/WildcardCountrySection";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 // Poisson score generator
 function getPoisson(lambda: number) {
@@ -48,6 +49,30 @@ function clampRating(value: number, min = 1, max = 99) {
   return Math.max(min, Math.min(max, Math.round(value)));
 }
 
+function InfoTooltip({ content }: { content: string }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button 
+            type="button"
+            onClick={(e) => e.stopPropagation()} 
+            className="inline-block ml-1.5 align-middle cursor-help select-none bg-transparent border-none p-0 outline-none focus:outline-none"
+          >
+            <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-slate-900 dark:hover:text-white transition-colors" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent 
+          side="top" 
+          className="max-w-[200px] bg-slate-950 text-white border border-white/10 px-2.5 py-1.5 text-[11px] font-medium normal-case tracking-normal leading-normal text-center shadow-xl rounded-lg z-50"
+        >
+          {content}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export default function CountryPredictionsClient({
   initialTeams,
   initialPlayers,
@@ -68,6 +93,7 @@ export default function CountryPredictionsClient({
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [zoomScale, setZoomScale] = useState(85);
 
   // Credit limits states
   const [creditsUsed, setCreditsUsed] = useState<number>(0);
@@ -1206,7 +1232,10 @@ export default function CountryPredictionsClient({
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-white/5">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70">Elo Rating</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70 flex items-center">
+                        <span>Elo Rating</span>
+                        <InfoTooltip content="Overall skill rating of the country. Higher ELO increases the probability of winning matches." />
+                      </span>
                       <input
                         type="number"
                         min={1200}
@@ -1218,7 +1247,10 @@ export default function CountryPredictionsClient({
                       />
                     </div>
                     <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-white/5">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70">Attack Power</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70 flex items-center">
+                        <span>Attack Power</span>
+                        <InfoTooltip content="Influences the average number of goals scored per match by this team." />
+                      </span>
                       <input
                         type="number"
                         min={15}
@@ -1230,7 +1262,10 @@ export default function CountryPredictionsClient({
                       />
                     </div>
                     <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-white/5">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70">Defense Strength</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70 flex items-center">
+                        <span>Defense Strength</span>
+                        <InfoTooltip content="Influences the average number of goals conceded per match by this team." />
+                      </span>
                       <input
                         type="number"
                         min={15}
@@ -1245,7 +1280,13 @@ export default function CountryPredictionsClient({
 
                   <div className="py-2.5 border-b border-slate-100 dark:border-white/5">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70">Player Rating Boost</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70 flex items-center gap-1.5">
+                        <span>Player Rating Boost</span>
+                        <InfoTooltip content="Increases or decreases the overall rating of all individual players in the squad." />
+                        <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded-md border bg-cyan-500/10 text-cyan-600 border-cyan-500/20 dark:bg-neon/10 dark:text-neon dark:border-neon/20 shrink-0 select-none">
+                          Plus
+                        </span>
+                      </span>
                       <div className="flex items-center gap-1.5">
                         {!canEditPlayerRatings && <Lock className="w-3 h-3 text-amber-500" />}
                         <span className="text-xs font-mono font-bold text-cyan-600 dark:text-neon">
@@ -1276,10 +1317,14 @@ export default function CountryPredictionsClient({
                     <AccordionItem value="players-in" className="border-b border-slate-100 dark:border-white/5">
                       <AccordionTrigger className="py-2.5 text-xs font-semibold text-slate-700 dark:text-white/70 hover:no-underline">
                         <span className="flex items-center justify-between w-full pr-4">
-                          <span className="flex items-center gap-2">
-                            Players In
+                          <span className="flex items-center gap-1.5">
+                            <span>Players In</span>
+                            <InfoTooltip content="Choose reserve players to sub into the active starting lineup/squad." />
+                            <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded-md border bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-500/20 dark:bg-neon-2/10 dark:text-neon-2 dark:border-neon-2/20 shrink-0 select-none">
+                              Pro
+                            </span>
                             {playersIn.length > 0 && (
-                              <span className="px-1.5 py-0.5 rounded-full bg-cyan-100 text-cyan-800 text-[10px] font-bold dark:bg-neon/20 dark:text-neon">
+                              <span className="px-1.5 py-0.5 rounded-full bg-cyan-100 text-cyan-800 text-[10px] font-bold dark:bg-neon/20 dark:text-neon ml-1">
                                 {playersIn.length}
                               </span>
                             )}
@@ -1304,8 +1349,12 @@ export default function CountryPredictionsClient({
                     <AccordionItem value="players-out" className="border-none">
                       <AccordionTrigger className="py-2.5 text-xs font-semibold text-slate-700 dark:text-white/70 hover:no-underline">
                         <span className="flex items-center justify-between w-full pr-4">
-                          <span className="flex items-center gap-2">
-                            Players Out
+                          <span className="flex items-center gap-1.5">
+                            <span>Players Out</span>
+                            <InfoTooltip content="Select active players to sideline or remove from the matches." />
+                            <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded-md border bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-500/20 dark:bg-neon-2/10 dark:text-neon-2 dark:border-neon-2/20 shrink-0 select-none">
+                              Pro
+                            </span>
                             {playersOut.length > 0 && (
                               <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold dark:bg-rose-500/20 dark:text-rose-400">
                                 {playersOut.length}
@@ -1784,18 +1833,54 @@ export default function CountryPredictionsClient({
               <div className="absolute right-0 top-0 w-96 h-96 bg-cyan-100/60 dark:bg-[#00c6ff]/5 rounded-full filter blur-3xl pointer-events-none" />
 
               {simResults?.mockTournament && (
-                <div className="w-full overflow-x-auto scrollbar-custom pb-8 relative z-10">
-                  {/* Header Row at the top of the bracket columns */}
-                  <div className="flex items-center justify-start min-w-max gap-12 px-4 mb-6">
-                    <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Round of 32</div>
-                    <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Round of 16</div>
-                    <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Quarter-Finals</div>
-                    <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Semi-Finals</div>
-                    <div className="w-56 text-[10px] uppercase font-bold text-yellow-600 dark:text-yellow-500 tracking-widest pb-2 border-b border-border dark:border-white/10 text-center">Finals & Champion</div>
+                <>
+                  {/* Zoom Controls */}
+                  <div className="flex justify-end mb-6 relative z-20">
+                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setZoomScale(prev => Math.max(50, prev - 10))}
+                        className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                        title="Zoom Out"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span className="text-xs font-mono font-bold w-12 text-center text-foreground dark:text-white">
+                        {zoomScale}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setZoomScale(prev => Math.min(150, prev + 10))}
+                        className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                        title="Zoom In"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setZoomScale(85)}
+                        className="text-[10px] font-bold px-2 py-1 rounded-md hover:bg-white dark:hover:bg-white/10 text-[#00c6ff] dark:text-neon transition cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Bracket Content Row */}
-                  <div className="flex items-start justify-start min-w-max gap-12 px-4">
+                  <div className="w-full overflow-x-auto scrollbar-custom pb-8 relative z-10">
+                    {/* Header Row at the top of the bracket columns */}
+                    <div className="flex items-center justify-start min-w-max gap-12 px-4 mb-6" style={{ zoom: zoomScale / 100 }}>
+                      <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Round of 32</div>
+                      <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Round of 16</div>
+                      <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Quarter-Finals</div>
+                      <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Semi-Finals</div>
+                      <div className="w-56 text-[10px] uppercase font-bold text-yellow-600 dark:text-yellow-500 tracking-widest pb-2 border-b border-border dark:border-white/10 text-center">Finals & Champion</div>
+                    </div>
+
+                    {/* Bracket Content Row */}
+                    <div 
+                      className="flex items-start justify-start min-w-max gap-12 px-4 transition-transform duration-300 origin-top-left"
+                      style={{ zoom: zoomScale / 100 }}
+                    >
                     {/* R32 Column */}
                     <div className="flex flex-col shrink-0">
                       {simResults.mockTournament.r32.map((m: any, i: number) => {
@@ -2041,6 +2126,7 @@ export default function CountryPredictionsClient({
                     </div>
                   </div>
                 </div>
+                </>
               )}
             </div>
           </AccordionContent>
