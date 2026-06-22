@@ -1125,7 +1125,7 @@ export default function CountryPredictionsClient({
             defaultValue={["country-list"]}
             className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900"
           >
-            <AccordionItem value="country-list" className="border-none data-[state=open]:flex data-[state=open]:flex-col data-[state=open]:lg:h-[920px]">
+            <AccordionItem value="country-list" className="border-none data-[state=open]:flex data-[state=open]:flex-col data-[state=open]:lg:h-[820px]">
               <AccordionTrigger className="shrink-0 px-5 pt-5 pb-3 hover:no-underline">
                 <div>
                   <div className="font-display text-lg font-bold text-foreground">Country Rankings</div>
@@ -1641,23 +1641,23 @@ export default function CountryPredictionsClient({
           </Accordion>
 
           {/* Dual Charts Row */}
-          <div className="grid items-start gap-6 md:grid-cols-2">
+          <div className="grid items-stretch gap-6 md:grid-cols-2">
             {/* Radar Attributes Card */}
-            <Accordion type="multiple" defaultValue={["performance-attributes"]} className="rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
-              <AccordionItem value="performance-attributes" className="border-none">
+            <Accordion type="multiple" defaultValue={["performance-attributes"]} className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="performance-attributes" className="flex h-full flex-col border-none">
                 <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
                   <div>
                     <div className="font-display font-bold text-lg text-foreground">Performance Attributes</div>
                     <div className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</div>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="px-6 pb-6">
+                <AccordionContent className="flex-1 px-6 pb-6">
                   <div className="flex justify-end mb-6">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30">
                       Attributes
                     </span>
                   </div>
-                  <div className="h-64 flex items-center justify-center">
+                  <div className="flex h-64 min-h-[280px] items-center justify-center">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} outerRadius={85}>
                         <PolarGrid stroke={activeTheme === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.14)"} />
@@ -1671,15 +1671,15 @@ export default function CountryPredictionsClient({
             </Accordion>
 
             {/* Squad Quality Tiers Card */}
-            <Accordion type="multiple" defaultValue={["squad-quality"]} className="rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
-              <AccordionItem value="squad-quality" className="border-none">
+            <Accordion type="multiple" defaultValue={["squad-quality"]} className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="squad-quality" className="flex h-full flex-col border-none">
                 <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
                   <div>
                     <div className="font-display font-bold text-lg text-foreground">Squad Quality Tiers</div>
                     <div className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</div>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="px-6 pb-6">
+                <AccordionContent className="flex-1 px-6 pb-6">
                   <div className="flex justify-end mb-6">
                     <span className="self-start rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-fuchsia-700 dark:border-neon-2/30 dark:bg-neon-2/10 dark:text-neon-2">
                       Squad Profile
@@ -1745,7 +1745,7 @@ export default function CountryPredictionsClient({
                     </span>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto pb-4 scrollbar-custom">
+                  <div className="overflow-x-auto overflow-y-hidden pb-4 scrollbar-custom [scrollbar-gutter:stable]">
                     <div className="flex items-stretch gap-4 min-w-max py-2 px-1">
                       {/* Start Node */}
                       <div className="flex flex-col justify-center items-center bg-gradient-to-br from-cyan-50 to-fuchsia-50 border border-cyan-200 rounded-[1.75rem] px-5 py-4 min-w-[140px] shadow-sm relative overflow-hidden group dark:from-neon/20 dark:to-neon-2/10 dark:border-neon/40 dark:shadow-glass">
@@ -2152,7 +2152,7 @@ export default function CountryPredictionsClient({
               {isSimulating ? (
                 <div className="flex w-full flex-col items-center justify-center gap-4 py-2">
                   <img
-                    src="/lottie/Footballer.svg"
+                    src="/lottie/World Cup!.svg"
                     alt="Simulation loading"
                     className="h-80 w-80 object-contain"
                   />

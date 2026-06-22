@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
-import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle } from "lucide-react";
+import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle, Brain, Cpu } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { StaminaBar, AlignmentGauge, TemperatureSlider } from "@/components/ui/SciFiControls";
 import { useSimulationStore } from "@/lib/store/simulationStore";
@@ -269,6 +269,42 @@ const KO_DETAILS: Record<string, { venue: string; date: string }[]> = {
     { venue: "Miami", date: "7/19" }
   ]
 };
+
+const MODEL_META = {
+  base: {
+    label: "Base",
+    title: "Simulation Engine",
+    description: "Elo, attack, and defense drive the current match prediction logic.",
+    summary: "Elo / Att / Def",
+    accent: "text-emerald-600 dark:text-neon",
+    border: "border-emerald-200/80 dark:border-emerald-400/20",
+    glow: "from-emerald-500/12 via-transparent to-transparent dark:from-emerald-400/10",
+    badge: "bg-emerald-100/80 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-300",
+    Icon: Cpu,
+  },
+  advanced: {
+    label: "Advanced",
+    title: "Simulation Engine",
+    description: "Adds squad quality and player rating balance on top of the base engine.",
+    summary: "Base + Squad",
+    accent: "text-sky-700 dark:text-sky-300",
+    border: "border-sky-200/80 dark:border-sky-400/20",
+    glow: "from-sky-500/12 via-transparent to-transparent dark:from-sky-400/10",
+    badge: "bg-sky-100/80 text-sky-800 dark:bg-sky-400/10 dark:text-sky-300",
+    Icon: Brain,
+  },
+  pro: {
+    label: "Pro",
+    title: "Simulation Engine",
+    description: "Uses player form, fitness, creativity, discipline, and experience signals too.",
+    summary: "Advanced + Player Aspects",
+    accent: "text-cyan-700 dark:text-cyan-300",
+    border: "border-cyan-200/80 dark:border-cyan-400/20",
+    glow: "from-cyan-500/12 via-transparent to-transparent dark:from-cyan-400/10",
+    badge: "bg-cyan-100/80 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-300",
+    Icon: Sparkles,
+  },
+} as const;
 
 interface GroupPredictorProps {
   defaultTab?: "group" | "knockout";
@@ -2255,6 +2291,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         </div>
       )}
 
+      <div className="mb-8 flex justify-start">
+        <SimulationEngineBadge model={selectedModel} />
+      </div>
+
       {/* Group Stage View */}
       {activeTab === "group" && (
         <div className="space-y-12">
@@ -3789,6 +3829,33 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function SimulationEngineBadge({ model }: { model: keyof typeof MODEL_META }) {
+  const meta = MODEL_META[model];
+  const Icon = meta.Icon;
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl border bg-white/70 px-4 py-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:bg-slate-900/70 ${meta.border}`}>
+      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-r ${meta.glow}`} />
+      <div className="relative flex flex-wrap items-center gap-3">
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-black/6 bg-black/4 dark:border-white/10 dark:bg-white/5 ${meta.accent}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+            {meta.title}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`font-display text-lg font-black leading-none ${meta.accent}`}>{meta.label}</span>
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] ${meta.badge}`}>
+              {meta.summary}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

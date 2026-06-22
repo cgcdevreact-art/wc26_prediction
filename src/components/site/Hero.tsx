@@ -100,7 +100,7 @@ export function Hero() {
 
             <div className="mt-4 grid grid-cols-4 gap-2 text-center">
               {top.slice(0, 4).map((t) => (
-                <div key={t.code} className="rounded-lg bg-white/5 p-2">
+                <div key={t.code} className="rounded-lg border border-black/8 bg-black/8 p-2 dark:border-white/8 dark:bg-white/5">
                   <div className="flex justify-center">
                     <CountryFlag code={t.code} flag={t.flag} name={t.name} className="h-6 w-8" emojiClassName="text-xl" />
                   </div>

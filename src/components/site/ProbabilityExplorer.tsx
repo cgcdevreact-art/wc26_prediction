@@ -200,6 +200,29 @@ export function ProbabilityExplorer() {
 
         {/* Main */}
         <div className="space-y-5 min-w-0">
+
+          <Accordion type="multiple" defaultValue={["home-route"]} className="glass self-start h-fit rounded-2xl overflow-hidden">
+            <AccordionItem value="home-route" className="border-none">
+              <AccordionTrigger className="px-5 pt-5 pb-3 hover:no-underline">
+                <div className="flex w-full items-center justify-between pr-3">
+                  <div className="text-left">
+                    <div className="font-display text-lg font-semibold">Most Likely Route to the Final</div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">Win % per stage</div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5 [&>div]:pb-0">
+                <div className="overflow-x-auto">
+                  <div className="flex items-stretch gap-2 min-w-max">
+                    <PathNode code={team.code} flag={team.flag} label={team.name} highlight />
+                    {PATH_TO_FINAL.map((p, i) => (
+                      <PathStep key={i} stage={p.stage} opp={p.opp} winPct={p.winPct} />
+                    ))}
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
           <Accordion type="multiple" defaultValue={["home-team-overview"]} className="glass-strong self-start h-fit rounded-3xl border border-white/10 shadow-xl overflow-hidden">
             <AccordionItem value="home-team-overview" className="border-none">
               <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
@@ -441,29 +464,6 @@ export function ProbabilityExplorer() {
               </AccordionItem>
             </Accordion>
           </div>
-
-          <Accordion type="multiple" defaultValue={["home-route"]} className="glass self-start h-fit rounded-2xl overflow-hidden">
-            <AccordionItem value="home-route" className="border-none">
-              <AccordionTrigger className="px-5 pt-5 pb-3 hover:no-underline">
-                <div className="flex w-full items-center justify-between pr-3">
-                  <div className="text-left">
-                    <div className="font-display text-lg font-semibold">Most Likely Route to the Final</div>
-                  </div>
-                  <div className="text-xs text-muted-foreground">Win % per stage</div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-5 pb-5 [&>div]:pb-0">
-                <div className="overflow-x-auto">
-                  <div className="flex items-stretch gap-2 min-w-max">
-                    <PathNode code={team.code} flag={team.flag} label={team.name} highlight />
-                    {PATH_TO_FINAL.map((p, i) => (
-                      <PathStep key={i} stage={p.stage} opp={p.opp} winPct={p.winPct} />
-                    ))}
-                  </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
         </div>
       </div>
       <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />

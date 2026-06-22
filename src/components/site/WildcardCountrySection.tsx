@@ -543,6 +543,7 @@ export function WildcardCountrySection() {
                   <MiniDetail number="01" text="Clone and customize initial ratings" />
                   <MiniDetail number="02" text="Slot into region suggested group position" />
                   <MiniDetail number="03" text="Test squad quality in simulation brackets" />
+                  <MiniDetail number="04" text="Run their path to glory" />
                 </div>
               </div>
 
@@ -715,7 +716,7 @@ export function WildcardCountrySection() {
                     <optgroup label="Suggested (Same Confederation)" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
                       {suggestedReplacements.map((team) => (
                         <option key={team.code} value={team.code}>
-                          Replace: {team.name} ({team.code}) - {team.confederation}
+                          Replace: {team.name} ({team.code})
                         </option>
                       ))}
                     </optgroup>
