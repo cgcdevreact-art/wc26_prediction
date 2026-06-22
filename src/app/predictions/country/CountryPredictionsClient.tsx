@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, ReactNode } from "react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { useSimulationStore, PlayerStats, TeamStats } from "@/lib/store/simulationStore";
 import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
 import { getMatchExpectedGoals, SimTeam } from "@/lib/simulation/model";
-import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check, PencilLine, Lock, Trash2, X, Info, Minus, Plus } from "lucide-react";
+import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check, PencilLine, Lock, Trash2, X, Info, Minus, Plus, Shield, Zap, Coins, Cpu, Award, Route } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { UpgradeModal } from "@/components/site/UpgradeModal";
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
 import { CustomCountry } from "@/components/site/WildcardCountrySection";
@@ -73,6 +73,35 @@ function InfoTooltip({ content }: { content: string }) {
   );
 }
 
+const CustomCompareTooltip = ({ active, payload, label, mode }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-950/95 text-white border border-white/10 px-3 py-2 text-xs rounded-xl shadow-xl backdrop-blur-md">
+        <p className="font-bold border-b border-white/10 pb-1 mb-1">{label}</p>
+        <div className="space-y-1">
+          {payload.map((pld: any) => {
+            const countryName = pld.name;
+            const value = pld.value;
+            const rawVal = mode === "attributes" && pld.payload ? pld.payload[`${countryName}_raw`] : null;
+            return (
+              <div key={countryName} className="flex items-center justify-between gap-4 font-medium">
+                <span className="flex items-center gap-1.5" style={{ color: pld.color }}>
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: pld.color }} />
+                  {countryName}
+                </span>
+                <span className="font-bold font-mono">
+                  {mode === "progression" ? `${value}%` : (rawVal ?? value)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function CountryPredictionsClient({
   initialTeams,
   initialPlayers,
@@ -82,7 +111,7 @@ export default function CountryPredictionsClient({
   initialPlayers: PlayerStats[],
   flagMap: Record<string, string>
 }) {
-  const { isInitialized, initializeData, players, selectedModel } = useSimulationStore();
+  const { isInitialized, initializeData, players, selectedModel, setSelectedModel } = useSimulationStore();
   const appTeams = useTeams();
   const GROUPS_CONFIG = useGroupsConfig();
   const { theme } = useTheme();
@@ -94,6 +123,128 @@ export default function CountryPredictionsClient({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [zoomScale, setZoomScale] = useState(85);
+
+  // Saved predictions state & logic
+  const [savedPredictions, setSavedPredictions] = useState<any[]>([]);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [selectedCompareIds, setSelectedCompareIds] = useState<string[]>([]);
+  const [compareChartTab, setCompareChartTab] = useState<"progression" | "attributes">("progression");
+
+  const fetchSavedPredictions = async () => {
+    if (!session?.user?.id) return;
+    setIsLoadingSaved(true);
+    try {
+      const res = await fetch("/api/predictions");
+      if (res.ok) {
+        const data = await res.json();
+        const countryProjs = data.filter((p: any) => p.type === "COUNTRY_PROJECTION");
+        setSavedPredictions(countryProjs);
+      }
+    } catch (err) {
+      console.error("Error fetching saved predictions:", err);
+    } finally {
+      setIsLoadingSaved(false);
+    }
+  };
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchSavedPredictions();
+    }
+  }, [session]);
+
+  const handleLoadPrediction = (prediction: any) => {
+    try {
+      ignoreResetRef.current = true;
+      const data = typeof prediction.predictedWinner === "string"
+        ? JSON.parse(prediction.predictedWinner)
+        : prediction.predictedWinner;
+
+      if (!data) {
+        ignoreResetRef.current = false;
+        return;
+      }
+
+      setSelectedCode(data.code);
+
+      if (data.modelName) {
+        setSelectedModel(data.modelName);
+      }
+
+      setCustomElo(data.customElo ?? data.elo ?? 1500);
+      setCustomAttack(data.customAttack ?? 75);
+      setCustomDefense(data.customDefense ?? 75);
+      setCustomPlayerRatingDelta(data.customPlayerRatingDelta ?? 0);
+      setPlayersIn(data.playersIn ?? []);
+      setPlayersOut(data.playersOut ?? []);
+
+      if (data.simResults) {
+        setSimResults(data.simResults);
+      } else {
+        const reconstructedStages = data.stages || {
+          group: 1000,
+          r32: 0,
+          r16: 0,
+          qf: 0,
+          sf: 0,
+          final: 0,
+          champion: (data.championProb ?? 0) * 10
+        };
+        setSimResults({
+          stages: reconstructedStages,
+          opponents: {},
+          mockTournament: null
+        });
+      }
+
+      toast.success(`Loaded saved simulation for ${data.name}!`);
+
+      // Delay resetting the ref to allow React to flush state updates
+      setTimeout(() => {
+        ignoreResetRef.current = false;
+      }, 100);
+    } catch (err) {
+      ignoreResetRef.current = false;
+      console.error("Error loading prediction:", err);
+      toast.error("Failed to load prediction. Data may be corrupted.");
+    }
+  };
+
+  const handleDeletePrediction = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete the saved prediction for ${name}?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/predictions?id=${id}`, {
+        method: "DELETE"
+      });
+
+      if (res.ok) {
+        toast.success(`Deleted prediction for ${name}`);
+        setSelectedCompareIds(prev => prev.filter(cid => cid !== id));
+        fetchSavedPredictions();
+      } else {
+        throw new Error("Failed to delete");
+      }
+    } catch (err) {
+      console.error("Error deleting prediction:", err);
+      toast.error("Failed to delete prediction.");
+    }
+  };
+
+  const toggleCompareSelect = (id: string) => {
+    setSelectedCompareIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((cid) => cid !== id);
+      }
+      if (prev.length >= 4) {
+        toast.error("You can select a maximum of 4 predictions for comparison.");
+        return prev;
+      }
+      return [...prev, id];
+    });
+  };
 
   // Credit limits states
   const [creditsUsed, setCreditsUsed] = useState<number>(0);
@@ -191,6 +342,7 @@ export default function CountryPredictionsClient({
   const hasSeenSelectionChange = useRef(false);
   const hasAppliedSearchSelection = useRef(false);
   const hasInitializedCustomizer = useRef(false);
+  const ignoreResetRef = useRef(false);
   const formattedModelName = selectedModel ? selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1) : "";
   const activePlan = (subscriptionTier || session?.user?.subscriptionTier || "free").toLowerCase();
   const canEditTeamCore = true;
@@ -383,6 +535,7 @@ export default function CountryPredictionsClient({
   const [playersOut, setPlayersOut] = useState<string[]>([]);
 
   useEffect(() => {
+    if (ignoreResetRef.current) return;
     if (!selectedTeam) return;
     setCustomElo(Math.round(selectedTeam.elo));
     setCustomAttack(formatTeamScaleRating(selectedTeam.attack));
@@ -394,6 +547,7 @@ export default function CountryPredictionsClient({
   }, [selectedCode, selectedTeam]);
 
   useEffect(() => {
+    if (ignoreResetRef.current) return;
     if (!hasInitializedCustomizer.current) {
       hasInitializedCustomizer.current = true;
       return;
@@ -491,7 +645,7 @@ export default function CountryPredictionsClient({
   const getTopPlayer = (teamCode: string) => {
     const teamPlayers = getTeamPlayers(teamCode);
     const topPlayer = teamPlayers[0];
-    const name = topPlayer ? (topPlayer["Name on Shirt"] || topPlayer["Player Name"]) : "";
+    const name = topPlayer ? cleanPlayerName(topPlayer["Name on Shirt"] || topPlayer["Player Name"]) : "";
     const rating = topPlayer ? (topPlayer["Overall Rating"] || "") : "";
     return name ? `${name} (${rating})` : "N/A";
   };
@@ -834,6 +988,15 @@ export default function CountryPredictionsClient({
         elo: Math.round(selectedTeam.elo),
         championProb: Math.round((simResults.stages.champion / 1000) * 100),
         stages: simResults.stages,
+        modelName: selectedModel,
+        customElo: customElo,
+        customAttack: customAttack,
+        customDefense: customDefense,
+        squadValueM: selectedTeam.squadValueM,
+        customPlayerRatingDelta: customPlayerRatingDelta,
+        playersIn: playersIn,
+        playersOut: playersOut,
+        simResults: simResults,
         path: pathStepInfo.map(step => ({
           stage: step.stage,
           opponentCode: step.opponent?.code || null,
@@ -856,6 +1019,8 @@ export default function CountryPredictionsClient({
 
       setSaveSuccess(true);
       toast.success(`Successfully saved simulation for ${selectedTeam.name}!`);
+      // Refresh saved predictions list
+      fetchSavedPredictions();
     } catch (err) {
       console.error(err);
       toast.error("Error saving prediction. Please try again.");
@@ -1413,12 +1578,12 @@ export default function CountryPredictionsClient({
                 <div className="relative">
                   <div className="absolute -right-16 -top-16 w-56 h-56 bg-emerald-100/70 rounded-full filter blur-3xl pointer-events-none dark:bg-neon/10" />
                   <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-fuchsia-100/70 rounded-full filter blur-3xl pointer-events-none dark:bg-neon-2/10" />
-                  <div className="flex flex-col lg:flex-row justify-between items-stretch gap-6 border-b border-slate-200 pb-6 mb-6 dark:border-white/5">
+                  <div className="flex flex-col xl:flex-row justify-between items-stretch gap-6 border-b border-slate-200 pb-6 mb-6 dark:border-white/5">
                     {/* Team Profile Basic Details */}
-                    <div className="flex flex-col justify-between flex-grow gap-4">
+                    <div className="flex flex-col justify-between flex-grow gap-4 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-                        <div className="flex items-center gap-5">
-                          <div className="filter transition-transform duration-300 hover:scale-105">
+                        <div className="flex items-center gap-5 min-w-0">
+                          <div className="filter transition-transform duration-300 hover:scale-105 shrink-0">
                             <CountryFlag
                               code={selectedTeam.code}
                               flag={selectedTeam.flag}
@@ -1427,20 +1592,20 @@ export default function CountryPredictionsClient({
                               emojiClassName="text-7xl drop-shadow-lg leading-none select-none"
                             />
                           </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-[0.25em] text-slate-600 dark:text-muted-foreground font-extrabold flex items-center gap-1.5">
+                          <div className="min-w-0">
+                            <div className="text-[10px] uppercase tracking-[0.25em] text-slate-600 dark:text-muted-foreground font-extrabold flex items-center gap-1.5 truncate">
                               <span>FIFA Rank #{selectedTeam.rank}</span>
                               <span className="text-slate-300 dark:text-white/20">&bull;</span>
                               <span className="text-fuchsia-600 dark:text-neon-2">Group {selectedGroup}</span>
                             </div>
                             <div className="mt-1 flex items-center gap-2">
-                              <h2 className="text-4xl font-extrabold font-display text-slate-950 dark:text-foreground tracking-tight">
+                              <h2 className="text-4xl font-extrabold font-display text-slate-950 dark:text-foreground tracking-tight truncate">
                                 {selectedTeam.name}
                               </h2>
                               <button
                                 type="button"
                                 onClick={() => document.getElementById("country-simulation-lab")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:border-cyan-400 hover:text-cyan-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:border-neon dark:hover:text-neon"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:border-cyan-400 hover:text-cyan-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:border-neon dark:hover:text-neon shrink-0"
                                 title="Edit simulation settings"
                               >
                                 <PencilLine className="h-4 w-4" />
@@ -1451,7 +1616,7 @@ export default function CountryPredictionsClient({
 
                         {/* Save Projections Action Button */}
                         {simResults && (
-                          <div className="flex items-center self-start sm:self-auto gap-2">
+                          <div className="flex items-center self-start sm:self-auto gap-2 shrink-0">
                             {session ? (
                               <button
                                 onClick={handleSavePrediction}
@@ -1492,27 +1657,27 @@ export default function CountryPredictionsClient({
                       </div>
 
                       {/* Core Attributes Mini Grid */}
-                      <div className="grid grid-cols-2 gap-3 mt-2 xl:grid-cols-5">
-                        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Elo Rating</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{Math.round(customElo)}</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mt-2">
+                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Elo Rating</span>
+                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">{Math.round(customElo)}</span>
                         </div>
-                        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Power Index</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{selectedTeam.power || 70}</span>
+                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Power Index</span>
+                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">{selectedTeam.power || 70}</span>
                         </div>
-                        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Squad Value</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">
+                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Squad Value</span>
+                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">
                             {selectedTeam.squadValueM ? `€${selectedTeam.squadValueM}M` : "N/A"}
                           </span>
                         </div>
-                        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Attack / Defense</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{customAttack} / {customDefense}</span>
+                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Attack / Defense</span>
+                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">{customAttack} / {customDefense}</span>
                         </div>
-                        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Top Player</span>
+                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Top Player</span>
                           <span className="text-xs font-bold text-emerald-700 mt-1.5 block truncate dark:text-neon" title={getTopPlayer(selectedTeam.code)}>
                             {getTopPlayer(selectedTeam.code)}
                           </span>
@@ -1521,7 +1686,7 @@ export default function CountryPredictionsClient({
                     </div>
 
                     {/* Circular Gauge for Champion Probability */}
-                    <div className="flex flex-col items-center justify-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 min-w-[200px] text-center shadow-sm relative group overflow-hidden dark:border-white/10 dark:bg-white/[0.02] dark:shadow-glass">
+                    <div className="flex flex-col items-center justify-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 min-w-[200px] max-w-sm w-full mx-auto xl:mx-0 text-center shadow-sm relative group overflow-hidden dark:border-white/10 dark:bg-white/[0.02] dark:shadow-glass shrink-0">
                       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-cyan-100/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 dark:to-neon/5" />
                       <span className="text-[10px] uppercase tracking-wider text-slate-700 dark:text-muted-foreground font-extrabold relative z-10">
                         Championship Prob
@@ -1573,7 +1738,7 @@ export default function CountryPredictionsClient({
                   </div>
 
                   {/* Stages Progression Matrix */}
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3">
                     {stageCards.map((s) => {
                       const count = simResults?.stages[s.key] || 0;
                       const pct = (count / 1000) * 100;
@@ -1686,29 +1851,31 @@ export default function CountryPredictionsClient({
                     </span>
                   </div>
 
-                  <div className="mt-6 grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start">
-                    <div className="flex min-h-[220px] flex-col justify-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/5 dark:bg-white/[0.02]">
+                  <div className="mt-6 flex flex-col gap-6">
+                    <div className="flex min-h-[140px] w-full flex-col justify-center items-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/5 dark:bg-white/[0.02]">
                       <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</span>
-                      <span className="mt-3 text-5xl font-black font-mono text-foreground">
+                      <span className="mt-2 text-5xl font-black font-mono text-foreground">
                         {squadStats.avgRating || "--"}
                         {squadStats.avgRating ? <span className="text-2xl align-top">%</span> : null}
                       </span>
-                      <span className="mt-4 text-sm font-semibold text-emerald-700 dark:text-neon">{squadStats.total} Players</span>
+                      <span className="mt-3 text-sm font-semibold text-emerald-700 dark:text-neon">{squadStats.total} Players</span>
                     </div>
 
-                    <div className="space-y-5">
+                    <div className="space-y-4 w-full">
                       {squadTiers.map((tier) => (
-                        <div key={tier.label} className="grid grid-cols-[minmax(110px,140px)_minmax(0,1fr)_auto] items-center gap-4">
-                          <div className="text-sm font-semibold text-foreground">{tier.label}</div>
-                          <div className="h-4 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/8">
+                        <div key={tier.label} className="flex items-center gap-3 w-full">
+                          <div className="text-xs font-semibold text-foreground w-28 shrink-0 truncate">
+                            {tier.label}
+                          </div>
+                          <div className="flex-1 h-3 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/8">
                             <div
                               className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
                               style={{ width: `${Math.max(tier.pct, tier.count > 0 ? 4 : 0)}%` }}
                             />
                           </div>
-                          <div className="min-w-[72px] text-right font-mono text-sm font-bold tabular-nums text-foreground">
+                          <div className="w-20 shrink-0 text-right font-mono text-xs font-bold tabular-nums text-foreground">
                             {tier.count}
-                            <span className="ml-2 text-xs text-muted-foreground">({tier.pct}%)</span>
+                            <span className="ml-1.5 text-[10px] text-muted-foreground font-medium">({tier.pct}%)</span>
                           </div>
                         </div>
                       ))}
@@ -2133,6 +2300,697 @@ export default function CountryPredictionsClient({
         </AccordionItem>
       </Accordion>
 
+      {/* Saved Projections & Comparison Accordion */}
+      <Accordion
+        type="multiple"
+        defaultValue={["saved-comparison"]}
+        className="w-full bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-[2rem] relative shadow-[0_18px_50px_rgba(15,23,42,0.08)] mt-8"
+      >
+        <AccordionItem value="saved-comparison" className="border-none">
+          <AccordionTrigger className="px-6 md:px-8 pt-6 md:pt-8 pb-3 hover:no-underline">
+            <div>
+              <div className="font-display font-extrabold text-2xl text-foreground dark:text-white tracking-tight">Saved Projections & Comparison</div>
+              <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">Load saved projections or select multiple to compare side-by-side</div>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-6 md:px-8 pb-6 md:pb-8">
+            {!session ? (
+              <div className="text-center py-10">
+                <p className="text-sm text-muted-foreground mb-4">Please sign in to view, load, and compare your saved predictions.</p>
+                <button
+                  onClick={() => openAuthModal("signin")}
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500 via-emerald-500 to-fuchsia-500 text-white px-5 py-3 rounded-2xl text-xs font-black shadow-md hover:scale-[1.02] transition-all cursor-pointer"
+                >
+                  <User className="w-4 h-4" />
+                  <span>Sign In to Access</span>
+                </button>
+              </div>
+            ) : isLoadingSaved ? (
+              <div className="flex flex-col justify-center items-center py-12 gap-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+                <span className="text-xs text-muted-foreground">Fetching saved simulations...</span>
+              </div>
+            ) : savedPredictions.length === 0 ? (
+              <div className="text-center py-12 text-sm text-muted-foreground border border-dashed border-slate-200 dark:border-white/10 rounded-[1.75rem] p-6 bg-slate-50/50 dark:bg-white/[0.01]">
+                <Sparkles className="w-8 h-8 text-cyan-500 mx-auto mb-3 opacity-60 animate-pulse" />
+                <p className="font-bold text-foreground">No country projections saved yet.</p>
+                <p className="text-xs mt-1.5 max-w-md mx-auto">Adjust team attributes in the Simulation Lab, run the simulator, and click &quot;Save to Predictions&quot; to begin building your comparison library.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="overflow-x-auto rounded-[1.5rem] border border-slate-200 dark:border-white/10 bg-slate-50/30 dark:bg-black/20">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        <th className="py-3 px-4 w-12 text-center">Compare</th>
+                        <th className="py-3 px-4 min-w-[150px]">Country</th>
+                        <th className="py-3 px-4">Elo Rating</th>
+                        <th className="py-3 px-4">Model Engine</th>
+                        <th className="py-3 px-4">Championship Odds</th>
+                        <th className="py-3 px-4">Saved On</th>
+                        <th className="py-3 px-4 text-right pr-6">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-white/5">
+                      {savedPredictions.map((p) => {
+                        let data: any = null;
+                        try {
+                          data = typeof p.predictedWinner === "string" ? JSON.parse(p.predictedWinner) : p.predictedWinner;
+                        } catch (e) {
+                          console.error(e);
+                        }
+
+                        if (!data) return null;
+                        const isChecked = selectedCompareIds.includes(p.id);
+                        const isDisableCompare = !isChecked && selectedCompareIds.length >= 4;
+                        const savedDate = new Date(p.updatedAt).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        });
+
+                        return (
+                          <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+                            <td className="py-3.5 px-4 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                disabled={isDisableCompare}
+                                onChange={() => toggleCompareSelect(p.id)}
+                                className="w-4.5 h-4.5 rounded border-slate-350 accent-cyan-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              />
+                            </td>
+                            <td className="py-3.5 px-4 font-bold">
+                              <div className="flex items-center gap-2">
+                                <CountryFlag code={data.code} flag={data.flag} name={data.name} className="h-5 w-7 shrink-0 rounded object-cover shadow-sm" emojiClassName="text-lg leading-none" />
+                                <span className="text-foreground">{data.name}</span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-xs text-muted-foreground">
+                              {Math.round(data.customElo ?? data.elo ?? 1500)}
+                            </td>
+                            <td className="py-3.5 px-4 text-xs font-semibold text-cyan-600 dark:text-neon uppercase">
+                              {data.modelName || "base"}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-foreground">
+                              {data.championProb}%
+                            </td>
+                            <td className="py-3.5 px-4 text-xs text-muted-foreground">
+                              {savedDate}
+                            </td>
+                            <td className="py-3.5 px-4 text-right pr-6">
+                              <div className="flex items-center justify-end gap-2.5">
+                                <button
+                                  onClick={() => handleLoadPrediction(p)}
+                                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 hover:border-cyan-400 hover:text-cyan-500 bg-white hover:bg-slate-50 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 dark:text-white transition cursor-pointer"
+                                  title="Load this simulation results and setup"
+                                >
+                                  Load
+                                </button>
+                                <button
+                                  onClick={() => handleDeletePrediction(p.id, data.name)}
+                                  className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition cursor-pointer"
+                                  title="Delete saved projection"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Compare Section */}
+                {selectedCompareIds.length < 2 ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-4 rounded-[1.25rem]">
+                    <Info className="w-4.5 h-4.5 text-cyan-500 shrink-0" />
+                    <span>Select at least 2 saved country projections above to compare their performance parameters and tournament outcomes side-by-side.</span>
+                  </div>
+                ) : (
+                  <div className="border-t border-slate-200 dark:border-white/10 pt-6">
+                    {(() => {
+                      const lineColors = [
+                        "#06b6d4", // Cyan
+                        "#d946ef", // Fuchsia
+                        "#10b981", // Emerald
+                        "#f59e0b", // Amber
+                        "#8b5cf6", // Violet
+                        "#3b82f6", // Blue
+                      ];
+
+                      const parsedCompareData = savedPredictions
+                        .filter(p => selectedCompareIds.includes(p.id))
+                        .map((p, idx) => {
+                          let data: any = null;
+                          try {
+                            data = typeof p.predictedWinner === "string" ? JSON.parse(p.predictedWinner) : p.predictedWinner;
+                          } catch (e) {
+                            console.error(e);
+                          }
+                          return { id: p.id, raw: p, data, color: lineColors[idx % lineColors.length] };
+                        })
+                        .filter(item => item.data !== null);
+
+                      const progressionChartData = [
+                        { stage: "Group Stage", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: 100 }), {}) },
+                        { stage: "Round of 32", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.r32 ?? 0) / 10).toFixed(1)) }), {}) },
+                        { stage: "Round of 16", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.r16 ?? 0) / 10).toFixed(1)) }), {}) },
+                        { stage: "Quarter Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.qf ?? 0) / 10).toFixed(1)) }), {}) },
+                        { stage: "Semi Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.sf ?? 0) / 10).toFixed(1)) }), {}) },
+                        { stage: "Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.final ?? 0) / 10).toFixed(1)) }), {}) },
+                        { stage: "Champion", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.champion ?? (c.data.championProb * 10) ?? 0) / 10).toFixed(1)) }), {}) }
+                      ];
+
+                      const attributesChartData = [
+                        {
+                          attribute: "Elo Rating",
+                          ...parsedCompareData.reduce((acc, c) => {
+                            const rawElo = c.data.customElo ?? c.data.elo ?? 1500;
+                            const scaledElo = Math.round((rawElo - 1300) / 6);
+                            return {
+                              ...acc,
+                              [c.data.name]: Math.max(0, Math.min(100, scaledElo)),
+                              [`${c.data.name}_raw`]: rawElo
+                            };
+                          }, {})
+                        },
+                        {
+                          attribute: "Attack Rating",
+                          ...parsedCompareData.reduce((acc, c) => {
+                            const rawAttack = c.data.customAttack ?? 75;
+                            return {
+                              ...acc,
+                              [c.data.name]: rawAttack,
+                              [`${c.data.name}_raw`]: rawAttack
+                            };
+                          }, {})
+                        },
+                        {
+                          attribute: "Defense Rating",
+                          ...parsedCompareData.reduce((acc, c) => {
+                            const rawDefense = c.data.customDefense ?? 75;
+                            return {
+                              ...acc,
+                              [c.data.name]: rawDefense,
+                              [`${c.data.name}_raw`]: rawDefense
+                            };
+                          }, {})
+                        },
+                        {
+                          attribute: "Squad Value",
+                          ...parsedCompareData.reduce((acc, c) => {
+                            const rawSquadValue = c.data.squadValueM ?? appTeams.find(t => t.code === c.data.code)?.squadValueM ?? 100;
+                            // Map 0 - 1500M squad value to 0-100
+                            const scaledSquad = Math.round(rawSquadValue / 15);
+                            return {
+                              ...acc,
+                              [c.data.name]: Math.max(0, Math.min(100, scaledSquad)),
+                              [`${c.data.name}_raw`]: `€${rawSquadValue}M`
+                            };
+                          }, {})
+                        },
+                        {
+                          attribute: "Championship Odds",
+                          ...parsedCompareData.reduce((acc, c) => {
+                            const ch = c.data.stages?.champion ?? (c.data.championProb * 10) ?? 0;
+                            const rawChamp = parseFloat((ch / 10).toFixed(1));
+                            return {
+                              ...acc,
+                              [c.data.name]: rawChamp,
+                              [`${c.data.name}_raw`]: `${rawChamp}%`
+                            };
+                          }, {})
+                        }
+                      ];
+
+                      return (
+                        <>
+                          {/* Line Chart Card */}
+                          <div className="mb-8 p-5 rounded-[2rem] border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900 shadow-[0_16px_40px_rgba(15,23,42,0.04)]">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                              <div>
+                                <h4 className="font-display font-extrabold text-base text-foreground flex items-center gap-2">
+                                  <TrendingUp className="w-5 h-5 text-cyan-500" />
+                                  <span>Comparison Metrics Projection</span>
+                                </h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">Visualize side-by-side attributes or progression probabilities</p>
+                              </div>
+                              <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200/50 dark:border-white/5 self-stretch sm:self-auto justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setCompareChartTab("progression")}
+                                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                                    compareChartTab === "progression"
+                                      ? "bg-white text-cyan-600 shadow-sm dark:bg-slate-800 dark:text-neon"
+                                      : "text-muted-foreground hover:text-foreground"
+                                  }`}
+                                >
+                                  Progression Curve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCompareChartTab("attributes")}
+                                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                                    compareChartTab === "attributes"
+                                      ? "bg-white text-cyan-600 shadow-sm dark:bg-slate-800 dark:text-neon"
+                                      : "text-muted-foreground hover:text-foreground"
+                                  }`}
+                                >
+                                  Attribute Profile
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="h-80 w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart
+                                  data={compareChartTab === "progression" ? progressionChartData : attributesChartData}
+                                  margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
+                                >
+                                  <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    stroke={activeTheme === "light" ? "rgba(15,23,42,0.06)" : "rgba(255,255,255,0.05)"}
+                                  />
+                                  <XAxis
+                                    dataKey={compareChartTab === "progression" ? "stage" : "attribute"}
+                                    tick={{
+                                      fill: activeTheme === "light" ? "rgba(15,23,42,0.6)" : "rgba(255,255,255,0.6)",
+                                      fontSize: 10,
+                                      fontFamily: "var(--font-display)",
+                                      fontWeight: "bold"
+                                    }}
+                                    stroke={activeTheme === "light" ? "rgba(15,23,42,0.1)" : "rgba(255,255,255,0.1)"}
+                                  />
+                                  <YAxis
+                                    domain={[0, 100]}
+                                    tick={{
+                                      fill: activeTheme === "light" ? "rgba(15,23,42,0.6)" : "rgba(255,255,255,0.6)",
+                                      fontSize: 10,
+                                      fontFamily: "var(--font-mono)"
+                                    }}
+                                    stroke={activeTheme === "light" ? "rgba(15,23,42,0.1)" : "rgba(255,255,255,0.1)"}
+                                    tickFormatter={(val) => compareChartTab === "progression" ? `${val}%` : val}
+                                  />
+                                  <RechartsTooltip
+                                    content={<CustomCompareTooltip mode={compareChartTab} />}
+                                  />
+                                  <Legend
+                                    wrapperStyle={{
+                                      fontSize: "11px",
+                                      fontFamily: "var(--font-display)",
+                                      fontWeight: "bold",
+                                      paddingTop: "16px"
+                                    }}
+                                  />
+                                  {parsedCompareData.map((c) => (
+                                    <Line
+                                      key={c.id}
+                                      type="monotone"
+                                      dataKey={c.data.name}
+                                      stroke={c.color}
+                                      activeDot={{ r: 6, strokeWidth: 0 }}
+                                      strokeWidth={3}
+                                      dot={{ r: 4, strokeWidth: 1.5, fill: "white" }}
+                                    />
+                                  ))}
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+
+                          {/* Side-by-Side Table Comparison */}
+                          {(() => {
+                            const compareLen = parsedCompareData.length;
+                            const maxElo = compareLen > 0 ? Math.max(...parsedCompareData.map(c => Math.round(c.data.customElo ?? c.data.elo ?? 1500))) : 0;
+                            const maxAttack = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.customAttack ?? 75)) : 0;
+                            const maxDefense = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.customDefense ?? 75)) : 0;
+                            const maxSquadValue = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.squadValueM ?? appTeams.find(t => t.code === c.data.code)?.squadValueM ?? 0)) : 0;
+                            const maxChampionshipOdds = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.champion ?? (c.data.championProb * 10) ?? 0)) : 0;
+                            const maxReachFinal = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.final ?? 0)) : 0;
+                            const maxReachSF = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.sf ?? 0)) : 0;
+                            const maxReachQF = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.qf ?? 0)) : 0;
+                            const maxReachR16 = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.r16 ?? 0)) : 0;
+                            const maxReachR32 = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.r32 ?? 0)) : 0;
+
+                            const renderStageRow = (label: string, icon: ReactNode, stageKey: string, maxVal: number) => {
+                              return (
+                                <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                  <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                    <div className="flex items-center gap-2">
+                                      {icon}
+                                      <span>{label}</span>
+                                    </div>
+                                  </td>
+                                  {parsedCompareData.map((c) => {
+                                    const rawVal = c.data.stages?.[stageKey] ?? 0;
+                                    const prob = parseFloat((rawVal / 10).toFixed(1));
+                                    const isBest = rawVal === maxVal && parsedCompareData.length > 1 && rawVal > 0;
+                                    return (
+                                      <td key={c.id} className={`py-4 px-5 transition-colors ${
+                                        isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
+                                      }`}>
+                                        <div className="space-y-1.5 max-w-[180px]">
+                                          <div className="flex items-center justify-between text-xs font-bold font-mono">
+                                            <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
+                                              {prob}%
+                                            </span>
+                                            {isBest && <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Best</span>}
+                                          </div>
+                                          <div className="w-full bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                            <div 
+                                              className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-emerald-500" : "bg-cyan-500"}`} 
+                                              style={{ width: `${prob}%` }} 
+                                            />
+                                          </div>
+                                        </div>
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            };
+
+                            return (
+                              <div className="mb-8 overflow-x-auto rounded-[2rem] border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900 shadow-[0_16px_40px_rgba(15,23,42,0.04)] scrollbar-custom relative">
+                                <table className="w-full text-left border-separate border-spacing-0 text-xs md:text-sm">
+                                  <thead>
+                                    <tr className="border-b border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
+                                      <th className="py-4 px-5 font-display font-extrabold text-slate-700 dark:text-muted-foreground w-48 sticky left-0 bg-slate-50 dark:bg-slate-900 z-20 border-r border-b border-slate-200/65 dark:border-white/15 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        Parameter
+                                      </th>
+                                      {parsedCompareData.map((c) => (
+                                        <th key={c.id} className="py-4 px-5 font-display font-extrabold text-foreground border-b border-slate-200 dark:border-white/10 min-w-[220px]">
+                                          <div className="flex flex-col gap-2 p-3 rounded-2xl bg-slate-50/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 relative overflow-hidden">
+                                            {/* Accent color bar mapping to line chart */}
+                                            <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: c.color }} />
+                                            <div className="flex items-center gap-2 mt-1.5">
+                                              <CountryFlag code={c.data.code} flag={c.data.flag} name={c.data.name} className="h-5 w-7 rounded object-cover shadow-md border border-slate-200/50 dark:border-white/10 shrink-0" emojiClassName="text-lg leading-none" />
+                                              <span className="text-sm font-extrabold truncate text-foreground">{c.data.name}</span>
+                                            </div>
+                                          </div>
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {/* Elo Rating */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <TrendingUp className="w-4 h-4 text-cyan-500 shrink-0" />
+                                          <span>Elo Rating</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const elo = Math.round(c.data.customElo ?? c.data.elo ?? 1500);
+                                        const isBest = elo === maxElo && parsedCompareData.length > 1;
+                                        return (
+                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 font-mono font-bold transition-colors ${
+                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
+                                          }`}>
+                                            <div className="flex items-center justify-between gap-1.5 max-w-[180px]">
+                                              <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
+                                                {elo}
+                                              </span>
+                                              {isBest && (
+                                                <span className="text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-0.5">
+                                                  <Trophy className="w-2.5 h-2.5" /> Best
+                                                </span>
+                                              )}
+                                            </div>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Attack Power */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+                                          <span>Attack Power</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const attack = c.data.customAttack ?? 75;
+                                        const isBest = attack === maxAttack && parsedCompareData.length > 1;
+                                        return (
+                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 transition-colors ${
+                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
+                                          }`}>
+                                            <div className="space-y-1.5 max-w-[180px]">
+                                              <div className="flex items-center justify-between text-xs font-bold font-mono">
+                                                <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
+                                                  {attack}
+                                                </span>
+                                                {isBest && <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Top</span>}
+                                              </div>
+                                              <div className="w-full bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                                <div 
+                                                  className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-emerald-500" : "bg-cyan-500"}`} 
+                                                  style={{ width: `${attack}%` }} 
+                                                />
+                                              </div>
+                                            </div>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Defense Strength */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
+                                          <span>Defense Strength</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const defense = c.data.customDefense ?? 75;
+                                        const isBest = defense === maxDefense && parsedCompareData.length > 1;
+                                        return (
+                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 transition-colors ${
+                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
+                                          }`}>
+                                            <div className="space-y-1.5 max-w-[180px]">
+                                              <div className="flex items-center justify-between text-xs font-bold font-mono">
+                                                <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
+                                                  {defense}
+                                                </span>
+                                                {isBest && <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Top</span>}
+                                              </div>
+                                              <div className="w-full bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                                <div 
+                                                  className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-emerald-500" : "bg-cyan-500"}`} 
+                                                  style={{ width: `${defense}%` }} 
+                                                />
+                                              </div>
+                                            </div>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Squad Value */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Coins className="w-4 h-4 text-yellow-500 shrink-0" />
+                                          <span>Squad Value</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const squadVal = c.data.squadValueM ?? appTeams.find(t => t.code === c.data.code)?.squadValueM ?? 0;
+                                        const isBest = squadVal === maxSquadValue && squadVal > 0 && parsedCompareData.length > 1;
+                                        return (
+                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 font-mono font-bold transition-colors ${
+                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
+                                          }`}>
+                                            <div className="flex items-center justify-between gap-1.5 max-w-[180px]">
+                                              <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
+                                                {squadVal ? `€${squadVal}M` : "N/A"}
+                                              </span>
+                                              {isBest && (
+                                                <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide bg-emerald-500/10 px-1 py-0.5 rounded border border-emerald-500/10">Highest</span>
+                                              )}
+                                            </div>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Model Engine */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Cpu className="w-4 h-4 text-purple-500 shrink-0" />
+                                          <span>Model Engine</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const model = c.data.modelName || "base";
+                                        let badgeClass = "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20";
+                                        if (model === "advanced") {
+                                          badgeClass = "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/20";
+                                        } else if (model === "pro") {
+                                          badgeClass = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
+                                        }
+                                        return (
+                                          <td key={c.id} className="py-4 px-5 border-b border-slate-100 dark:border-white/5">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${badgeClass}`}>
+                                              {model}
+                                            </span>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Championship Odds */}
+                                    <tr className="border-b border-slate-200 dark:border-white/10 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Award className="w-4 h-4 text-rose-500 shrink-0" />
+                                          <span>Championship Odds</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const ch = c.data.stages?.champion ?? (c.data.championProb * 10) ?? 0;
+                                        const prob = parseFloat((ch / 10).toFixed(1));
+                                        const isBest = ch === maxChampionshipOdds && parsedCompareData.length > 1;
+                                        return (
+                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-200 dark:border-white/10 transition-colors ${
+                                            isBest ? "bg-cyan-500/[0.08] dark:bg-neon/10" : "bg-cyan-500/[0.02] dark:bg-neon/5"
+                                          }`}>
+                                            <div className="space-y-1.5 max-w-[180px]">
+                                              <div className="flex items-center justify-between text-xs font-black font-mono">
+                                                <span className={isBest ? "text-cyan-600 dark:text-neon text-sm" : "text-foreground"}>
+                                                  {prob}%
+                                                </span>
+                                                {isBest && (
+                                                  <span className="text-[9px] font-extrabold text-cyan-600 dark:text-neon uppercase tracking-wide bg-cyan-500/15 dark:bg-neon/20 px-1 py-0.2 rounded flex items-center gap-0.5 animate-pulse">
+                                                    <Trophy className="w-2.5 h-2.5" /> Favorite
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="w-full bg-slate-200 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
+                                                <div 
+                                                  className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-cyan-500 dark:bg-neon" : "bg-cyan-400"}`} 
+                                                  style={{ width: `${prob}%` }} 
+                                                />
+                                              </div>
+                                            </div>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Reach Final */}
+                                    {renderStageRow("Reach Final", <ChevronRight className="w-4 h-4 text-cyan-500 shrink-0" />, "final", maxReachFinal)}
+
+                                    {/* Reach Semi-Final */}
+                                    {renderStageRow("Reach Semi-Final", <ChevronRight className="w-4 h-4 text-cyan-500/80 shrink-0" />, "sf", maxReachSF)}
+
+                                    {/* Reach Quarter-Final */}
+                                    {renderStageRow("Reach Quarter-Final", <ChevronRight className="w-4 h-4 text-cyan-500/60 shrink-0" />, "qf", maxReachQF)}
+
+                                    {/* Reach Round of 16 */}
+                                    {renderStageRow("Reach Round of 16", <ChevronRight className="w-4 h-4 text-cyan-500/40 shrink-0" />, "r16", maxReachR16)}
+
+                                    {/* Reach Round of 32 */}
+                                    {renderStageRow("Reach Round of 32", <ChevronRight className="w-4 h-4 text-cyan-500/20 shrink-0" />, "r32", maxReachR32)}
+
+                                    {/* Expected Path */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Route className="w-4 h-4 text-pink-500 shrink-0" />
+                                          <span>Expected Path</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => (
+                                        <td key={c.id} className="py-4 px-5">
+                                          <div className="relative pl-4 border-l border-slate-200 dark:border-white/10 space-y-3.5 my-1 max-w-[220px] ml-2">
+                                            {c.data.path?.map((step: any, sidx: number) => {
+                                              const stageShort = step.stage
+                                                .replace("Round of 32", "R32")
+                                                .replace("Round of 16", "R16")
+                                                .replace("Quarter Final", "QF")
+                                                .replace("Semi Final", "SF")
+                                                .replace("Final", "Final");
+                                              return (
+                                                <div key={sidx} className="relative text-[11px]">
+                                                  {/* Timeline Bullet Node centered on parent border-l */}
+                                                  <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-cyan-500 border-2 border-white dark:border-slate-900 shadow-sm" />
+                                                  <div className="flex flex-col gap-0.5">
+                                                    <span className="font-extrabold text-[9px] uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                                      {stageShort}
+                                                    </span>
+                                                    <div className="flex items-center gap-1.5">
+                                                      <span className="font-bold text-foreground truncate max-w-[120px]" title={step.opponentName}>
+                                                        {step.opponentFlag} {step.opponentName}
+                                                      </span>
+                                                      <span className="font-mono font-bold text-cyan-600 dark:text-neon text-[10px] bg-cyan-500/10 px-1 py-0.2 rounded shrink-0">
+                                                        {step.winPct}%
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </td>
+                                      ))}
+                                    </tr>
+
+                                    {/* Actions */}
+                                    <tr className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
+                                          <span>Actions</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => (
+                                        <td key={c.id} className="py-4 px-5">
+                                          <div className="flex gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleLoadPrediction(c.raw)}
+                                              className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-cyan-500/10 text-cyan-700 hover:bg-cyan-500/20 dark:bg-neon/10 dark:text-neon dark:hover:bg-neon/20 transition cursor-pointer"
+                                            >
+                                              Load Settings
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleCompareSelect(c.id)}
+                                              className="text-[11px] font-bold px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                                            >
+                                              Remove
+                                            </button>
+                                          </div>
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            );
+                          })()}
+
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
       {/* Confirmation Dialog: Futuristic Styled Modal */}
       <Dialog open={showConfirmPopup} onOpenChange={(open) => {
         if (!isSimulating) setShowConfirmPopup(open);
@@ -2324,7 +3182,39 @@ function cleanPlayerName(name: string) {
     .replace(/ALVAREZ/g, "ÁLVAREZ")
     .replace(/GONZALEZ/g, "GONZÁLEZ")
     .replace(/DI MARA/g, "DI MARÍA")
-    .replace(/FERNANDEZ/g, "FERNÁNDEZ");
+    .replace(/FERNANDEZ/g, "FERNÁNDEZ")
+    // Fix Croatia / Balkan names corrupted by encoding issues (replacing both ? and replacement chars)
+    .replace(/KOVA[?\uFFFD]I[?\uFFFD]/gi, "KOVACIC")
+    .replace(/STANI[?\uFFFD]I[?\uFFFD]/gi, "STANISIC")
+    .replace(/PONGRA[?\uFFFD]I[?\uFFFD]/gi, "PONGRACIC")
+    .replace(/MODRI[?\uFFFD]/gi, "MODRIC")
+    .replace(/[?\uFFFD]ALETA-CAR/gi, "CALETA-CAR")
+    .replace(/PA[?\uFFFD]ALI[?\uFFFD]/gi, "PASALIC")
+    .replace(/P\.\s*SU[?\uFFFD]I[?\uFFFD]/gi, "P. SUCIC")
+    .replace(/[?\uFFFD]UTALO/gi, "SUTALO")
+    .replace(/VLA[?\uFFFD]I[?\uFFFD]/gi, "VLASIC")
+    .replace(/PERI[?\uFFFD]I[?\uFFFD]/gi, "PERISIC")
+    .replace(/KRAMARI[?\uFFFD]/gi, "KRAMARIC")
+    .replace(/LIVAKOVI[?\uFFFD]/gi, "LIVAKOVIC")
+    .replace(/PJA[?\uFFFD]A/gi, "PJACA")
+    .replace(/SU[?\uFFFD]I[?\uFFFD]/gi, "SUCIC")
+    .replace(/GON[?\uFFFD]LEZ/gi, "GONZALEZ")
+    .replace(/MART[?\uFFFD]NEZ/gi, "MARTINEZ")
+    .replace(/ALV[?\uFFFD]H?REZ/gi, "ALVAREZ")
+    .replace(/DI MAR[?\uFFFD]A/gi, "DI MARIA")
+    .replace(/FERN[?\uFFFD]NDEZ/gi, "FERNANDEZ")
+    .replace(/S[?\uFFFD]NCHEZ/gi, "SANCHEZ")
+    .replace(/GIM[?\uFFFD]NEZ/gi, "GIMENEZ")
+    .replace(/NU[?\uFFFD]EZ/gi, "NUNEZ")
+    .replace(/VI[?\uFFFD]A/gi, "VINA")
+    .replace(/R[?\uFFFD]DIGER/gi, "RUDIGER")
+    .replace(/GRO[?\uFFFD]/gi, "GROSS")
+    .replace(/SAN[?\uFFFD]/gi, "SANE")
+    .replace(/N[?\uFFFD]BEL/gi, "NUBEL")
+    .replace(/KONAT[?\uFFFD]/gi, "KONATE")
+    .replace(/ZA[?\uFFFD]RE-EMERY/gi, "ZAIRE-EMERY")
+    .replace(/[\uFFFD]/g, "")
+    .replace(/\?/g, "");
 }
 
 function PlayerBucketCompact({

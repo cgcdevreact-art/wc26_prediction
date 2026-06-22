@@ -254,3 +254,22 @@
   }
 }
 
+@utility scrollbar-x-thin {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--neon) 35%, transparent) color-mix(in oklab, var(--foreground) 8%, transparent);
+
+  &::-webkit-scrollbar {
+    height: 2px;
+  }
+  &::-webkit-scrollbar-track {
+    background: color-mix(in oklab, var(--foreground) 8%, transparent);
+    border-radius: 999px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--neon) 35%, transparent);
+    border-radius: 999px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklab, var(--neon) 55%, transparent);
+  }
+}

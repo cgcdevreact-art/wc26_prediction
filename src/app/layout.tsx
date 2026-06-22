@@ -48,10 +48,10 @@ export default async function RootLayout({
               (function() {
                 try {
                   var theme = localStorage.getItem('wc26-ui-theme');
-                  var isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  if (theme === 'dark' || (!theme && isSystemDark) || theme === 'system' && isSystemDark) {
+                  document.documentElement.classList.remove('light', 'dark');
+                  if (theme === 'dark') {
                     document.documentElement.classList.add('dark');
-                  } else if (theme === 'light' || (!theme && !isSystemDark) || theme === 'system' && !isSystemDark) {
+                  } else {
                     document.documentElement.classList.add('light');
                   }
                 } catch (e) {}
