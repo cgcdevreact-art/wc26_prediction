@@ -75,6 +75,12 @@ export const GROUPS_CONFIG: Record<string, string[]> = {
 
 export async function getTeams() {
   const staticTeams = getStaticTeamsFromCup();
+  const resolveStaticTeam = (teamCode?: string | null, teamName?: string | null, shortName?: string | null) =>
+    staticTeams.find((team) => team.code === teamCode) ??
+    staticTeams.find((team) => team.name === shortName) ??
+    staticTeams.find((team) => team.name === teamName) ??
+    null;
+
   try {
     const session = await auth();
     const userId = session?.user?.id;
@@ -114,7 +120,7 @@ export async function getTeams() {
     }
 
     return dbTeams.map((dbTeam) => {
-      const staticData = staticTeams.find((t) => t.code === dbTeam.tla) || staticTeams[0];
+      const staticData = resolveStaticTeam(dbTeam.tla, dbTeam.name, dbTeam.shortName) || staticTeams[0];
       const teamCode = dbTeam.tla || staticData.code;
       const override = overridesMap.get(teamCode);
       
@@ -266,4 +272,3 @@ export async function getPlayers() {
 
   return defaultPlayers;
 }
-
