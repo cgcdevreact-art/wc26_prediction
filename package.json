@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "prisma:prepare": "node prisma/prepare-schema.mjs",
-    "prisma:generate": "npm run prisma:prepare && prisma generate",
-    "prisma:db:push": "npm run prisma:prepare && prisma db push",
-    "prisma:validate": "npm run prisma:prepare && prisma validate",
+    "prisma:generate": "npm run prisma:prepare && prisma generate --schema prisma/schema.runtime.prisma",
+    "prisma:db:push": "npm run prisma:prepare && prisma db push --schema prisma/schema.runtime.prisma",
+    "prisma:validate": "npm run prisma:prepare && prisma validate --schema prisma/schema.runtime.prisma",
     "dev": "npm run prisma:generate && next dev",
     "build": "npm run prisma:generate && next build",
     "start": "npm run prisma:generate && next start",
