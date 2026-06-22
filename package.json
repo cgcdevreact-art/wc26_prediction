@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prisma:prepare": "node scripts/prepare-prisma-schema.mjs",
+    "prisma:prepare": "node prisma/prepare-schema.mjs",
     "prisma:generate": "npm run prisma:prepare && prisma generate",
     "prisma:db:push": "npm run prisma:prepare && prisma db push",
     "prisma:validate": "npm run prisma:prepare && prisma validate",

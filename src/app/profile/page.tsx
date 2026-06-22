@@ -72,7 +72,8 @@ export default async function ProfilePage() {
     createdAt         : Date;
     predictedHomeScore: number | null;
     predictedAwayScore: number | null;
-    predictedWinner   : Prisma.JsonValue | null;
+    predictedWinner   : string | null;
+    predictedPayload  : Prisma.JsonValue | null;
     match             : {
       homeTeam: { name: string | null; tla: string | null } | null;
       awayTeam: { name: string | null; tla: string | null } | null;
@@ -123,6 +124,7 @@ export default async function ProfilePage() {
           predictedHomeScore: true,
           predictedAwayScore: true,
           predictedWinner   : true,
+          predictedPayload  : true,
           match             : {
             select: {
               homeTeam: {
