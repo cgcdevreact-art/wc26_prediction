@@ -117,9 +117,9 @@ export function FixturesExplorer() {
 
     if (selectedStatus === "COMPLETED") {
       nextFixtures.sort((a, b) => {
-        const timeA = a.kickoffAtIso ? new Date(a.kickoffAtIso).getTime() : 0;
-        const timeB = b.kickoffAtIso ? new Date(b.kickoffAtIso).getTime() : 0;
-        return timeB - timeA;
+        const matchA = Number(a.match_no || 0);
+        const matchB = Number(b.match_no || 0);
+        return matchB - matchA;
       });
     }
 

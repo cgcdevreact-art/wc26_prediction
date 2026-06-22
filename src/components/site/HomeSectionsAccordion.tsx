@@ -12,19 +12,19 @@ const SECTIONS = [
   {
     value: "probability",
     title: "Pick a country. See every chance.",
-    description: "Explore the full probability journey for any nation.",
+    contentClassName: "-mt-10",
     content: <ProbabilityExplorer />,
   },
   {
     value: "wildcard",
-    title: "Wildcard Country Builder",
-    description: "Swap in custom teams and explore alternate tournament runs.",
+    title: "Your team didn't make the World Cup?",
+    contentClassName: "-mt-10",
     content: <WildcardCountrySection />,
   },
   {
     value: "fixtures",
     title: "Matches & Fixtures",
-    description: "Browse the full tournament schedule and upcoming matches.",
+    contentClassName: "-mt-10",
     content: <FixturesExplorer />,
   },
 ] as const;
@@ -59,7 +59,7 @@ export function HomeSectionsAccordion() {
               </AccordionTrigger>
             </div>
             <AccordionContent className="[&>div]:pb-0">
-              <div>{section.content}</div>
+              <div className={section.contentClassName}>{section.content}</div>
             </AccordionContent>
           </AccordionItem>
         );
