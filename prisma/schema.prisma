@@ -1,12 +1,12 @@
-// Generated into prisma/schema.prisma by prisma/prepare-schema.mjs.
-// Edit this template instead of prisma/schema.prisma.
+// Checked-in default Prisma schema for SQLite/server validation.
+// Local/runtime variants are generated into prisma/schema.runtime.prisma from prisma/schema.template.prisma.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 

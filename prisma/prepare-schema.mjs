@@ -4,7 +4,7 @@ import path from "node:path";
 const root = process.cwd();
 const prismaDir = path.join(root, "prisma");
 const templatePath = path.join(prismaDir, "schema.template.prisma");
-const outputPath = path.join(prismaDir, "schema.prisma");
+const outputPath = path.join(prismaDir, "schema.runtime.prisma");
 
 const readDatabaseUrlFromEnvFile = () => {
   const envPaths = [
@@ -40,4 +40,4 @@ const rendered = template.replace("__DATABASE_PROVIDER__", provider);
 
 fs.writeFileSync(outputPath, rendered);
 
-console.log(`[prisma] prepared schema.prisma for ${provider}`);
+console.log(`[prisma] prepared schema.runtime.prisma for ${provider}`);
