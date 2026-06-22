@@ -3,9 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
-    "start": "next start",
+    "prisma:prepare": "node scripts/prepare-prisma-schema.mjs",
+    "prisma:generate": "npm run prisma:prepare && prisma generate",
+    "prisma:db:push": "npm run prisma:prepare && prisma db push",
+    "prisma:validate": "npm run prisma:prepare && prisma validate",
+    "dev": "npm run prisma:generate && next dev",
+    "build": "npm run prisma:generate && next build",
+    "start": "npm run prisma:generate && next start",
     "lint": "eslint",
     "cron:fixtures": "node scripts/sync-fixtures-cron.mjs"
   },
