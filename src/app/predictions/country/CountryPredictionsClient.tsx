@@ -2461,7 +2461,7 @@ export default function CountryPredictionsClient({
                         { stage: "Quarter Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.qf ?? 0) / 10).toFixed(1)) }), {}) },
                         { stage: "Semi Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.sf ?? 0) / 10).toFixed(1)) }), {}) },
                         { stage: "Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.final ?? 0) / 10).toFixed(1)) }), {}) },
-                        { stage: "Champion", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.champion ?? (c.data.championProb * 10) ?? 0) / 10).toFixed(1)) }), {}) }
+                        { stage: "Champion", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.champion ?? (c.data.championProb * 10 || 0)) / 10).toFixed(1)) }), {}) }
                       ];
 
                       const attributesChartData = [
@@ -2515,7 +2515,7 @@ export default function CountryPredictionsClient({
                         {
                           attribute: "Championship Odds",
                           ...parsedCompareData.reduce((acc, c) => {
-                            const ch = c.data.stages?.champion ?? (c.data.championProb * 10) ?? 0;
+                            const ch = c.data.stages?.champion ?? (c.data.championProb * 10 || 0);
                             const rawChamp = parseFloat((ch / 10).toFixed(1));
                             return {
                               ...acc,
@@ -2628,7 +2628,7 @@ export default function CountryPredictionsClient({
                             const maxAttack = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.customAttack ?? 75)) : 0;
                             const maxDefense = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.customDefense ?? 75)) : 0;
                             const maxSquadValue = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.squadValueM ?? appTeams.find(t => t.code === c.data.code)?.squadValueM ?? 0)) : 0;
-                            const maxChampionshipOdds = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.champion ?? (c.data.championProb * 10) ?? 0)) : 0;
+                            const maxChampionshipOdds = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.champion ?? (c.data.championProb * 10 || 0))) : 0;
                             const maxReachFinal = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.final ?? 0)) : 0;
                             const maxReachSF = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.sf ?? 0)) : 0;
                             const maxReachQF = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.qf ?? 0)) : 0;
@@ -2857,7 +2857,7 @@ export default function CountryPredictionsClient({
                                         </div>
                                       </td>
                                       {parsedCompareData.map((c) => {
-                                        const ch = c.data.stages?.champion ?? (c.data.championProb * 10) ?? 0;
+                                        const ch = c.data.stages?.champion ?? (c.data.championProb * 10 || 0);
                                         const prob = parseFloat((ch / 10).toFixed(1));
                                         const isBest = ch === maxChampionshipOdds && parsedCompareData.length > 1;
                                         return (

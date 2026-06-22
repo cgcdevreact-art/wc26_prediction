@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "__DATABASE_PROVIDER__"
   url      = env("DATABASE_URL")
 }
 
@@ -220,7 +220,7 @@ model Prediction {
   
   predictedHomeScore Int?
   predictedAwayScore Int?
-  predictedWinner    String?  @db.LongText // HOME_TEAM, AWAY_TEAM, DRAW, or serialized metadata payloads
+  predictedWinner    String?__PREDICTED_WINNER_NATIVE_TYPE__ // HOME_TEAM, AWAY_TEAM, DRAW, or serialized metadata payloads
   
   predictedTeamId    Int? // For champion or group winner predictions
   
