@@ -73,13 +73,20 @@ export const GROUPS_CONFIG: Record<string, string[]> = {
   L: ["COL", "AUS", "COD", "NZL"],
 };
 
+const TEAM_CODE_ALIASES: Record<string, string> = {
+  KSA: "SAU",
+};
+
 export async function getTeams() {
   const staticTeams = getStaticTeamsFromCup();
-  const resolveStaticTeam = (teamCode?: string | null, teamName?: string | null, shortName?: string | null) =>
-    staticTeams.find((team) => team.code === teamCode) ??
+  const resolveStaticTeam = (teamCode?: string | null, teamName?: string | null, shortName?: string | null) => {
+    const normalizedCode = teamCode ? TEAM_CODE_ALIASES[teamCode] ?? teamCode : null;
+
+    return staticTeams.find((team) => team.code === normalizedCode) ??
     staticTeams.find((team) => team.name === shortName) ??
     staticTeams.find((team) => team.name === teamName) ??
     null;
+  };
 
   try {
     const session = await auth();
