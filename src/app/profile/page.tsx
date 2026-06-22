@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link         from "next/link";
+import { Prisma }   from "@prisma/client";
 import { Header }   from "@/components/site/Header";
 import { Footer }   from "@/components/site/Footer";
 import { auth }     from "@/lib/auth";
@@ -71,7 +72,7 @@ export default async function ProfilePage() {
     createdAt         : Date;
     predictedHomeScore: number | null;
     predictedAwayScore: number | null;
-    predictedWinner   : string | null;
+    predictedWinner   : Prisma.JsonValue | null;
     match             : {
       homeTeam: { name: string | null; tla: string | null } | null;
       awayTeam: { name: string | null; tla: string | null } | null;

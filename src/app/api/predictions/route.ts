@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { normalizePredictionWinnerForWrite } from "@/lib/predictionWinner";
 
 async function ensureMatchPlaceholder(matchId: number) {
   const matchExists = await prisma.match.findUnique({ where: { id: matchId } });
@@ -38,9 +39,11 @@ export async function POST(request: Request) {
         
         await ensureMatchPlaceholder(targetMatchId);
 
-        let predictedWinner = inputWinner || null;
+        let predictedWinner = normalizePredictionWinnerForWrite(inputWinner);
         if (type.startsWith("MATCH_SCORE") && predictedHomeScore !== undefined && predictedHomeScore !== "" && predictedAwayScore !== undefined && predictedAwayScore !== "") {
-          predictedWinner = Number(predictedHomeScore) > Number(predictedAwayScore) ? "HOME_TEAM" : (Number(predictedHomeScore) < Number(predictedAwayScore) ? "AWAY_TEAM" : "DRAW");
+          predictedWinner = normalizePredictionWinnerForWrite(
+            Number(predictedHomeScore) > Number(predictedAwayScore) ? "HOME_TEAM" : (Number(predictedHomeScore) < Number(predictedAwayScore) ? "AWAY_TEAM" : "DRAW"),
+          );
         }
 
         const prediction = await prisma.prediction.upsert({
@@ -76,9 +79,11 @@ export async function POST(request: Request) {
 
       await ensureMatchPlaceholder(targetMatchId);
 
-      let predictedWinner = inputWinner || null;
+      let predictedWinner = normalizePredictionWinnerForWrite(inputWinner);
       if (type.startsWith("MATCH_SCORE") && predictedHomeScore !== undefined && predictedHomeScore !== "" && predictedAwayScore !== undefined && predictedAwayScore !== "") {
-        predictedWinner = Number(predictedHomeScore) > Number(predictedAwayScore) ? "HOME_TEAM" : (Number(predictedHomeScore) < Number(predictedAwayScore) ? "AWAY_TEAM" : "DRAW");
+        predictedWinner = normalizePredictionWinnerForWrite(
+          Number(predictedHomeScore) > Number(predictedAwayScore) ? "HOME_TEAM" : (Number(predictedHomeScore) < Number(predictedAwayScore) ? "AWAY_TEAM" : "DRAW"),
+        );
       }
 
       const prediction = await prisma.prediction.upsert({
