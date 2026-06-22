@@ -19,7 +19,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
 import { CustomCountry } from "@/components/site/WildcardCountrySection";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { readPredictionWinner } from "@/lib/predictionWinner";
+import { readPredictionPayload } from "@/lib/predictionWinner";
 
 // Poisson score generator
 function getPoisson(lambda: number) {
@@ -157,7 +157,7 @@ export default function CountryPredictionsClient({
   const handleLoadPrediction = (prediction: any) => {
     try {
       ignoreResetRef.current = true;
-      const data = readPredictionWinner<any>(prediction.predictedWinner);
+      const data = readPredictionPayload<any>(prediction.predictedPayload, prediction.predictedWinner);
 
       if (!data) {
         ignoreResetRef.current = false;
@@ -2354,7 +2354,7 @@ export default function CountryPredictionsClient({
                       {savedPredictions.map((p) => {
                         let data: any = null;
                         try {
-                          data = readPredictionWinner(p.predictedWinner);
+                          data = readPredictionPayload(p.predictedPayload, p.predictedWinner);
                         } catch (e) {
                           console.error(e);
                         }
@@ -2445,7 +2445,7 @@ export default function CountryPredictionsClient({
                         .map((p, idx) => {
                           let data: any = null;
                           try {
-                            data = readPredictionWinner(p.predictedWinner);
+                            data = readPredictionPayload(p.predictedPayload, p.predictedWinner);
                           } catch (e) {
                             console.error(e);
                           }

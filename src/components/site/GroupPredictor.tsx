@@ -14,7 +14,7 @@ import { UpgradeModal } from "./UpgradeModal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
 import { CountryFlag } from "@/components/ui/CountryFlag";
-import { readPredictionWinner } from "@/lib/predictionWinner";
+import { readPredictionPayload } from "@/lib/predictionWinner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -860,7 +860,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       const slotId = p.matchId - 999000;
       if (slotId >= 0 && slotId <= 5) {
         try {
-          const meta = readPredictionWinner<{ name?: string; updatedAt?: string; summary?: unknown }>(p.predictedWinner);
+          const meta = readPredictionPayload<{ name?: string; updatedAt?: string; summary?: unknown }>(p.predictedPayload, p.predictedWinner);
           if (meta && typeof meta === "object") {
             if ("name" in meta && meta.name && slotId > 0) names[slotId] = meta.name;
             if ("updatedAt" in meta && meta.updatedAt) dates[slotId] = new Date(meta.updatedAt).toLocaleString();

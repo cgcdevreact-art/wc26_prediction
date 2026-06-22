@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CountryFlag } from "@/components/ui/CountryFlag";
-import { readPredictionWinner } from "@/lib/predictionWinner";
+import { readPredictionPayload } from "@/lib/predictionWinner";
 
 function intToTeamCode(val: number): string {
   if (val <= 0) return "";
@@ -87,7 +87,7 @@ export default async function PredictionsPage(props: {
     const slotId = p.matchId - 999000;
     if (slotId >= 1 && slotId <= 5) {
       try {
-        const parsed = readPredictionWinner<{ name?: string }>(p.predictedWinner);
+        const parsed = readPredictionPayload<{ name?: string }>(p.predictedPayload, p.predictedWinner);
         if (parsed && typeof parsed === "object" && "name" in parsed && parsed.name) {
           slotNames[slotId] = parsed.name;
         }
@@ -106,7 +106,7 @@ export default async function PredictionsPage(props: {
   let activeSummary: any = null;
   if (activeMetadataRow) {
     try {
-      const parsed = readPredictionWinner<{ summary?: unknown }>(activeMetadataRow.predictedWinner);
+      const parsed = readPredictionPayload<{ summary?: unknown }>(activeMetadataRow.predictedPayload, activeMetadataRow.predictedWinner);
       if (parsed && typeof parsed === "object" && "summary" in parsed) {
         activeSummary = parsed.summary;
       }
@@ -114,13 +114,13 @@ export default async function PredictionsPage(props: {
   }
 
   const groupPredictedCount = activeSummary?.groupPredictedCount ?? matchesPreds.filter(p => p.predictedHomeScore !== null && p.predictedAwayScore !== null).length;
-  const bracketPredictedCount = activeSummary?.bracketPredictedCount ?? knockoutPreds.filter(p => p.predictedTeamId !== null || p.predictedWinner !== null).length;
+  const bracketPredictedCount = activeSummary?.bracketPredictedCount ?? knockoutPreds.filter(p => p.predictedTeamId !== null || p.predictedWinner !== null || p.predictedPayload !== null).length;
   const championCode = activeSummary?.championCode ?? (() => {
     const finalPred = knockoutPreds.find(p => p.matchId === 500);
       if (finalPred) {
         if (finalPred.predictedTeamId) return intToTeamCode(finalPred.predictedTeamId);
         try {
-        const parsed = readPredictionWinner<{ winnerCode?: string | null }>(finalPred.predictedWinner);
+        const parsed = readPredictionPayload<{ winnerCode?: string | null }>(finalPred.predictedPayload, finalPred.predictedWinner);
         if (parsed && typeof parsed === "object" && "winnerCode" in parsed) {
           return parsed.winnerCode || null;
         }
@@ -322,7 +322,7 @@ export default async function PredictionsPage(props: {
                       {countryPreds.map((p) => {
                         let data: any = null;
                         try {
-                          data = readPredictionWinner(p.predictedWinner);
+                          data = readPredictionPayload(p.predictedPayload, p.predictedWinner);
                         } catch (e) {
                           console.error("Failed to parse country projection details", e);
                         }
