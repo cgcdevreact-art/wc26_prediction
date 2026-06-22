@@ -212,7 +212,7 @@ export function ProbabilityExplorer() {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-5 pb-5 [&>div]:pb-0">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overflow-y-hidden pb-1 scrollbar-x-thin">
                   <div className="flex items-stretch gap-2 min-w-max">
                     <PathNode code={team.code} flag={team.flag} label={team.name} highlight />
                     {PATH_TO_FINAL.map((p, i) => (

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
@@ -108,6 +109,18 @@ export async function POST(request: Request) {
     }
   } catch (error: any) {
     console.error("Error inside predictions POST API:", error);
+
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2000" &&
+      error.meta?.column_name === "predictedWinner"
+    ) {
+      return NextResponse.json(
+        { error: "Prediction payload is too large for the current database schema. Sync the Prisma schema to update the predictedWinner column." },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -135,9 +148,20 @@ export async function DELETE(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
   const slot = searchParams.get("slot");
 
   try {
+    if (id) {
+      await prisma.prediction.delete({
+        where: {
+          id: id,
+          userId: session.user.id,
+        }
+      });
+      return NextResponse.json({ success: true });
+    }
+
     if (!slot || slot === "active" || slot === "0") {
       await prisma.prediction.deleteMany({
         where: {
