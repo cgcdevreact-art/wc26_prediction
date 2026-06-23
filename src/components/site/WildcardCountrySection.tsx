@@ -452,20 +452,18 @@ export function WildcardCountrySection() {
     router.push(`/predictions/country?team=${teamCode}&autorun=true`);
   };
 
-  const editingSelectedCustom = Boolean(isBuilding && editingCode && selectedCode === editingCode);
-
-  const previewTeam = editingSelectedCustom
+  const previewTeam = isBuilding
     ? {
-        code: editingCode!,
+        code: editingCode || "CC_NEW",
         name: customName.trim() || selectedTeam?.name || "Custom Country",
         flag: customFlag,
       }
     : selectedTeam;
 
-  const previewDetails = editingSelectedCustom
+  const previewDetails = isBuilding
     ? {
         ...selectedTeamDetails,
-        code: editingCode!,
+        code: editingCode || "CC_NEW",
         name: customName.trim() || selectedTeamDetails.name,
         flag: customFlag,
         rank: "Custom",
@@ -480,17 +478,8 @@ export function WildcardCountrySection() {
     : selectedTeamDetails;
 
   return (
-    <section className="container mx-auto px-4 py-16">
-      {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-slate-200 dark:border-white/5 pb-6">
-        <SectionHeader
-          eyebrow="Dream Route"
-          title="Your team didn't make the World Cup?"
-          sub="Drop them in anyway. Build your custom country profile, swap them into the tournament brackets, and run their path to glory."
-        />
-      </div>
-
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_400px] min-w-0">
+    <div className="py-2">
+      <div className="grid gap-8 lg:grid-cols-[1fr_400px] min-w-0">
 
         {/* Left Column: Selector & Launcher Panel */}
         <div className="glass-strong rounded-3xl p-6 relative border border-slate-200 dark:border-white/10 shadow-xl overflow-hidden flex flex-col justify-between min-h-[480px]">
@@ -621,7 +610,7 @@ export function WildcardCountrySection() {
                   <optgroup label="Custom Wildcard Teams" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
                     {customCountries.map((cc) => (
                       <option key={cc.code} value={cc.code}>
-                        {cc.flag} {cc.name} ({cc.code})
+                        {cc.flag} {cc.name}
                       </option>
                     ))}
                   </optgroup>
@@ -691,7 +680,7 @@ export function WildcardCountrySection() {
               {previewDetails.isCustom && (
                 <div className="flex items-center gap-2.5 text-xs text-neon bg-neon/8 px-4 py-3 rounded-2xl border border-neon/20 font-bold transition-all">
                   <Sparkles className="w-4 h-4 text-neon shrink-0 animate-pulse" />
-                  <span>Custom wildcard team replacing {previewDetails.replacedName} (baseline cloned from {teams.find(t => t.code === (editingSelectedCustom ? baselineCode : customCountries.find(cc => cc.code === selectedCode)?.baselineCode))?.name})</span>
+                  <span>Custom wildcard team replacing {previewDetails.replacedName} (baseline cloned from {teams.find(t => t.code === (isBuilding ? baselineCode : customCountries.find(cc => cc.code === selectedCode)?.baselineCode))?.name})</span>
                 </div>
               )}
             </div>
@@ -745,7 +734,7 @@ export function WildcardCountrySection() {
           ) : (
             /* Active Creator Form (Single Screen Layout) */
             <div className="flex flex-col h-full justify-between space-y-5">
-              <div className="space-y-3.5 max-h-[500px] overflow-y-auto pr-1 scrollbar-custom">
+              <div className="space-y-3.5 flex-1 min-h-0 overflow-y-auto pr-1 scrollbar-custom">
                 <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-white/5">
                   <h4 className="font-display text-lg font-bold text-slate-950 dark:text-white flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-neon" />
@@ -1024,7 +1013,7 @@ export function WildcardCountrySection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </div>
   );
 }
 

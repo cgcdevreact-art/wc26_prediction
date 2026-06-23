@@ -7,6 +7,7 @@ import { CountryFlag } from "@/components/ui/CountryFlag";
 import { PlayerStats } from "@/lib/store/simulationStore";
 import { useSession } from "next-auth/react";
 import { UpgradeModal } from "@/components/site/UpgradeModal";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 type RankedPlayer = {
   id: string;
@@ -48,6 +49,23 @@ type SortKey =
   | "disciplineRisk"
   | "matchImportance"
   | "ratingTier";
+
+function TableHeaderCell({ label, tooltip, children }: { label?: string; tooltip: string; children?: React.ReactNode }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-help underline decoration-dotted decoration-muted-foreground/45 hover:decoration-foreground/60 transition-colors">
+            {children || label}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="bg-slate-900 text-white dark:bg-slate-950 px-2.5 py-1.5 text-xs font-normal normal-case tracking-normal max-w-xs shadow-xl border border-white/10 rounded-lg z-50">
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 const PAGE_SIZES = [25, 50, 100];
 
@@ -188,19 +206,19 @@ export function PlayersRankingsTable({
   };
 
   const columns: { key: SortKey; label: string; tooltip: string; render: (player: RankedPlayer) => React.ReactNode }[] = [
-    { key: "position", label: "Pos", tooltip: "Position", render: (player) => player.position },
-    { key: "age", label: "Age", tooltip: "Age", render: (player) => player.age.toFixed(1) },
-    { key: "overallRating", label: "OVR", tooltip: "Overall Rating", render: (player) => player.overallRatingLabel },
-    { key: "baseQuality", label: "Base", tooltip: "Base Quality", render: (player) => player.baseQuality },
-    { key: "recentForm", label: "Form", tooltip: "Recent Form", render: (player) => player.recentForm },
-    { key: "internationalExperience", label: "Intl", tooltip: "International Experience", render: (player) => player.internationalExperience },
-    { key: "attackingImpact", label: "Att", tooltip: "Attacking Impact", render: (player) => player.attackingImpact },
-    { key: "defensiveImpact", label: "Def", tooltip: "Defensive Impact", render: (player) => player.defensiveImpact },
-    { key: "passingCreativity", label: "Pass", tooltip: "Passing / Creativity", render: (player) => player.passingCreativity },
-    { key: "fitnessAvailability", label: "Fit", tooltip: "Fitness / Availability", render: (player) => player.fitnessAvailability },
-    { key: "disciplineRisk", label: "Disc", tooltip: "Discipline Risk", render: (player) => player.disciplineRisk },
-    { key: "matchImportance", label: "Imp", tooltip: "Match Importance", render: (player) => player.matchImportance },
-    { key: "ratingTier", label: "Tier", tooltip: "Rating Tier", render: (player) => player.ratingTier },
+    { key: "position", label: "Pos", tooltip: "Player Field Position", render: (player) => player.position },
+    { key: "age", label: "Age", tooltip: "Player Age in years", render: (player) => player.age.toFixed(1) },
+    { key: "overallRating", label: "OVR", tooltip: "Overall Skill Rating", render: (player) => player.overallRatingLabel },
+    { key: "baseQuality", label: "Base", tooltip: "Base Quality (fundamental talent baseline)", render: (player) => player.baseQuality },
+    { key: "recentForm", label: "Form", tooltip: "Recent Performance Form rating", render: (player) => player.recentForm },
+    { key: "internationalExperience", label: "Intl", tooltip: "International Experience rating", render: (player) => player.internationalExperience },
+    { key: "attackingImpact", label: "Att", tooltip: "Attacking Impact rating", render: (player) => player.attackingImpact },
+    { key: "defensiveImpact", label: "Def", tooltip: "Defensive Impact rating", render: (player) => player.defensiveImpact },
+    { key: "passingCreativity", label: "Pass", tooltip: "Passing & Creativity quality", render: (player) => player.passingCreativity },
+    { key: "fitnessAvailability", label: "Fit", tooltip: "Fitness & Availability rating", render: (player) => player.fitnessAvailability },
+    { key: "disciplineRisk", label: "Disc", tooltip: "Discipline Risk (card frequency)", render: (player) => player.disciplineRisk },
+    { key: "matchImportance", label: "Imp", tooltip: "Match Importance weighting", render: (player) => player.matchImportance },
+    { key: "ratingTier", label: "Tier", tooltip: "Rating Tier Category", render: (player) => player.ratingTier },
   ];
 
   return (
@@ -261,12 +279,13 @@ export function PlayersRankingsTable({
                 </button>
               </th>
               {columns.map((column) => (
-                <th key={column.key} className="px-1 py-3 font-semibold whitespace-nowrap" title={column.tooltip}>
+                <th key={column.key} className="px-1 py-3 font-semibold whitespace-nowrap">
                   <button 
                     onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeOpen(true); } : () => toggleSort(column.key)} 
                     className="flex items-center gap-1 whitespace-nowrap"
                   >
-                    <span>{column.label}</span>{renderSortIcon(column.key)}
+                    <TableHeaderCell tooltip={column.tooltip}>{column.label}</TableHeaderCell>
+                    {renderSortIcon(column.key)}
                   </button>
                 </th>
               ))}

@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, Eye } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, Eye, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
 import { UpgradeModal } from "@/components/site/UpgradeModal";
 import { useSimulationStore, TeamStats, PlayerStats } from "@/lib/store/simulationStore";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { PlayersRankingsTable } from "@/components/site/PlayersRankingsTable";
+import { toast } from "sonner";
 
 type RankingTeam = {
   code: string;
@@ -46,6 +50,23 @@ type RankingSortKey =
   | "avgAge"
   | "goalsPerMatch";
 
+function TableHeaderCell({ label, tooltip, children }: { label?: string; tooltip: string; children?: React.ReactNode }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-help underline decoration-dotted decoration-muted-foreground/45 hover:decoration-foreground/60 transition-colors">
+            {children || label}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="bg-slate-900 text-white dark:bg-slate-950 px-2.5 py-1.5 text-xs font-normal normal-case tracking-normal max-w-xs shadow-xl border border-white/10 rounded-lg z-50">
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export default function TeamsClient({
   initialTeams,
   initialPlayers,
@@ -72,6 +93,18 @@ export default function TeamsClient({
     key: "winProbability",
     direction: "desc",
   });
+
+  // State for inline stats editor modal (for free users)
+  const [editStatsModalOpen, setEditStatsModalOpen] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<{
+    code: string;
+    name: string;
+    flag?: string;
+    elo: number;
+    attack: number;
+    defense: number;
+  } | null>(null);
+  const [isSavingStats, setIsSavingStats] = useState(false);
 
   const getTeamGroup = (teamCode: string) => {
     for (const [group, codes] of Object.entries(groupsConfig)) {
@@ -219,18 +252,17 @@ export default function TeamsClient({
     align?: "left" | "center" | "right";
     render: (team: RankingTeam) => string;
   }[] = [
-    { key: "playersCount", label: "Players", tooltip: "Total Players", render: (team) => String(team.playersCount) },
-    { key: "eliteCount", label: "Elite", tooltip: "Elite Players (90+)", render: (team) => String(team.eliteCount) },
-    { key: "strongCount", label: "Strong", tooltip: "Strong Players (85-89)", render: (team) => String(team.strongCount) },
-    { key: "winProbability", label: "Win %", tooltip: "Championship Win Probability", render: (team) => `${team.winProbability.toFixed(1)}%` },
-    { key: "rank", label: "FIFA", tooltip: "FIFA Ranking", render: (team) => `#${team.rank}` },
-    { key: "elo", label: "Elo", tooltip: "Elo Rating", render: (team) => team.elo.toFixed(2) },
-    { key: "attack", label: "Att", tooltip: "Attack Rating", render: (team) => String(team.attack) },
-    { key: "defense", label: "Def", tooltip: "Defense Rating", render: (team) => String(team.defense) },
-    { key: "squadValueM", label: "Value", tooltip: "Squad Value", render: (team) => `€${Math.round(team.squadValueM)}M` },
-    { key: "avgAge", label: "Age", tooltip: "Average Age", render: (team) => team.avgAge.toFixed(1) },
-    { key: "goalsPerMatch", label: "Goals/M", tooltip: "Goals / Match", render: (team) => team.goalsPerMatch.toFixed(2) },
-  ];
+      { key: "eliteCount", label: "Elite", tooltip: "Elite Players (overall rating 90+)", render: (team) => String(team.eliteCount) },
+      { key: "strongCount", label: "Strong", tooltip: "Strong Players (overall rating 85-89)", render: (team) => String(team.strongCount) },
+      { key: "winProbability", label: "Win %", tooltip: "Championship Win Probability", render: (team) => `${team.winProbability.toFixed(1)}%` },
+      { key: "rank", label: "FIFA", tooltip: "Official FIFA World Ranking position", render: (team) => `#${team.rank}` },
+      { key: "elo", label: "Elo", tooltip: "Elo rating of team strength based on historic match results", render: (team) => team.elo.toFixed(2) },
+      { key: "attack", label: "Att", tooltip: "Attack rating (average goals scored index)", render: (team) => String(team.attack) },
+      { key: "defense", label: "Def", tooltip: "Defense rating (average goals conceded index)", render: (team) => String(team.defense) },
+      { key: "squadValueM", label: "Value", tooltip: "Total squad market value in millions of Euros", render: (team) => `€${Math.round(team.squadValueM)}M` },
+      { key: "avgAge", label: "Age", tooltip: "Average age of players in the squad", render: (team) => team.avgAge.toFixed(1) },
+      { key: "goalsPerMatch", label: "Goals/M", tooltip: "Average goals scored per match by this team", render: (team) => team.goalsPerMatch.toFixed(2) },
+    ];
 
   const toggleRankingSort = (key: RankingSortKey) => {
     setRankingSort((current) => (
@@ -253,6 +285,45 @@ export default function TeamsClient({
 
   const openTeam = (teamCode: string) => {
     router.push(`/teams/${teamCode}`);
+  };
+
+  const handleSaveStats = async () => {
+    if (!editingTeam) return;
+    if (!session?.user?.id) {
+      toast.error("Please sign in to save your progress!");
+      return;
+    }
+
+    setIsSavingStats(true);
+    try {
+      const response = await fetch("/api/user/save-team", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          teamCode: editingTeam.code,
+          elo: editingTeam.elo,
+          attack: editingTeam.attack,
+          defense: editingTeam.defense,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save team progress");
+      }
+
+      toast.success(`${editingTeam.name} ratings saved successfully!`);
+      setEditStatsModalOpen(false);
+      setEditingTeam(null);
+      router.refresh();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Something went wrong while saving team ratings.");
+    } finally {
+      setIsSavingStats(false);
+    }
   };
 
   if (!mounted || !isInitialized) {
@@ -307,12 +378,21 @@ export default function TeamsClient({
                 <tr>
                   <th className="w-16 rounded-tl-[1.75rem] px-5 py-4 text-left font-semibold whitespace-nowrap">Rk</th>
                   <th className="px-5 py-4 font-semibold whitespace-nowrap">Team</th>
-                  <th className="px-4 py-4 text-center font-semibold whitespace-nowrap">Players</th>
-                  <th className="px-4 py-4 text-center font-semibold whitespace-nowrap cursor-help" title="Players with an overall rating of 90+">Elite (90+)</th>
-                  <th className="px-4 py-4 text-center font-semibold whitespace-nowrap cursor-help" title="Players with an overall rating of 85-89">Strong (85-89)</th>
-                  <th className="w-20 px-4 py-4 text-center font-semibold whitespace-nowrap">Elo</th>
-                  <th className="w-16 px-4 py-4 text-center font-semibold whitespace-nowrap">Att</th>
-                  <th className="w-16 px-4 py-4 text-center font-semibold whitespace-nowrap">Def</th>
+                  <th className="px-4 py-4 text-center font-semibold whitespace-nowrap">
+                    <TableHeaderCell tooltip="Elite Players (overall rating 90+)">Elite (90+)</TableHeaderCell>
+                  </th>
+                  <th className="px-4 py-4 text-center font-semibold whitespace-nowrap">
+                    <TableHeaderCell tooltip="Strong Players (overall rating 85-89)">Strong (85-89)</TableHeaderCell>
+                  </th>
+                  <th className="w-20 px-4 py-4 text-center font-semibold whitespace-nowrap">
+                    <TableHeaderCell tooltip="Elo rating of team strength based on historic match results">Elo</TableHeaderCell>
+                  </th>
+                  <th className="w-16 px-4 py-4 text-center font-semibold whitespace-nowrap">
+                    <TableHeaderCell tooltip="Attack rating (average goals scored index)">Att</TableHeaderCell>
+                  </th>
+                  <th className="w-16 px-4 py-4 text-center font-semibold whitespace-nowrap">
+                    <TableHeaderCell tooltip="Defense rating (average goals conceded index)">Def</TableHeaderCell>
+                  </th>
                   <th className="w-56 px-5 py-4 text-right font-semibold whitespace-nowrap">Top Player</th>
                   <th className="w-32 rounded-tr-[1.75rem] px-5 py-4 text-right font-semibold whitespace-nowrap">Actions</th>
                 </tr>
@@ -353,12 +433,7 @@ export default function TeamsClient({
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
-                          {team.Players}
-                        </span>
-                      </td>
-                      <td 
+                      <td
                         className={`px-4 py-3 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : ""}`}
                         onClick={subTier === "free" ? (e) => {
                           e.stopPropagation();
@@ -370,7 +445,7 @@ export default function TeamsClient({
                           {team.Elite || "0"}
                         </span>
                       </td>
-                      <td 
+                      <td
                         className={`px-4 py-3 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : ""}`}
                         onClick={subTier === "free" ? (e) => {
                           e.stopPropagation();
@@ -382,17 +457,77 @@ export default function TeamsClient({
                           {team["Very Strong"] || "0"}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
+                      <td
+                        onClick={subTier === "free" ? (e) => {
+                          e.stopPropagation();
+                          const appTeam = appTeams.find((t) => t.code === team["Team Code"]);
+                          if (appTeam) {
+                            setEditingTeam({
+                              code: team["Team Code"],
+                              name: team.Team,
+                              flag: flagMap[team["Team Code"]] || appTeam.flag,
+                              elo: Math.round(appTeam.elo),
+                              attack: appTeam.attack >= 10 ? Math.round(appTeam.attack) : Number(formatRating(appTeam.attack)),
+                              defense: appTeam.defense >= 10 ? Math.round(appTeam.defense) : Number(formatRating(appTeam.defense)),
+                            });
+                            setEditStatsModalOpen(true);
+                          }
+                        } : undefined}
+                        className={`px-3 py-3 text-center font-mono tabular-nums text-slate-800 dark:text-slate-100 ${subTier === "free"
+                          ? "cursor-pointer hover:bg-slate-100 hover:text-cyan-600 dark:hover:bg-white/5 dark:hover:text-cyan-400 transition-colors"
+                          : ""
+                          }`}
+                      >
                         <span className="font-semibold text-slate-800 dark:text-slate-100">
                           {appTeam?.elo ? Math.round(appTeam.elo) : "-"}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
+                      <td
+                        onClick={subTier === "free" ? (e) => {
+                          e.stopPropagation();
+                          const appTeam = appTeams.find((t) => t.code === team["Team Code"]);
+                          if (appTeam) {
+                            setEditingTeam({
+                              code: team["Team Code"],
+                              name: team.Team,
+                              flag: flagMap[team["Team Code"]] || appTeam.flag,
+                              elo: Math.round(appTeam.elo),
+                              attack: appTeam.attack >= 10 ? Math.round(appTeam.attack) : Number(formatRating(appTeam.attack)),
+                              defense: appTeam.defense >= 10 ? Math.round(appTeam.defense) : Number(formatRating(appTeam.defense)),
+                            });
+                            setEditStatsModalOpen(true);
+                          }
+                        } : undefined}
+                        className={`px-3 py-3 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80 ${subTier === "free"
+                          ? "cursor-pointer hover:bg-slate-100 hover:text-cyan-600 dark:hover:bg-white/5 dark:hover:text-cyan-400 transition-colors"
+                          : ""
+                          }`}
+                      >
                         <span className="inline-flex min-w-14 items-center justify-center rounded-full bg-fuchsia-50 px-3 py-1 font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:ring-fuchsia-500/20">
                           {formatRating(appTeam?.attack)}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
+                      <td
+                        onClick={subTier === "free" ? (e) => {
+                          e.stopPropagation();
+                          const appTeam = appTeams.find((t) => t.code === team["Team Code"]);
+                          if (appTeam) {
+                            setEditingTeam({
+                              code: team["Team Code"],
+                              name: team.Team,
+                              flag: flagMap[team["Team Code"]] || appTeam.flag,
+                              elo: Math.round(appTeam.elo),
+                              attack: appTeam.attack >= 10 ? Math.round(appTeam.attack) : Number(formatRating(appTeam.attack)),
+                              defense: appTeam.defense >= 10 ? Math.round(appTeam.defense) : Number(formatRating(appTeam.defense)),
+                            });
+                            setEditStatsModalOpen(true);
+                          }
+                        } : undefined}
+                        className={`px-3 py-3 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80 ${subTier === "free"
+                          ? "cursor-pointer hover:bg-slate-100 hover:text-cyan-600 dark:hover:bg-white/5 dark:hover:text-cyan-400 transition-colors"
+                          : ""
+                          }`}
+                      >
                         <span className="inline-flex min-w-14 items-center justify-center rounded-full bg-fuchsia-50 px-3 py-1 font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:ring-fuchsia-500/20">
                           {formatRating(appTeam?.defense)}
                         </span>
@@ -496,9 +631,8 @@ export default function TeamsClient({
                               setModalOpen(true);
                             } : () => toggleRankingSort(column.key)}
                             className="flex items-center gap-1 whitespace-nowrap text-left transition hover:text-slate-950 dark:hover:text-white"
-                            title={column.tooltip}
                           >
-                            <span>{column.label}</span>
+                            <TableHeaderCell tooltip={column.tooltip}>{column.label}</TableHeaderCell>
                             {renderSortIcon(column.key)}
                           </button>
                         </th>
@@ -545,14 +679,38 @@ export default function TeamsClient({
                           column.key === "avgAge" ||
                           column.key === "goalsPerMatch"
                         ) && subTier === "free";
+                        const isEditableField = (
+                          column.key === "elo" ||
+                          column.key === "attack" ||
+                          column.key === "defense"
+                        ) && subTier === "free";
                         return (
                           <td
                             key={column.key}
-                            className={`px-1 py-2 font-mono tabular-nums text-slate-800 dark:text-slate-100 ${isRestricted ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : ""}`}
+                            className={`px-1 py-2 font-mono tabular-nums text-slate-800 dark:text-slate-100 ${isRestricted
+                              ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10"
+                              : isEditableField
+                                ? "cursor-pointer hover:bg-slate-100 hover:text-cyan-600 dark:hover:bg-white/5 dark:hover:text-cyan-400 transition-colors"
+                                : ""
+                              }`}
                             onClick={isRestricted ? (e) => {
                               e.stopPropagation();
                               setModalReason("plus");
                               setModalOpen(true);
+                            } : isEditableField ? (e) => {
+                              e.stopPropagation();
+                              const appTeam = appTeams.find((t) => t.code === team.code);
+                              if (appTeam) {
+                                setEditingTeam({
+                                  code: team.code,
+                                  name: team.name,
+                                  flag: team.flag,
+                                  elo: Math.round(appTeam.elo),
+                                  attack: appTeam.attack >= 10 ? Math.round(appTeam.attack) : Number(formatRating(appTeam.attack)),
+                                  defense: appTeam.defense >= 10 ? Math.round(appTeam.defense) : Number(formatRating(appTeam.defense)),
+                                });
+                                setEditStatsModalOpen(true);
+                              }
                             } : undefined}
                           >
                             <span className={isRestricted ? "blur-[5px] select-none pointer-events-none" : ""}>
@@ -610,6 +768,116 @@ export default function TeamsClient({
       </Tabs>
 
       <UpgradeModal isOpen={modalOpen} onClose={() => setModalOpen(false)} reason={modalReason} />
+
+      {/* Inline Stats Editing Modal for Free Plan Users */}
+      <Dialog open={editStatsModalOpen} onOpenChange={(open) => {
+        if (!open) {
+          setEditStatsModalOpen(false);
+          setEditingTeam(null);
+        }
+      }}>
+        <DialogContent className="glass-strong max-w-md border border-slate-200/80 text-foreground dark:border-white/10">
+          {editingTeam && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-xl font-display font-bold flex items-center space-x-3">
+                  <CountryFlag
+                    code={editingTeam.code}
+                    flag={editingTeam.flag}
+                    name={editingTeam.name}
+                    className="h-6 w-9 shrink-0 rounded object-cover shadow-sm"
+                    emojiClassName="text-2xl leading-none"
+                  />
+                  <div>
+                    <span className="text-slate-900 dark:text-white">Edit Ratings: {editingTeam.name}</span>
+                    <span className="ml-2 text-xs font-mono font-normal text-muted-foreground uppercase">
+                      ({editingTeam.code})
+                    </span>
+                  </div>
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-5 pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-elo" className="text-xs font-semibold text-muted-foreground flex justify-between">
+                    <span>Elo Rating</span>
+                    {/* <span className="font-normal font-mono opacity-80">(Historic Strength)</span> */}
+                  </Label>
+                  <Input
+                    id="edit-elo"
+                    type="number"
+                    value={editingTeam.elo}
+                    onChange={(e) => setEditingTeam({ ...editingTeam, elo: Number(e.target.value) })}
+                    className="bg-background/50 border-slate-200 dark:border-white/10 text-lg font-bold text-foreground font-mono h-11 focus-visible:ring-neon"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-attack" className="text-xs font-semibold text-muted-foreground flex justify-between">
+                    <span>Attack rating (Att)</span>
+                    {/* <span className="font-normal font-mono opacity-80">(Scale: 15 - 99)</span> */}
+                  </Label>
+                  <Input
+                    id="edit-attack"
+                    type="number"
+                    min={15}
+                    max={99}
+                    value={editingTeam.attack}
+                    onChange={(e) => setEditingTeam({ ...editingTeam, attack: Number(e.target.value) })}
+                    className="bg-background/50 border-slate-200 dark:border-white/10 text-lg font-bold text-foreground font-mono h-11 focus-visible:ring-neon"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-defense" className="text-xs font-semibold text-muted-foreground flex justify-between">
+                    <span>Defense rating (Def)</span>
+                    {/* <span className="font-normal font-mono opacity-80">(Scale: 15 - 99)</span> */}
+                  </Label>
+                  <Input
+                    id="edit-defense"
+                    type="number"
+                    min={15}
+                    max={99}
+                    value={editingTeam.defense}
+                    onChange={(e) => setEditingTeam({ ...editingTeam, defense: Number(e.target.value) })}
+                    className="bg-background/50 border-slate-200 dark:border-white/10 text-lg font-bold text-foreground font-mono h-11 focus-visible:ring-neon"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end space-x-3 pt-6 border-t border-slate-200/60 dark:border-white/10">
+                  <button
+                    onClick={() => {
+                      setEditStatsModalOpen(false);
+                      setEditingTeam(null);
+                    }}
+                    className="px-4.5 py-2 rounded-full text-xs font-bold text-red-600 hover:text-red-700 border border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15 dark:hover:text-red-200 transition-all"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    onClick={handleSaveStats}
+                    disabled={isSavingStats}
+                    className="px-5 py-2 rounded-full font-bold text-xs bg-gradient-to-r from-neon via-cyan-500 to-blue-600 text-white shadow-[0_0_12px_rgba(0,255,255,0.3)] hover:shadow-[0_0_20px_rgba(0,255,255,0.5)] transition-all duration-300 disabled:opacity-50 flex items-center space-x-2"
+                  >
+                    {isSavingStats ? (
+                      <>
+                        <div className="animate-spin rounded-full h-3 w-3 border-t border-white"></div>
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Save Ratings</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
