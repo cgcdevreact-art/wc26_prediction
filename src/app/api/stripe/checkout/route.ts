@@ -32,7 +32,7 @@ export async function POST(request: Request) {
           stripeCurrentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
         },
       });
-      return NextResponse.json({ url: `${appUrl}/simulator?success=true` });
+      return NextResponse.json({ url: `${appUrl}/subscription/thank-you?tier=${tier}` });
     }
 
     try {
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
           userId: session.user.id,
           tier: tier,
         },
-        success_url: `${appUrl}/simulator?session_id={CHECKOUT_SESSION_ID}&success=true`,
+        success_url: `${appUrl}/subscription/thank-you?tier=${tier}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${appUrl}/subscription?canceled=true`,
       });
 
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
           stripeCurrentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         },
       });
-      return NextResponse.json({ url: `${appUrl}/simulator?success=true` });
+      return NextResponse.json({ url: `${appUrl}/subscription/thank-you?tier=${tier}` });
     }
   } catch (error: any) {
     console.error("Error creating Stripe Checkout Session:", error);

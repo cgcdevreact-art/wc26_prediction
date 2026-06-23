@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useSession } from "next-auth/react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
-import { Check, Sparkles, Trophy, Shield, RefreshCw } from "lucide-react";
+import { Check, Sparkles, Trophy, Shield, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
@@ -17,6 +17,11 @@ export default function SubscriptionPage() {
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
 
   const currentTier = session?.user?.subscriptionTier || "free";
+  const tierLabels = {
+    free: "Free Predictor",
+    plus: "Advanced Predictor",
+    pro: "Expert Predictor",
+  } as const;
 
   const handleSubscribe = async (tier: "plus" | "pro") => {
     if (!session) {
@@ -54,59 +59,86 @@ export default function SubscriptionPage() {
 
   const tiers = [
     {
-      name: "Free",
+      name: "Free Predictor",
       id: "free",
       price: "$0",
       description: "Basic tournament simulation and predictions.",
       icon: <Shield className="h-6 w-6 text-muted-foreground" />,
       features: [
-        "Access to Base Model (Elo/Att/Def)",
-        "Limited to 5 simulation credits",
-        "Public Leaderboard predictions entry",
-        "Group stage prediction builder",
-        "Teams (Players, Elo, Att, Def, Top Player only)",
+        "Base simulation model",
+        "5 free simulation credits",
+        "Country probability explorer",
+        "Customize team ELO, Attack, & Defense",
+        "Compare core ELO/Attack/Defense side-by-side",
+        "Saved predictions and leaderboard access",
       ],
       cta: "Current Plan",
       gradient: "from-white to-slate-50 border-border dark:from-zinc-800 dark:to-zinc-900 dark:border-white/5 shadow-sm dark:shadow-none",
     },
     {
-      name: "Plus",
+      name: "Advanced Predictor",
       id: "plus",
       price: "$4.99",
       period: "/month",
       description: "Unlock advanced squad metrics and unlimited simulations.",
       icon: <Sparkles className="h-6 w-6 text-blue-500 dark:text-blue-400 animate-pulse" />,
       features: [
-        "Access to Advanced Model (+Squad details)",
-        "Unlimited simulations & bracket runs",
-        "Weighted Elo + squad quality rating prior",
-        "Unlock full team-by-team comparison engine",
-        "Teams (Unlock Elite, Strong, Quality, Form, Exp)",
-        "No ad-like promotional overlays",
+        "Core predictor tools included",
+        "Advanced simulation model",
+        "Unlimited simulations",
+        "Unlock player stats & squad rankings",
+        "Edit the top-rated player for any team",
+        "Compare advanced metrics (Value, Win %, Age, Goals/Match)",
       ],
-      cta: "Upgrade to Plus",
+      cta: "Upgrade to Advanced",
       gradient: "from-blue-50/40 via-blue-50/20 to-transparent dark:from-blue-950/40 dark:via-[#0f1d3a] dark:to-[#071329] border-blue-200 dark:border-blue-500/20 shadow-[0_0_25px_rgba(59,130,246,0.05)] dark:shadow-[0_0_25px_rgba(59,130,246,0.15)]",
     },
     {
-      name: "Pro",
+      name: "Expert Predictor",
       id: "pro",
       price: "$9.99",
       period: "/month",
       description: "Ultimate simulation engine with tactical variables.",
-      icon: <Trophy className="h-6 w-6 text-amber-500 animate-float" />,
+      icon: <Trophy className="h-6 w-6 text-amber-500" />,
       features: [
-        "Access to Pro Model (+Aspects & Pitch details)",
-        "Unlimited simulations & bracket runs",
-        "Team & Player Ratings override customization",
-        "Pitch parameters (weather, crowd, referee bias)",
-        "Injury & squad rotation risk factors",
-        "Priority simulation execution queue",
-        "Exclusive Pro Member Badge on leaderboard",
+        "Everything in Advanced",
+        "Pro simulation model",
+        "Full team ratings & squad customizations",
+        "Edit ratings for all roster players",
+        "Players in / players out controls",
       ],
-      cta: "Upgrade to Pro",
+      cta: "Upgrade to Expert",
       gradient: "from-purple-50/40 via-purple-50/20 to-transparent dark:from-purple-950/40 dark:via-[#1b1236] dark:to-[#0d071e] border-purple-200 dark:border-purple-500/20 shadow-[0_0_25px_rgba(168,85,247,0.05)] dark:shadow-[0_0_25px_rgba(168,85,247,0.15)]",
     },
   ];
+
+  const comparisonRows = [
+    { feature: "Base simulation model", free: true, plus: true, pro: true },
+    { feature: "Advanced simulation model", free: false, plus: true, pro: true },
+    { feature: "Pro simulation model", free: false, plus: false, pro: true },
+    { feature: "Free simulation credits", free: "5 credits", plus: "Unlimited", pro: "Unlimited" },
+    { feature: "Country probability explorer", free: true, plus: true, pro: true },
+    { feature: "Match and bracket predictions", free: true, plus: true, pro: true },
+    { feature: "Saved predictions library", free: true, plus: true, pro: true },
+    { feature: "Customize team ELO, Attack, & Defense", free: true, plus: true, pro: true },
+    { feature: "View player stats & squad rankings", free: false, plus: true, pro: true },
+    { feature: "Edit top-rated player ratings", free: false, plus: true, pro: true },
+    { feature: "Edit ratings for all roster players", free: false, plus: false, pro: true },
+    { feature: "Compare advanced team metrics", free: false, plus: true, pro: true },
+    { feature: "Players in / players out controls", free: false, plus: false, pro: true },
+  ] as const;
+
+  const renderComparisonCell = (value: boolean | string) => {
+    if (typeof value === "string") {
+      return <span className="text-sm font-semibold text-foreground dark:text-white">{value}</span>;
+    }
+
+    if (value) {
+      return <Check className="h-4.5 w-4.5 text-neon" />;
+    }
+
+    return <X className="h-4.5 w-4.5 text-rose-500" />;
+  };
 
   return (
     <div className="min-h-screen bg-hero text-foreground">
@@ -119,7 +151,7 @@ export default function SubscriptionPage() {
             Subscription Pricing
           </div>
           <h1 className="font-display text-4xl font-bold tracking-tight text-foreground dark:text-white sm:text-5xl">
-            Choose Your <span className="text-gradient">Simulation Tier</span>
+            Choose Your <span className="text-gradient">Predictor Plan</span>
           </h1>
           <p className="mt-4 text-base md:text-lg text-muted-foreground">
             Power up your predictions. Access advanced squad variables, match day factors, and unlimited computational simulations.
@@ -139,7 +171,7 @@ export default function SubscriptionPage() {
                   ? "bg-blue-500/10 dark:bg-blue-500/20 border border-blue-500/20 dark:border-blue-500/40 text-blue-600 dark:text-blue-400"
                   : "bg-zinc-500/10 dark:bg-zinc-500/20 border border-zinc-500/20 dark:border-zinc-500/40 text-zinc-600 dark:text-zinc-400"
               }`}>
-                {currentTier}
+                {tierLabels[currentTier as keyof typeof tierLabels] || currentTier}
               </span>
             </div>
             {currentTier === "free" && (
@@ -244,6 +276,65 @@ export default function SubscriptionPage() {
             );
           })}
         </div>
+
+        <section id="compare-plans" className="mx-auto mt-16 max-w-6xl scroll-mt-28">
+          <div className="mb-6 text-center">
+            <h2 className="font-display text-3xl font-bold tracking-tight text-foreground dark:text-white sm:text-4xl">
+              Compare Plans
+            </h2>
+            <p className="mt-3 text-sm text-muted-foreground sm:text-base">
+              Every row below maps to functionality that already exists in the app today.
+            </p>
+          </div>
+
+          <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.88))] shadow-[0_20px_60px_-40px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))]">
+            <table className="min-w-full border-separate border-spacing-0">
+              <thead>
+                <tr>
+                  <th className="border-b border-slate-200/80 px-6 py-5 text-left text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500 dark:border-white/10 dark:text-white/55">
+                    Feature
+                  </th>
+                  <th className="border-b border-slate-200/80 bg-slate-50/80 px-6 py-5 text-center text-[11px] font-bold uppercase tracking-[0.24em] text-slate-600 dark:border-white/10 dark:bg-white/[0.02] dark:text-white/70">
+                    Free Predictor
+                  </th>
+                  <th className="border-b border-slate-200/80 bg-blue-50/70 px-6 py-5 text-center text-[11px] font-bold uppercase tracking-[0.24em] text-blue-700 dark:border-white/10 dark:bg-blue-500/[0.08] dark:text-blue-300">
+                    Advanced Predictor
+                  </th>
+                  <th className="border-b border-slate-200/80 bg-purple-50/70 px-6 py-5 text-center text-[11px] font-bold uppercase tracking-[0.24em] text-purple-700 dark:border-white/10 dark:bg-purple-500/[0.08] dark:text-purple-300">
+                    Expert Predictor
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonRows.map((row, idx) => (
+                  <tr
+                    key={row.feature}
+                    className="group"
+                  >
+                    <td className={`px-6 py-4 text-sm font-medium text-slate-900 dark:text-white ${idx !== comparisonRows.length - 1 ? "border-b border-slate-200/70 dark:border-white/8" : ""}`}>
+                      {row.feature}
+                    </td>
+                    <td className={`bg-slate-50/80 px-6 py-4 dark:bg-white/[0.02] ${idx !== comparisonRows.length - 1 ? "border-b border-slate-200/70 dark:border-white/8" : ""}`}>
+                      <div className="flex justify-center">
+                        {renderComparisonCell(row.free)}
+                      </div>
+                    </td>
+                    <td className={`bg-blue-50/60 px-6 py-4 dark:bg-blue-500/[0.05] ${idx !== comparisonRows.length - 1 ? "border-b border-slate-200/70 dark:border-white/8" : ""}`}>
+                      <div className="flex justify-center">
+                        {renderComparisonCell(row.plus)}
+                      </div>
+                    </td>
+                    <td className={`bg-purple-50/60 px-6 py-4 dark:bg-purple-500/[0.05] ${idx !== comparisonRows.length - 1 ? "border-b border-slate-200/70 dark:border-white/8" : ""}`}>
+                      <div className="flex justify-center">
+                        {renderComparisonCell(row.pro)}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </main>
 
       <Footer />

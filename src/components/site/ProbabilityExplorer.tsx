@@ -6,7 +6,6 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { AuthModal } from "./AuthModal";
 import { CountryFlag } from "@/components/ui/CountryFlag";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const PATH_TO_FINAL = [
   { stage: "Group Stage", opp: "Switzerland", winPct: 78 },
@@ -123,116 +122,76 @@ export function ProbabilityExplorer() {
 
   const handleSimulationClick = () => {
     if (session) {
-      router.push("/predictions/country");
+      router.push(`/predictions/country?team=${encodeURIComponent(code)}`);
     } else {
       setAuthModalOpen(true);
     }
   };
 
   return (
-    <section id="predict" className="container mx-auto px-4 py-16  ">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-white/5 pb-6">
-        <SectionHeader
-          eyebrow="Team Probability Explorer"
-          title="Pick a country. See every chance."
-          sub="From group qualification to lifting the trophy — explore the full probability journey for any nation."
-        />
-        <button
-          onClick={handleSimulationClick}
-          className="shrink-0 bg-gradient-to-r from-neon to-neon-2 text-background px-6 py-3 rounded-xl font-bold transition hover:opacity-95 active:scale-95 flex items-center gap-2 self-start sm:self-auto shadow-lg shadow-neon/20 hover:shadow-neon/30"
-        >
-          <Sparkles className="w-4 h-4 fill-current" />
-          <span>Run Simulation</span>
-        </button>
-      </div>
-
-      <div className="mt-8 grid gap-5 lg:grid-cols-[280px_1fr] min-w-0">
+    <div id="predict" className="py-2">
+      <div className="grid gap-5 lg:grid-cols-[280px_1fr] min-w-0">
         {/* Team list */}
-        <Accordion
-          type="multiple"
-          defaultValue={["home-country-list"]}
-          className="glass self-start h-fit rounded-2xl border border-border/70 dark:border-white/10 overflow-hidden"
-        >
-          <AccordionItem value="home-country-list" className="border-none">
-            <AccordionTrigger className="px-4 pt-4 pb-3 hover:no-underline">
-              <div className="text-left">
-                <div className="font-display text-lg font-semibold text-foreground">Country Rankings</div>
-                <div className="text-xs text-muted-foreground mt-0.5">Browse every team by title probability</div>
+        <div className="glass self-start h-fit rounded-2xl border border-border/70 dark:border-white/10 overflow-hidden">
+          <div className="px-4 pt-4 pb-3 text-left">
+            <div className="font-display text-lg font-semibold text-foreground">Country Rankings</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Browse every team by title probability</div>
+          </div>
+          <div className="px-2 pb-2">
+            <div className="lg:max-h-[930px] lg:overflow-y-auto scrollbar-custom">
+              <div className="grid grid-cols-3 gap-1 lg:grid-cols-1">
+                {sortedTeams.map((t) => {
+                  const active = t.code === code;
+                  return (
+                    <button
+                      key={t.code}
+                      onClick={() => setCode(t.code)}
+                      className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${active
+                        ? "bg-gradient-to-r from-neon/10 to-neon-2/10 border-neon/25 text-foreground font-bold shadow-[0_10px_30px_-20px_color-mix(in_oklab,var(--color-neon)_65%,transparent)]"
+                        : "border-transparent bg-transparent text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
+                        }`}
+                    >
+                      {active && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-neon to-neon-2" />
+                      )}
+                      <span className="flex items-center gap-2 truncate z-10">
+                        <CountryFlag
+                          code={t.code}
+                          flag={t.flag}
+                          name={t.name}
+                          className="h-6 w-8 shrink-0 group-hover:scale-110 transition-transform duration-300"
+                          emojiClassName="text-lg shrink-0 select-none group-hover:scale-110 transition-transform duration-300"
+                        />
+                        <span className="hidden truncate lg:inline tracking-wide">{t.name}</span>
+                        <span className="lg:hidden">{t.code}</span>
+                      </span>
+                      <span className="text-xs font-mono font-bold text-neon-2 text-right z-10">{t.prob.champion.toFixed(1)}%</span>
+                    </button>
+                  );
+                })}
               </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-2 pb-2 [&>div]:pb-0">
-              <div className="lg:max-h-[930px] lg:overflow-y-auto scrollbar-custom">
-                <div className="grid grid-cols-3 gap-1 lg:grid-cols-1">
-                  {sortedTeams.map((t) => {
-                    const active = t.code === code;
-                    return (
-                      <button
-                        key={t.code}
-                        onClick={() => setCode(t.code)}
-                        className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${active
-                          ? "bg-gradient-to-r from-neon/10 to-neon-2/10 border-neon/25 text-foreground font-bold shadow-[0_10px_30px_-20px_color-mix(in_oklab,var(--color-neon)_65%,transparent)]"
-                          : "border-transparent bg-transparent text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
-                          }`}
-                      >
-                        {active && (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-neon to-neon-2" />
-                        )}
-                        <span className="flex items-center gap-2 truncate z-10">
-                          <CountryFlag
-                            code={t.code}
-                            flag={t.flag}
-                            name={t.name}
-                            className="h-6 w-8 shrink-0 group-hover:scale-110 transition-transform duration-300"
-                            emojiClassName="text-lg shrink-0 select-none group-hover:scale-110 transition-transform duration-300"
-                          />
-                          <span className="hidden truncate lg:inline tracking-wide">{t.name}</span>
-                          <span className="lg:hidden">{t.code}</span>
-                        </span>
-                        <span className="text-xs font-mono font-bold text-neon-2 text-right z-10">{t.prob.champion.toFixed(1)}%</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+            </div>
+          </div>
+        </div>
 
         {/* Main */}
         <div className="space-y-5 min-w-0">
-
-          <Accordion type="multiple" defaultValue={["home-route"]} className="glass self-start h-fit rounded-2xl overflow-hidden">
-            <AccordionItem value="home-route" className="border-none">
-              <AccordionTrigger className="px-5 pt-5 pb-3 hover:no-underline">
-                <div className="flex w-full items-center justify-between pr-3">
-                  <div className="text-left">
-                    <div className="font-display text-lg font-semibold">Most Likely Route to the Final</div>
-                  </div>
-                  <div className="text-xs text-muted-foreground">Win % per stage</div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-5 pb-5 [&>div]:pb-0">
-                <div className="overflow-x-auto overflow-y-hidden pb-1 scrollbar-x-thin">
-                  <div className="flex items-stretch gap-2 min-w-max">
-                    <PathNode code={team.code} flag={team.flag} label={team.name} highlight />
-                    {PATH_TO_FINAL.map((p, i) => (
-                      <PathStep key={i} stage={p.stage} opp={p.opp} winPct={p.winPct} />
-                    ))}
-                  </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-          <Accordion type="multiple" defaultValue={["home-team-overview"]} className="glass-strong self-start h-fit rounded-3xl border border-white/10 shadow-xl overflow-hidden">
-            <AccordionItem value="home-team-overview" className="border-none">
-              <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
-                <div className="text-left">
-                  <div className="font-display text-xl font-extrabold text-foreground">Team Overview</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Profile, champion odds, and stage progression</div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pb-6 [&>div]:pb-0">
-                <div className="relative overflow-hidden">
+          <div className="glass-strong self-start h-fit rounded-3xl border border-white/10 shadow-xl overflow-hidden">
+            <div className="px-6 pt-6 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 text-left">
+              <div>
+                <div className="font-display text-xl font-extrabold text-foreground">Team Overview</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Profile, champion odds, and stage progression</div>
+              </div>
+              <button
+                onClick={handleSimulationClick}
+                className="shrink-0 bg-gradient-to-r from-neon to-neon-2 text-background px-5 py-2.5 rounded-xl text-xs font-bold transition hover:opacity-95 active:scale-95 flex items-center gap-1.5 shadow-lg shadow-neon/20 hover:shadow-neon/30 self-start sm:self-auto"
+              >
+                <Sparkles className="w-3.5 h-3.5 fill-current" />
+                <span>Run Simulation</span>
+              </button>
+            </div>
+            <div className="px-6 pb-6">
+              <div className="relative overflow-hidden">
                   <div className="absolute -right-16 -top-16 w-56 h-56 bg-neon/10 rounded-full filter blur-3xl pointer-events-none" />
                   <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-neon-2/10 rounded-full filter blur-3xl pointer-events-none" />
                   <div className="flex flex-col lg:flex-row justify-between items-stretch gap-6 border-b border-white/5 pb-6 mb-6">
@@ -380,94 +339,109 @@ export function ProbabilityExplorer() {
                       );
                     })}
                   </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+              </div>
+            </div>
+          </div>
 
           <div className="grid gap-5 md:grid-cols-2 md:items-start min-w-0">
-            <Accordion type="multiple" defaultValue={["home-strengths-radar"]} className="glass self-start h-fit rounded-2xl overflow-hidden">
-              <AccordionItem value="home-strengths-radar" className="border-none">
-                <AccordionTrigger className="px-5 pt-5 pb-3 hover:no-underline">
-                  <div className="flex w-full items-center justify-between pr-3">
-                    <div className="text-left">
-                      <div className="font-display text-lg font-semibold">Strengths Radar</div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">vs Tournament Avg</div>
+            <div className="glass self-start h-fit rounded-2xl overflow-hidden">
+              <div className="px-5 pt-5 pb-3">
+                <div className="flex w-full items-center justify-between pr-3">
+                  <div className="text-left">
+                    <div className="font-display text-lg font-semibold">Strengths Radar</div>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-5 pb-5 [&>div]:pb-0">
-                  <div className="h-60 min-w-0 overflow-hidden">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                      <RadarChart data={radar} outerRadius={75}>
-                        <PolarGrid
-                          stroke="color-mix(in oklab, var(--color-foreground) 20%, transparent)"
-                        />
-                        <PolarAngleAxis dataKey="axis" tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }} />
-                        <Radar
-                          dataKey="v"
-                          stroke="var(--color-neon)"
-                          fill="var(--color-neon)"
-                          fillOpacity={0.28}
-                        />
-                      </RadarChart>
-                    </ResponsiveContainer>
+                  <div className="text-xs text-muted-foreground">vs Tournament Avg</div>
+                </div>
+              </div>
+              <div className="px-5 pb-5">
+                <div className="h-60 min-w-0 overflow-hidden">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+                    <RadarChart data={radar} outerRadius={75}>
+                      <PolarGrid
+                        stroke="color-mix(in oklab, var(--color-foreground) 20%, transparent)"
+                      />
+                      <PolarAngleAxis dataKey="axis" tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }} />
+                      <Radar
+                        dataKey="v"
+                        stroke="var(--color-neon)"
+                        fill="var(--color-neon)"
+                        fillOpacity={0.28}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+            <div className="glass self-start h-fit rounded-2xl overflow-hidden">
+              <div className="px-5 pt-5 pb-3">
+                <div className="flex w-full flex-col gap-3 pr-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="text-left">
+                    <div className="font-display text-lg font-semibold">Squad Quality Tiers</div>
+                    <div className="text-xs text-muted-foreground">Distribution of squad players across rating tiers</div>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-            <Accordion type="multiple" defaultValue={["home-squad-quality"]} className="glass self-start h-fit rounded-2xl overflow-hidden">
-              <AccordionItem value="home-squad-quality" className="border-none">
-                <AccordionTrigger className="px-5 pt-5 pb-3 hover:no-underline">
-                  <div className="flex w-full flex-col gap-3 pr-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="text-left">
-                      <div className="font-display text-lg font-semibold">Squad Quality Tiers</div>
-                      <div className="text-xs text-muted-foreground">Distribution of squad players across rating tiers</div>
+                  <div className="self-start rounded-full border border-neon-2/30 bg-neon-2/8 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-neon-2">
+                    Squad Profile
+                  </div>
+                </div>
+              </div>
+              <div className="px-5 pb-5">
+                <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start">
+                  <div className="flex min-h-[220px] flex-col justify-center rounded-[2rem] border border-border bg-muted/45 p-6 text-center shadow-glass">
+                    <div className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</div>
+                    <div className="mt-3 text-5xl font-black font-mono text-foreground">
+                      {squadQuality.averageRating || "--"}
+                      {squadQuality.averageRating ? <span className="text-2xl align-top">%</span> : null}
                     </div>
-                    <div className="self-start rounded-full border border-neon-2/30 bg-neon-2/8 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-neon-2">
-                      Squad Profile
+                    <div className="mt-4 text-sm font-semibold text-neon">
+                      {squadQuality.total} Players
                     </div>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-5 pb-5 [&>div]:pb-0">
-                  <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start">
-                    <div className="flex min-h-[220px] flex-col justify-center rounded-[2rem] border border-border bg-muted/45 p-6 text-center shadow-glass">
-                      <div className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</div>
-                      <div className="mt-3 text-5xl font-black font-mono text-foreground">
-                        {squadQuality.averageRating || "--"}
-                        {squadQuality.averageRating ? <span className="text-2xl align-top">%</span> : null}
-                      </div>
-                      <div className="mt-4 text-sm font-semibold text-neon">
-                        {squadQuality.total} Players
-                      </div>
-                    </div>
 
-                    <div className="space-y-5">
-                      {squadQuality.tiers.map((tier) => (
-                        <div key={tier.label} className="grid grid-cols-[minmax(110px,140px)_minmax(0,1fr)_auto] items-center gap-4">
-                          <div className="text-sm font-semibold text-foreground">{tier.label}</div>
-                          <div className="h-4 rounded-full bg-black/6 dark:bg-white/8 overflow-hidden">
-                            <div
-                              className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
-                              style={{ width: `${Math.max(tier.percentage, tier.count > 0 ? 4 : 0)}%` }}
-                            />
-                          </div>
-                          <div className="min-w-[72px] text-right font-mono text-sm font-bold tabular-nums text-foreground">
-                            {tier.count}
-                            <span className="ml-2 text-xs text-muted-foreground">({tier.percentage}%)</span>
-                          </div>
+                  <div className="space-y-5">
+                    {squadQuality.tiers.map((tier) => (
+                      <div key={tier.label} className="grid grid-cols-[minmax(110px,140px)_minmax(0,1fr)_auto] items-center gap-4">
+                        <div className="text-sm font-semibold text-foreground">{tier.label}</div>
+                        <div className="h-4 rounded-full bg-black/6 dark:bg-white/8 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
+                            style={{ width: `${Math.max(tier.percentage, tier.count > 0 ? 4 : 0)}%` }}
+                          />
                         </div>
-                      ))}
-                    </div>
+                        <div className="min-w-[72px] text-right font-mono text-sm font-bold tabular-nums text-foreground">
+                          {tier.count}
+                          <span className="ml-2 text-xs text-muted-foreground">({tier.percentage}%)</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="glass self-start h-fit rounded-2xl overflow-hidden">
+            <div className="px-5 pt-5 pb-3">
+              <div className="flex w-full items-center justify-between pr-3">
+                <div className="text-left">
+                  <div className="font-display text-lg font-semibold">Most Likely Route to the Final</div>
+                </div>
+                <div className="text-xs text-muted-foreground">Win % per stage</div>
+              </div>
+            </div>
+            <div className="px-5 pb-5">
+              <div className="overflow-x-auto overflow-y-hidden pb-1 scrollbar-x-thin">
+                <div className="flex items-stretch gap-2 min-w-max">
+                  <PathNode code={team.code} flag={team.flag} label={team.name} highlight />
+                  {PATH_TO_FINAL.map((p, i) => (
+                    <PathStep key={i} stage={p.stage} opp={p.opp} winPct={p.winPct} />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
-    </section>
+    </div>
   );
 }
 

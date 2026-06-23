@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useTeams } from "@/components/TeamsProvider";
+import { useSession } from "next-auth/react";
+import { UpgradeModal } from "@/components/site/UpgradeModal";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, Legend } from "recharts";
 import { SectionHeader } from "./ProbabilityExplorer";
 import { ArrowLeftRight } from "lucide-react";
@@ -11,6 +13,10 @@ import { CountryFlag } from "@/components/ui/CountryFlag";
 export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
   const teams = useTeams();
   const { theme } = useTheme();
+  const { data: session } = useSession();
+  const subTier = session?.user?.subscriptionTier || "free";
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+
   const [a, setA] = useState("ARG");
   const [b, setB] = useState("BRA");
   const tA = teams.find(t => t.code === a) || teams[0];
@@ -31,7 +37,7 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
   const radarLegendColor = activeTheme === "light" ? "rgba(51,65,85,0.9)" : "rgba(226,232,240,0.9)";
   const comparisonDivider = activeTheme === "light" ? "border-slate-200" : "border-white/5";
 
-  const data = [
+  const rawData = [
     { axis: "Attack", a: tA.attack, b: tB.attack },
     { axis: "Defense", a: tA.defense, b: tB.defense },
     { axis: "Power", a: tA.power, b: tB.power },
@@ -39,6 +45,10 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
     { axis: "Squad", a: Math.min(99, tA.squadValueM / 15), b: Math.min(99, tB.squadValueM / 15) },
     { axis: "Elo", a: (tA.elo - 1500) / 7, b: (tB.elo - 1500) / 7 },
   ];
+
+  const data = subTier === "free"
+    ? rawData.filter(d => d.axis === "Attack" || d.axis === "Defense" || d.axis === "Elo")
+    : rawData;
 
   const rows: [string, string | number, string | number, "higher" | "lower"][] = [
     ["Win Probability", `${tA.prob.champion.toFixed(1)}%`, `${tB.prob.champion.toFixed(1)}%`, "higher"],
@@ -62,8 +72,9 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
   };
 
   return (
-    <section className={standalone ? "mx-auto max-w-7xl px-4 py-10 md:px-6" : "mx-auto max-w-7xl px-4 py-16 md:px-6"}>
-      {!standalone && (
+    <>
+      <section className={standalone ? "mx-auto max-w-7xl px-4 py-10 md:px-6" : "mx-auto max-w-7xl px-4 py-16 md:px-6"}>
+        {!standalone && (
         <SectionHeader eyebrow="Compare Teams" title="Head-to-head, every metric." sub="Stack two nations side by side across the metrics that actually predict tournaments." />
       )}
       <div className="mt-8 grid gap-5 lg:grid-cols-2 min-w-0">
@@ -104,17 +115,31 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
             const na = parseFloat(String(va).replace(/[^\d.-]/g, ""));
             const nb = parseFloat(String(vb).replace(/[^\d.-]/g, ""));
             const aBetter = dir === "higher" ? na > nb : na < nb;
+            const isRestricted = (
+              label === "Win Probability" ||
+              label === "FIFA Ranking" ||
+              label === "Squad Value" ||
+              label === "Average Age" ||
+              label === "Goals / Match"
+            ) && subTier === "free";
+
             return (
-              <div key={label} className={`grid grid-cols-[1fr_90px_90px] items-center gap-2 border-b py-2 text-sm ${comparisonDivider}`}>
-                <div className="text-muted-foreground">{label}</div>
-                <div className={`text-right font-semibold ${aBetter ? "text-neon" : ""}`}>{va}</div>
-                <div className={`text-right font-semibold ${!aBetter ? "text-[var(--color-neon-2)]" : ""}`}>{vb}</div>
+              <div 
+                key={label} 
+                onClick={isRestricted ? () => setUpgradeOpen(true) : undefined}
+                className={`grid grid-cols-[1fr_90px_90px] items-center gap-2 border-b py-2 text-sm ${comparisonDivider} ${isRestricted ? "cursor-pointer hover:bg-slate-100/50 dark:hover:bg-white/5" : ""}`}
+              >
+                <div className={`text-muted-foreground ${isRestricted ? "blur-[5px] select-none pointer-events-none" : ""}`}>{label}</div>
+                <div className={`text-right font-semibold ${aBetter ? "text-neon" : ""} ${isRestricted ? "blur-[5px] select-none pointer-events-none" : ""}`}>{va}</div>
+                <div className={`text-right font-semibold ${!aBetter ? "text-[var(--color-neon-2)]" : ""} ${isRestricted ? "blur-[5px] select-none pointer-events-none" : ""}`}>{vb}</div>
               </div>
             );
           })}
         </div>
       </div>
-    </section>
+      </section>
+      <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} reason="plus" />
+    </>
   );
 }
 

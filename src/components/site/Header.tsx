@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { Trophy, Menu, LogOut, Sun, Moon, ChevronDown, Check, Sparkles, Brain, Cpu, LayoutGrid, FolderKanban, UserCircle2 } from "lucide-react";
+import { Menu, LogOut, Sun, Moon, ChevronDown, Check, Sparkles, Brain, Cpu, LayoutGrid, FolderKanban, UserCircle2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "@/components/ThemeProvider";
@@ -21,6 +22,12 @@ const SIMULATOR_NAV = [
   { to: "/simulator", label: "Simulator", icon: Cpu },
   { to: "/bracket", label: "Bracket", icon: LayoutGrid },
 ];
+
+const TIER_LABELS: Record<string, string> = {
+  free: "Free Predictor",
+  plus: "Advanced Predictor",
+  pro: "Expert Predictor",
+};
 
 export function Header() {
   const [open, setOpen] = useState(false);
@@ -121,29 +128,35 @@ export function Header() {
     <header className="sticky top-0 z-40 glass">
       <div className="container mx-auto flex px-4 items-center justify-between py-3">
         <Link href="/" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-neon to-neon-2 text-background">
-            <Trophy className="h-5 w-5" strokeWidth={2.4} />
+          <span className="flex h-9 items-center">
+            <Image
+              src="/wc26-logo.png"
+              alt="WC26 Predict"
+              width={66}
+              height={36}
+              className="h-9 w-auto"
+              priority
+            />
           </span>
           <div className="leading-tight">
             <div className="text-sm font-semibold tracking-wide">WC26 <span className="text-gradient">PREDICT</span></div>
-            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Probability · Picks · Glory</div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Predict like a Expert</div>
           </div>
         </Link>
-        
+
         <nav className="hidden items-center gap-1.5 xl:flex shrink-0 whitespace-nowrap">
           <div
-            className="relative pt-2"
+            className="relative"
             ref={simulatorMenuRef}
             onMouseEnter={() => setSimulatorMenuOpen(true)}
             onMouseLeave={() => setSimulatorMenuOpen(false)}
           >
             <button
               onClick={() => setSimulatorMenuOpen((open) => !open)}
-              className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm transition ${
-                isPredictionSectionActive
-                  ? "bg-black/6 dark:bg-white/6 text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm transition ${isPredictionSectionActive
+                ? "bg-black/6 dark:bg-white/6 text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               <span>Prediction</span>
               <ChevronDown className="h-3.5 w-3.5 opacity-60" />
@@ -157,11 +170,10 @@ export function Header() {
                       key={item.to}
                       href={item.to}
                       onClick={() => setSimulatorMenuOpen(false)}
-                      className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition ${
-                        isActiveRoute(item.to)
-                          ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
-                          : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
-                      }`}
+                      className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition ${isActiveRoute(item.to)
+                        ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
+                        : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
+                        }`}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
                       <span>{item.label}</span>
@@ -176,19 +188,18 @@ export function Header() {
             <Link
               key={n.to}
               href={n.to}
-              className={`rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm transition whitespace-nowrap ${
-                isActiveRoute(n.to)
-                  ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm transition whitespace-nowrap ${isActiveRoute(n.to)
+                ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
+                : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               {n.label}
             </Link>
           ))}
-          
+
           {/* Custom Redesigned Model Selector */}
           <div
-            className="relative ml-2 mr-1 pt-2"
+            className="relative ml-2 mr-1"
             ref={dropdownRef}
             onMouseEnter={() => setDropdownOpen(true)}
             onMouseLeave={() => setDropdownOpen(false)}
@@ -215,9 +226,8 @@ export function Header() {
                     handleModelChange("base");
                     setDropdownOpen(false);
                   }}
-                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${
-                    selectedModel === "base" ? "text-emerald-600 dark:text-neon font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"
-                  }`}
+                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${selectedModel === "base" ? "text-emerald-600 dark:text-neon font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"
+                    }`}
                 >
                   <div className="flex items-center gap-2">
                     <Cpu className="h-3.5 w-3.5 text-emerald-600 dark:text-neon shrink-0" />
@@ -228,15 +238,14 @@ export function Header() {
                   </div>
                   {selectedModel === "base" && <Check className="h-3.5 w-3.5" />}
                 </button>
-                
+
                 <button
                   onClick={() => {
                     handleModelChange("advanced");
                     setDropdownOpen(false);
                   }}
-                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${
-                    selectedModel === "advanced" ? "text-blue-600 dark:text-blue-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"
-                  }`}
+                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${selectedModel === "advanced" ? "text-blue-600 dark:text-blue-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"
+                    }`}
                 >
                   <div className="flex items-center gap-2">
                     <Brain className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
@@ -253,9 +262,8 @@ export function Header() {
                     handleModelChange("pro");
                     setDropdownOpen(false);
                   }}
-                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${
-                    selectedModel === "pro" ? "text-purple-600 dark:text-purple-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"
-                  }`}
+                  className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${selectedModel === "pro" ? "text-purple-600 dark:text-purple-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"
+                    }`}
                 >
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
@@ -269,7 +277,7 @@ export function Header() {
               </div>
             )}
           </div>
-          
+
           <button
             onClick={toggleTheme}
             className="ml-1 rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition duration-200"
@@ -303,12 +311,11 @@ export function Header() {
                       {session.user?.name}
                     </span>
                     {session.user.subscriptionTier && session.user.subscriptionTier !== "free" && (
-                      <span className={`text-[8px] font-extrabold uppercase tracking-wider mt-0.5 px-1 py-0.2 rounded ${
-                        session.user.subscriptionTier === "pro"
-                          ? "bg-purple-500/10 border border-purple-500/20 text-purple-400"
-                          : "bg-blue-500/10 border border-blue-500/20 text-blue-400"
-                      }`}>
-                        {session.user.subscriptionTier}
+                      <span className={`text-[8px] font-extrabold uppercase tracking-wider mt-0.5 px-1 py-0.2 rounded ${session.user.subscriptionTier === "pro"
+                        ? "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+                        : "bg-blue-500/10 border border-blue-500/20 text-blue-400"
+                        }`}>
+                        {TIER_LABELS[session.user.subscriptionTier] || session.user.subscriptionTier}
                       </span>
                     )}
                   </div>
@@ -356,12 +363,12 @@ export function Header() {
             </button>
           )}
         </nav>
-        
+
         <button onClick={() => setOpen((o) => !o)} className="xl:hidden rounded-md p-2 text-muted-foreground hover:text-foreground" aria-label="menu">
           <Menu className="h-5 w-5" />
         </button>
       </div>
-      
+
       {open && (
         <div className="xl:hidden border-t border-slate-200 dark:border-white/5 px-4 py-3 flex flex-col gap-2">
           <div className="rounded-md px-3 py-2 text-sm text-muted-foreground">
@@ -372,11 +379,10 @@ export function Header() {
                   key={n.to}
                   href={n.to}
                   onClick={() => setOpen(false)}
-                  className={`rounded-md px-3 py-2 text-sm transition ${
-                    isActiveRoute(n.to)
-                      ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
-                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                  }`}
+                  className={`rounded-md px-3 py-2 text-sm transition ${isActiveRoute(n.to)
+                    ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
+                    : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                    }`}
                 >
                   {n.label}
                 </Link>
@@ -388,16 +394,15 @@ export function Header() {
               key={n.to}
               href={n.to}
               onClick={() => setOpen(false)}
-              className={`rounded-md px-3 py-2 text-sm transition ${
-                isActiveRoute(n.to)
-                  ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
-                  : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-              }`}
+              className={`rounded-md px-3 py-2 text-sm transition ${isActiveRoute(n.to)
+                ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
+                : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                }`}
             >
               {n.label}
             </Link>
           ))}
-          
+
           <button
             onClick={() => {
               toggleTheme();
@@ -427,15 +432,14 @@ export function Header() {
                 <button
                   key={m}
                   onClick={() => handleModelChange(m)}
-                  className={`py-1 text-[10px] font-bold uppercase rounded-md transition ${
-                    selectedModel === m
-                      ? m === "pro"
-                        ? "bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30"
-                        : m === "advanced"
-                          ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30"
-                          : "bg-emerald-100 dark:bg-neon/20 text-emerald-600 dark:text-neon border border-emerald-200 dark:border-neon/30"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`py-1 text-[10px] font-bold uppercase rounded-md transition ${selectedModel === m
+                    ? m === "pro"
+                      ? "bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/30"
+                      : m === "advanced"
+                        ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30"
+                        : "bg-emerald-100 dark:bg-neon/20 text-emerald-600 dark:text-neon border border-emerald-200 dark:border-neon/30"
+                    : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   {m === "base" && "Base"}
                   {m === "advanced" && "Adv"}
@@ -451,12 +455,11 @@ export function Header() {
                 <div className="flex flex-col">
                   <span className="text-xs font-semibold text-muted-foreground truncate">{session.user?.name}</span>
                   {session.user.subscriptionTier && session.user.subscriptionTier !== "free" && (
-                    <span className={`text-[8px] font-extrabold uppercase tracking-wider self-start mt-0.5 px-1 py-0.2 rounded ${
-                      session.user.subscriptionTier === "pro"
-                        ? "bg-purple-500/10 border border-purple-500/20 text-purple-400"
-                        : "bg-blue-500/10 border border-blue-500/20 text-blue-400"
-                    }`}>
-                      {session.user.subscriptionTier}
+                    <span className={`text-[8px] font-extrabold uppercase tracking-wider self-start mt-0.5 px-1 py-0.2 rounded ${session.user.subscriptionTier === "pro"
+                      ? "bg-purple-500/10 border border-purple-500/20 text-purple-400"
+                      : "bg-blue-500/10 border border-blue-500/20 text-blue-400"
+                      }`}>
+                      {TIER_LABELS[session.user.subscriptionTier] || session.user.subscriptionTier}
                     </span>
                   )}
                 </div>

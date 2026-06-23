@@ -1,10 +1,14 @@
+import fs from "fs";
+import path from "path";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { redirect } from "next/navigation";
-import { Trophy, Sparkles } from "lucide-react";
-import { getTeams } from "@/lib/data";
+import { Trophy, Sparkles, User, SlidersHorizontal } from "lucide-react";
+import { getStaticTeamsFromCup, getTeams } from "@/lib/data";
+import SavedPredictionsClient from "./SavedPredictionsClient";
+import CustomizationsClient from "./CustomizationsClient";
 import {
   Accordion,
   AccordionContent,
@@ -30,6 +34,28 @@ function intToTeamCode(val: number): string {
   return String.fromCharCode(c1) + String.fromCharCode(c2) + String.fromCharCode(c3);
 }
 
+function loadRawPlayers() {
+  try {
+    const playersPath = path.join(process.cwd(), "public", "players.json");
+    return JSON.parse(fs.readFileSync(playersPath, "utf8")) as Array<Record<string, string>>;
+  } catch {
+    return [] as Array<Record<string, string>>;
+  }
+}
+
+function formatTeamRating(val: number | undefined | null) {
+  if (val === undefined || val === null) return "-";
+  if (val < 10) {
+    const minM = 0.75;
+    const maxM = 1.10;
+    const minR = 50;
+    const maxR = 95;
+    const rating = ((val - minM) / (maxM - minM)) * (maxR - minR) + minR;
+    return Math.max(15, Math.min(99, Math.round(rating)));
+  }
+  return Math.round(val);
+}
+
 export const metadata = {
   title: "My Predictions — WC26 Predict",
   description: "Track your World Cup 2026 predictions and leaderboard status.",
@@ -48,19 +74,35 @@ export default async function PredictionsPage(props: {
   const currentSlotId = slot ? parseInt(slot) : 0;
 
   let predictions: any[] = [];
+  let teamOverrides: any[] = [];
+  let playerOverrides: any[] = [];
   try {
-    predictions = await prisma.prediction.findMany({
-      where: { userId: session.user.id },
-      include: {
-        match: {
-          include: {
-            homeTeam: true,
-            awayTeam: true,
+    const [predictionRows, teamOverrideRows, playerOverrideRows] = await Promise.all([
+      prisma.prediction.findMany({
+        where: { userId: session.user.id },
+        include: {
+          match: {
+            include: {
+              homeTeam: true,
+              awayTeam: true,
+            }
           }
-        }
-      },
-      orderBy: { createdAt: "desc" }
-    });
+        },
+        orderBy: { createdAt: "desc" }
+      }),
+      prisma.userTeamOverride.findMany({
+        where: { userId: session.user.id },
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.userPlayerOverride.findMany({
+        where: { userId: session.user.id },
+        orderBy: { updatedAt: "desc" },
+      }),
+    ]);
+
+    predictions = predictionRows;
+    teamOverrides = teamOverrideRows;
+    playerOverrides = playerOverrideRows;
   } catch (error) {
     console.warn("Failed to fetch user predictions, falling back to empty list. Database might not be running.");
   }
@@ -72,6 +114,10 @@ export default async function PredictionsPage(props: {
     console.warn("Failed to fetch teams info");
   }
   const teamsMap = new Map(teams.map(t => [t.code, t]));
+  const staticTeams = getStaticTeamsFromCup();
+  const staticTeamsMap = new Map(staticTeams.map((t) => [t.code, t]));
+  const rawPlayers = loadRawPlayers();
+  const rawPlayersMap = new Map(rawPlayers.map((p: any) => [`${p["Team Code"]}-${p["Player Name"]}`, p]));
 
   // Load metadata to get slot names
   const metadataRows = predictions.filter(p => p.type === "SLOT_METADATA");
@@ -129,11 +175,12 @@ export default async function PredictionsPage(props: {
     return null;
   })();
   const standingsSummary = activeSummary?.standingsSummary || null;
+  const hasSavedCustomizations = teamOverrides.length > 0 || playerOverrides.length > 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
-      <main className="mx-auto max-w-5xl px-4 py-24 md:px-6">
+      <main className="container mx-auto px-4 py-24 md:px-6">
         <div className="mb-12">
           <h1 className="font-display text-4xl font-bold tracking-tight text-gradient sm:text-5xl">
             My Predictions
@@ -296,77 +343,46 @@ export default async function PredictionsPage(props: {
           )}
         </div>
 
-        <Accordion type="single" collapsible className="w-full space-y-6">
-          {/* Country Projections */}
-          <AccordionItem value="country-projections" className="glass-strong rounded-2xl border-none px-6 py-2">
-            <AccordionTrigger className="hover:no-underline [&[data-state=open]>svg]:rotate-180 text-left">
-              <div className="flex items-center gap-2 font-display text-2xl font-bold">
-                <Sparkles className="text-neon" /> Country Predictions
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="mt-4 overflow-x-auto">
-                {countryPreds.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No country projections saved yet.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-slate-200 dark:border-white/10 hover:bg-transparent">
-                        <TableHead className="w-[200px] text-muted-foreground">Country</TableHead>
-                        <TableHead className="text-muted-foreground">Elo</TableHead>
-                        <TableHead className="text-muted-foreground whitespace-nowrap">Champ Prob.</TableHead>
-                        <TableHead className="min-w-[300px] text-muted-foreground">Simulated Path Summary</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {countryPreds.map((p) => {
-                        let data: any = null;
-                        try {
-                          data = readPredictionPayload(p.predictedPayload, p.predictedWinner);
-                        } catch (e) {
-                          console.error("Failed to parse country projection details", e);
-                        }
+        <div className="mb-8 bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-6 rounded-[2rem] shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 border-b border-slate-150 dark:border-white/5 pb-4">
+            <div>
+              <h2 className="text-xl font-bold font-display text-slate-900 dark:text-white flex items-center gap-2">
+                <SlidersHorizontal className="h-5 w-5 text-neon" />
+                <span>Saved Team & Player Customizations</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Your saved team rating overrides and player edits from the teams section.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+              <span className="rounded-full bg-cyan-50 px-3 py-1 text-cyan-700 border border-cyan-200 dark:bg-cyan-500/10 dark:border-cyan-500/20 dark:text-cyan-300">
+                {teamOverrides.length} team edits
+              </span>
+              <span className="rounded-full bg-fuchsia-50 px-3 py-1 text-fuchsia-700 border border-fuchsia-200 dark:bg-fuchsia-500/10 dark:border-fuchsia-500/20 dark:text-fuchsia-300">
+                {playerOverrides.length} player edits
+              </span>
+            </div>
+          </div>          {!hasSavedCustomizations ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-white/[0.01] p-5 text-center">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                No saved customizations yet.
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Save team ratings or player edits from the teams page and they&apos;ll appear here.
+              </p>
+            </div>
+          ) : (
+            <CustomizationsClient
+              teamOverrides={teamOverrides}
+              playerOverrides={playerOverrides}
+              teams={teams}
+              staticTeams={staticTeams}
+              rawPlayers={rawPlayers}
+            />
+          )}
+        </div>
 
-                        if (!data) return null;
-
-                        const pathSummary = data.path
-                          ?.filter((s: any) => s.winPct !== undefined)
-                          .map((s: any) => `${s.stage} (${s.winPct}%)`)
-                          .join(" ➔ ");
-
-                        return (
-                          <TableRow key={p.id} className="border-slate-100 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <CountryFlag
-                                  code={data.code}
-                                  flag={data.flag}
-                                  name={data.name}
-                                  className="h-6 w-8 shrink-0 rounded object-cover"
-                                  emojiClassName="text-2xl leading-none"
-                                />
-                                <span className="font-display font-bold text-gradient">{data.name}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">
-                              {data.elo}
-                            </TableCell>
-                            <TableCell className="font-display font-bold text-slate-900 dark:text-white">
-                              {data.championProb}%
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground leading-relaxed">
-                              {pathSummary || <span className="italic opacity-50">No path data</span>}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+        <SavedPredictionsClient />
       </main>
       <Footer />
     </div>

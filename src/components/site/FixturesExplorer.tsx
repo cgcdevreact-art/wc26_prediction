@@ -163,10 +163,17 @@ export function FixturesExplorer() {
     setSelectedLocation("");
   };
 
-  const formatCountdown = (kickoffAtIso?: string, status?: string) => {
+  const isTodayFixtureDate = (fixtureDate?: string) => {
+    if (!fixtureDate) return false;
+    const todayUtc = new Date(now).toISOString().slice(0, 10);
+    return fixtureDate === todayUtc;
+  };
+
+  const formatCountdown = (kickoffAtIso?: string, status?: string, fixtureDate?: string) => {
     if (status === "COMPLETED") return "FT";
     if (status === "LIVE") return "Live now";
     if (!kickoffAtIso) return "TBD";
+    if (status === "UPCOMING" && isTodayFixtureDate(fixtureDate)) return null;
 
     const diffMs = new Date(kickoffAtIso).getTime() - now;
     if (diffMs <= 0) return "Starting now";
@@ -183,8 +190,9 @@ export function FixturesExplorer() {
     return `In ${seconds}s`;
   };
 
-  const formatMatchupCountdown = (kickoffAtIso?: string, status?: string) => {
+  const formatMatchupCountdown = (kickoffAtIso?: string, status?: string, fixtureDate?: string) => {
     if (status !== "UPCOMING" || !kickoffAtIso) return null;
+    if (!isTodayFixtureDate(fixtureDate)) return null;
 
     const diffMs = new Date(kickoffAtIso).getTime() - now;
     if (diffMs <= 0) return "00s";
@@ -202,16 +210,8 @@ export function FixturesExplorer() {
   };
 
   return (
-    <section className="container mx-auto px-4 py-16  ">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
-        <div>
-          <div className="text-xs uppercase tracking-[0.25em] text-neon">Tournament Schedule</div>
-          <h2 className="mt-2 font-display text-3xl font-bold sm:text-4xl text-foreground dark:text-white">Matches & Fixtures</h2>
-          <p className="mt-2 text-muted-foreground text-sm max-w-xl">
-            Browse full schedules for all 104 matches of the FIFA World Cup 2026™. Filter by stage, date, or search by venue.
-          </p>
-        </div>
-
+    <div className="py-2">
+      <div className="flex justify-between items-center mb-6">
         {/* Stage Selector tabs */}
         <div className="flex bg-muted dark:bg-white/5 border border-border dark:border-white/10 p-1 rounded-xl shrink-0">
           <button
@@ -363,6 +363,8 @@ export function FixturesExplorer() {
                   const teamMatchup = [f.homeTeamObj, f.awayTeamObj];
                   const isLive = f.status === "LIVE";
                   const score = { homeGoals: f.homeScore, awayGoals: f.awayScore };
+                  const dateCountdown = formatCountdown(f.kickoffAtIso, f.status, f.date);
+                  const matchupCountdown = formatMatchupCountdown(f.kickoffAtIso, f.status, f.date);
 
                   return (
                     <tr
@@ -390,17 +392,11 @@ export function FixturesExplorer() {
                               </span>
                             ) : null}
                           </div>
-                          <span
-                            className={`text-[10px] font-bold mt-1 ${
-                              f.status === "LIVE"
-                                ? "text-red-500"
-                                : f.status === "COMPLETED"
-                                  ? "text-muted-foreground"
-                                  : "text-cyan-700 dark:text-neon"
-                            }`}
-                          >
-                            {formatCountdown(f.kickoffAtIso, f.status)}
-                          </span>
+                          {dateCountdown ? (
+                            <span className="mt-1 text-[10px] font-bold text-cyan-700 dark:text-neon">
+                              {dateCountdown}
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                       {activeStage === "group" && (
@@ -447,9 +443,11 @@ export function FixturesExplorer() {
                                 VS
                               </span>
                               <span className="text-[8px] uppercase font-bold text-muted-foreground/40 mt-1">Upcoming</span>
-                              <span className="mt-1 text-[10px] font-mono font-bold text-cyan-700 dark:text-neon whitespace-nowrap tabular-nums">
-                                {formatMatchupCountdown(f.kickoffAtIso, f.status)}
-                              </span>
+                              {matchupCountdown ? (
+                                <span className="mt-1 whitespace-nowrap text-[10px] font-mono font-bold tabular-nums text-red-500">
+                                  {matchupCountdown}
+                                </span>
+                              ) : null}
                             </div>
                           )}
 
@@ -490,6 +488,6 @@ export function FixturesExplorer() {
         )}
         </div>
       </div>
-    </section>
+    </div>
   );
 }
