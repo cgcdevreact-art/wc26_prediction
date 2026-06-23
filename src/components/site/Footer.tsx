@@ -1,6 +1,7 @@
 "use client";
 
 import { Trophy } from "lucide-react";
+import Link from "next/link";
 
 export function Footer() {
   return (
@@ -53,9 +54,9 @@ function FooterCol({ title, items }: { title: string; items: { label: string; hr
       <ul className="mt-3 space-y-1.5 text-sm">
         {items.map((i) => (
           <li key={i.label}>
-            <a className="text-muted-foreground hover:text-foreground transition-colors" href={i.href}>
+            <Link className="text-muted-foreground hover:text-foreground transition-colors" href={i.href}>
               {i.label}
-            </a>
+            </Link>
           </li>
         ))}
       </ul>

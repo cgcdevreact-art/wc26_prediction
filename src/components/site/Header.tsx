@@ -132,7 +132,7 @@ export function Header() {
         
         <nav className="hidden items-center gap-1.5 xl:flex shrink-0 whitespace-nowrap">
           <div
-            className="relative pt-2"
+            className="relative"
             ref={simulatorMenuRef}
             onMouseEnter={() => setSimulatorMenuOpen(true)}
             onMouseLeave={() => setSimulatorMenuOpen(false)}
@@ -188,7 +188,7 @@ export function Header() {
           
           {/* Custom Redesigned Model Selector */}
           <div
-            className="relative ml-2 mr-1 pt-2"
+            className="relative ml-2 mr-1"
             ref={dropdownRef}
             onMouseEnter={() => setDropdownOpen(true)}
             onMouseLeave={() => setDropdownOpen(false)}

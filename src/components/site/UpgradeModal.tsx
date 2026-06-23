@@ -113,13 +113,13 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
               <div className="text-[10px] text-neon/80 font-bold mt-1.5">5 Simulations</div>
             </div>
             <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 relative overflow-hidden">
-              <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+              {/* <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-blue-400 animate-pulse" /> */}
               <div className="font-semibold text-blue-600 dark:text-blue-400 mb-1">Plus</div>
               <div className="text-muted-foreground">Advanced Model</div>
               <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mt-1.5">Unlimited</div>
             </div>
             <div className="rounded-xl bg-purple-500/10 border border-purple-500/20 p-3 relative overflow-hidden">
-              <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+              {/* <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-purple-400 animate-pulse" /> */}
               <div className="font-semibold text-purple-600 dark:text-purple-400 mb-1">Pro</div>
               <div className="text-muted-foreground">All Models</div>
               <div className="text-[10px] text-purple-600 dark:text-purple-400 font-bold mt-1.5">Unlimited</div>

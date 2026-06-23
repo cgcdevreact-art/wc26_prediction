@@ -1575,7 +1575,7 @@ export default function CountryPredictionsClient({
               </AccordionTrigger>
               <AccordionContent className="px-6 pb-6">
                 <div className="relative">
-                  <div className="absolute -right-16 -top-16 w-56 h-56 bg-emerald-100/70 rounded-full filter blur-3xl pointer-events-none dark:bg-neon/10" />
+                  <div className="absolute -right-16 -top-16 w-56 h-56 rounded-full filter blur-3xl pointer-events-none dark:bg-neon/10" />
                   <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-fuchsia-100/70 rounded-full filter blur-3xl pointer-events-none dark:bg-neon-2/10" />
                   <div className="flex flex-col xl:flex-row justify-between items-stretch gap-6 border-b border-slate-200 pb-6 mb-6 dark:border-white/5">
                     {/* Team Profile Basic Details */}
@@ -1620,14 +1620,14 @@ export default function CountryPredictionsClient({
                               <button
                                 onClick={handleSavePrediction}
                                 disabled={isSaving || isSimulating}
-                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${saveSuccess
+                                className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all ${saveSuccess
                                   ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
-                                  : "bg-slate-100 border border-slate-200 hover:bg-slate-200 hover:border-slate-300 text-slate-900 active:scale-95 disabled:opacity-50 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 dark:hover:border-white/25 dark:text-white"
+                                  : "border border-transparent bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] text-white shadow-[0_10px_25px_rgba(44,124,135,0.2)] hover:opacity-95 active:scale-95 disabled:opacity-50"
                                   }`}
                               >
                                 {isSaving ? (
                                   <>
-                                    <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin dark:border-white/20 dark:border-t-white" />
+                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     <span>Saving...</span>
                                   </>
                                 ) : saveSuccess ? (
@@ -1637,7 +1637,7 @@ export default function CountryPredictionsClient({
                                   </>
                                 ) : (
                                   <>
-                                    <Sparkles className="w-3.5 h-3.5 text-neon" />
+                                    <Sparkles className="h-4 w-4 text-white" />
                                     <span>Save to Predictions</span>
                                   </>
                                 )}
@@ -1807,93 +1807,88 @@ export default function CountryPredictionsClient({
           {/* Dual Charts Row */}
           <div className="grid items-stretch gap-6 md:grid-cols-2">
             {/* Radar Attributes Card */}
-            <Accordion type="multiple" defaultValue={["performance-attributes"]} className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
-              <AccordionItem value="performance-attributes" className="flex h-full flex-col border-none">
-                <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
-                  <div>
-                    <div className="font-display font-bold text-lg text-foreground">Performance Attributes</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="flex-1 px-6 pb-6">
-                  <div className="flex justify-end mb-6">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30">
-                      Attributes
-                    </span>
-                  </div>
-                  <div className="flex h-64 min-h-[280px] items-center justify-center">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart data={radarData} outerRadius={85}>
-                        <PolarGrid stroke={activeTheme === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.14)"} />
-                        <PolarAngleAxis dataKey="axis" tick={{ fill: activeTheme === "light" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.6)", fontSize: 10, fontFamily: "var(--font-display)" }} />
-                        <Radar dataKey="v" stroke="var(--color-neon)" fill="var(--color-neon)" fillOpacity={activeTheme === "light" ? 0.35 : 0.2} />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+            <div className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <div className="px-6 pt-6 pb-3">
+                <div>
+                  <div className="font-display font-bold text-lg text-foreground">Performance Attributes</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</div>
+                </div>
+              </div>
+              <div className="flex-1 px-6 pb-6">
+                <div className="flex justify-end mb-6">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30">
+                    Attributes
+                  </span>
+                </div>
+                <div className="flex h-64 min-h-[280px] items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart data={radarData} outerRadius={85}>
+                      <PolarGrid stroke={activeTheme === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.14)"} />
+                      <PolarAngleAxis dataKey="axis" tick={{ fill: activeTheme === "light" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.6)", fontSize: 10, fontFamily: "var(--font-display)" }} />
+                      <Radar dataKey="v" stroke="var(--color-neon)" fill="var(--color-neon)" fillOpacity={activeTheme === "light" ? 0.35 : 0.2} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
 
             {/* Squad Quality Tiers Card */}
-            <Accordion type="multiple" defaultValue={["squad-quality"]} className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
-              <AccordionItem value="squad-quality" className="flex h-full flex-col border-none">
-                <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
-                  <div>
-                    <div className="font-display font-bold text-lg text-foreground">Squad Quality Tiers</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="flex-1 px-6 pb-6">
-                  <div className="flex justify-end mb-6">
-                    <span className="self-start rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-fuchsia-700 dark:border-neon-2/30 dark:bg-neon-2/10 dark:text-neon-2">
-                      Squad Profile
+            <div className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <div className="px-6 pt-6 pb-3">
+                <div>
+                  <div className="font-display font-bold text-lg text-foreground">Squad Quality Tiers</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</div>
+                </div>
+              </div>
+              <div className="flex-1 px-6 pb-6">
+                <div className="flex justify-end mb-6">
+                  <span className="self-start rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-fuchsia-700 dark:border-neon-2/30 dark:bg-neon-2/10 dark:text-neon-2">
+                    Squad Profile
+                  </span>
+                </div>
+
+                <div className="mt-6 flex flex-col gap-6">
+                  <div className="flex min-h-[140px] w-full flex-col justify-center items-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/5 dark:bg-white/[0.02]">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</span>
+                    <span className="mt-2 text-5xl font-black font-mono text-foreground">
+                      {squadStats.avgRating || "--"}
+                      {squadStats.avgRating ? <span className="text-2xl align-top">%</span> : null}
                     </span>
+                    <span className="mt-3 text-sm font-semibold text-emerald-700 dark:text-neon">{squadStats.total} Players</span>
                   </div>
 
-                  <div className="mt-6 flex flex-col gap-6">
-                    <div className="flex min-h-[140px] w-full flex-col justify-center items-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/5 dark:bg-white/[0.02]">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</span>
-                      <span className="mt-2 text-5xl font-black font-mono text-foreground">
-                        {squadStats.avgRating || "--"}
-                        {squadStats.avgRating ? <span className="text-2xl align-top">%</span> : null}
-                      </span>
-                      <span className="mt-3 text-sm font-semibold text-emerald-700 dark:text-neon">{squadStats.total} Players</span>
-                    </div>
-
-                    <div className="space-y-4 w-full">
-                      {squadTiers.map((tier) => (
-                        <div key={tier.label} className="flex items-center gap-3 w-full">
-                          <div className="text-xs font-semibold text-foreground w-28 shrink-0 truncate">
-                            {tier.label}
-                          </div>
-                          <div className="flex-1 h-3 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/8">
-                            <div
-                              className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
-                              style={{ width: `${Math.max(tier.pct, tier.count > 0 ? 4 : 0)}%` }}
-                            />
-                          </div>
-                          <div className="w-20 shrink-0 text-right font-mono text-xs font-bold tabular-nums text-foreground">
-                            {tier.count}
-                            <span className="ml-1.5 text-[10px] text-muted-foreground font-medium">({tier.pct}%)</span>
-                          </div>
+                  <div className="space-y-4 w-full">
+                    {squadTiers.map((tier) => (
+                      <div key={tier.label} className="flex items-center gap-3 w-full">
+                        <div className="text-xs font-semibold text-foreground w-28 shrink-0 truncate">
+                          {tier.label}
                         </div>
-                      ))}
-                    </div>
+                        <div className="flex-1 h-3 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/8">
+                          <div
+                            className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
+                            style={{ width: `${Math.max(tier.pct, tier.count > 0 ? 4 : 0)}%` }}
+                          />
+                        </div>
+                        <div className="w-20 shrink-0 text-right font-mono text-xs font-bold tabular-nums text-foreground">
+                          {tier.count}
+                          <span className="ml-1.5 text-[10px] text-muted-foreground font-medium">({tier.pct}%)</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <Accordion type="multiple" defaultValue={["expected-path"]} className="rounded-[2rem] bg-white border border-slate-200 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
-            <AccordionItem value="expected-path" className="border-none">
-              <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
-                <div>
-                  <div className="font-display font-bold text-xl text-foreground">Expected Path to Glory</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Calculated dynamically from the most common matchups and scores across all simulations.</div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pb-6">
+          <div className="rounded-[2rem] bg-white border border-slate-200 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
+            <div className="px-6 pt-6 pb-3">
+              <div>
+                <div className="font-display font-bold text-xl text-foreground">Expected Path to Glory</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Calculated dynamically from the most common matchups and scores across all simulations.</div>
+              </div>
+            </div>
+            <div className="px-6 pb-6">
                 <div className="flex justify-end border-b border-slate-200 pb-5 mb-6 dark:border-white/5">
                   <div className="text-[10px] uppercase bg-cyan-50 border border-cyan-200 text-cyan-700 px-3.5 py-1.5 rounded-full font-bold self-start sm:self-auto shadow-sm dark:bg-neon/10 dark:border-neon/30 dark:text-neon">
                     Model: {formattedModelName}
@@ -1979,9 +1974,8 @@ export default function CountryPredictionsClient({
                     </div>
                   </div>
                 )}
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2237,7 +2231,7 @@ export default function CountryPredictionsClient({
                     {/* Final Column */}
                     <div className="h-[2080px] w-56 relative shrink-0">
                       {/* High fidelity Champion Showcase */}
-                      <div className="absolute top-[780px] -translate-y-1/2 left-0 right-0 flex flex-col items-center p-8 bg-gradient-to-br from-[#1e1b4b]/20 dark:from-[#1e1b4b]/80 to-[#311042]/20 dark:to-[#311042]/80 rounded-3xl border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.1)] z-20 hover:border-yellow-500/50 transition-all duration-500 group">
+                      <div className="absolute top-[780px] -translate-y-1/2 left-0 right-0 flex flex-col items-center p-8 bg-gradient-to-br from-[#1e1b4b]/20 dark:from-[#1e1b4b]/80 to-[#311042]/20 dark:to-[#311042]/80 rounded-3xl border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.1)] z-20 hover:border-yellow-500/50 transition-all duration-500 group px-2">
                         <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl" />
                         <Trophy className="w-20 h-20 text-yellow-500 dark:text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.5)] mb-4 animate-float" />
                         <div className="text-[10px] font-bold text-yellow-600 dark:text-yellow-500 tracking-widest uppercase mb-2">World Cup Champion</div>
@@ -2308,8 +2302,8 @@ export default function CountryPredictionsClient({
         <AccordionItem value="saved-comparison" className="border-none">
           <AccordionTrigger className="px-6 md:px-8 pt-6 md:pt-8 pb-3 hover:no-underline">
             <div>
-              <div className="font-display font-extrabold text-2xl text-foreground dark:text-white tracking-tight">Saved Projections & Comparison</div>
-              <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">Load saved projections or select multiple to compare side-by-side</div>
+              <div className="font-display font-extrabold text-2xl text-foreground dark:text-white tracking-tight">Saved Predictions & Comparison</div>
+              <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">Load saved Prediction or select multiple to compare side-by-side</div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 md:px-8 pb-6 md:pb-8">

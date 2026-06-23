@@ -6,10 +6,11 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTeams } from "@/components/TeamsProvider";
+import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
 import { UpgradeModal } from "@/components/site/UpgradeModal";
 import { useSimulationStore, TeamStats, PlayerStats } from "@/lib/store/simulationStore";
 import { CountryFlag } from "@/components/ui/CountryFlag";
+import { PlayersRankingsTable } from "@/components/site/PlayersRankingsTable";
 
 type RankingTeam = {
   code: string;
@@ -28,6 +29,8 @@ type RankingTeam = {
   squadValueM: number;
   avgAge: number;
   goalsPerMatch: number;
+  confederation: string;
+  group: string;
 };
 
 type RankingSortKey =
@@ -54,6 +57,7 @@ export default function TeamsClient({
 }) {
   const { isInitialized, initializeData, teams, players } = useSimulationStore();
   const appTeams = useTeams();
+  const groupsConfig = useGroupsConfig();
   const router = useRouter();
   const { data: session } = useSession();
 
@@ -62,10 +66,19 @@ export default function TeamsClient({
   const [modalOpen, setModalOpen] = useState(false);
   const [modalReason, setModalReason] = useState<"plus" | "pro" | "credits" | "guest">("plus");
   const [rankingSearch, setRankingSearch] = useState("");
+  const [rankingTeamFilter, setRankingTeamFilter] = useState("ALL");
+  const [rankingGroupFilter, setRankingGroupFilter] = useState("ALL");
   const [rankingSort, setRankingSort] = useState<{ key: RankingSortKey; direction: "asc" | "desc" }>({
     key: "winProbability",
     direction: "desc",
   });
+
+  const getTeamGroup = (teamCode: string) => {
+    for (const [group, codes] of Object.entries(groupsConfig)) {
+      if (codes.includes(teamCode)) return group;
+    }
+    return "";
+  };
 
   const subTier = session?.user?.subscriptionTier || "free";
 
@@ -141,19 +154,54 @@ export default function TeamsClient({
         squadValueM: team.squadValueM,
         avgAge: team.avgAge,
         goalsPerMatch: team.goalsPerMatch,
+        confederation: team.confederation,
+        group: getTeamGroup(team.code),
       };
     });
-  }, [appTeams, flagMap, teams, players]);
+  }, [appTeams, flagMap, teams, players, groupsConfig]);
+
+  const rankingTeamOptions = useMemo(
+    () => [
+      { code: "ALL", name: "All Teams" },
+      ...rankingTeams
+        .map((team) => ({ code: team.code, name: team.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    ],
+    [rankingTeams],
+  );
+
+  const rankingGroupOptions = useMemo(
+    () => [
+      "ALL",
+      ...Array.from(new Set(rankingTeams.map((team) => team.group).filter(Boolean))).sort(),
+    ],
+    [rankingTeams],
+  );
+
+  const formatGroupLabel = (group: string) => {
+    if (group === "ALL") return "All Groups";
+    return `Group ${group}`;
+  };
 
   const filteredRankingTeams = useMemo(() => {
-    if (!rankingSearch) return rankingTeams;
     const lowerSearch = rankingSearch.toLowerCase();
-    return rankingTeams.filter(
-      (team) =>
-        team.name.toLowerCase().includes(lowerSearch) ||
-        team.code.toLowerCase().includes(lowerSearch),
-    );
-  }, [rankingSearch, rankingTeams]);
+    return rankingTeams.filter((team) => {
+      if (
+        lowerSearch &&
+        !team.name.toLowerCase().includes(lowerSearch) &&
+        !team.code.toLowerCase().includes(lowerSearch)
+      ) {
+        return false;
+      }
+      if (rankingTeamFilter !== "ALL" && team.code !== rankingTeamFilter) {
+        return false;
+      }
+      if (rankingGroupFilter !== "ALL" && team.group !== rankingGroupFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [rankingSearch, rankingTeamFilter, rankingGroupFilter, rankingTeams]);
 
   const sortedRankingTeams = useMemo(() => {
     return [...filteredRankingTeams].sort((a, b) => {
@@ -234,6 +282,12 @@ export default function TeamsClient({
             className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
           >
             Team Rankings
+          </TabsTrigger>
+          <TabsTrigger
+            value="players"
+            className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+          >
+            Player Rankings
           </TabsTrigger>
         </TabsList>
 
@@ -367,17 +421,41 @@ export default function TeamsClient({
 
         <TabsContent value="rankings" className="space-y-6">
           <div className="space-y-5">
-            <div className="relative max-w-md">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <Search className="h-5 w-5 text-muted-foreground" />
+            <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] md:grid-cols-2 xl:grid-cols-5 dark:border-white/10 dark:bg-slate-950">
+              <div className="relative xl:col-span-3">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <Search className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Search rankings, teams..."
+                  value={rankingSearch}
+                  onChange={(e) => setRankingSearch(e.target.value)}
+                  className="h-12 rounded-xl border-slate-200 bg-white pl-10 text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-cyan-500 dark:border-white/10 dark:bg-white/[0.04] dark:focus-visible:ring-neon"
+                />
               </div>
-              <Input
-                type="text"
-                placeholder="Search rankings..."
-                value={rankingSearch}
-                onChange={(e) => setRankingSearch(e.target.value)}
-                className="h-12 rounded-xl border-slate-200 bg-white pl-10 text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:ring-cyan-500 dark:border-white/10 dark:bg-white/[0.04] dark:focus-visible:ring-neon"
-              />
+              <select
+                value={rankingTeamFilter}
+                onChange={(e) => setRankingTeamFilter(e.target.value)}
+                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm text-foreground shadow-sm outline-none focus:border-cyan-500 dark:border-white/10 dark:bg-white/[0.04]"
+              >
+                {rankingTeamOptions.map((team) => (
+                  <option key={team.code} value={team.code}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={rankingGroupFilter}
+                onChange={(e) => setRankingGroupFilter(e.target.value)}
+                className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm text-foreground shadow-sm outline-none focus:border-cyan-500 dark:border-white/10 dark:bg-white/[0.04]"
+              >
+                {rankingGroupOptions.map((group) => (
+                  <option key={group} value={group}>
+                    {formatGroupLabel(group)}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
@@ -478,6 +556,10 @@ export default function TeamsClient({
               )}
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="players" className="space-y-6">
+          <PlayersRankingsTable initialPlayers={initialPlayers} flagMap={flagMap} />
         </TabsContent>
       </Tabs>
 
