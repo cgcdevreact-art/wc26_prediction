@@ -7,7 +7,7 @@ import { WildcardCountrySection } from "@/components/site/WildcardCountrySection
 import { FixturesExplorer } from "@/components/site/FixturesExplorer";
 import { ChevronDown } from "lucide-react";
 
-const DEFAULT_OPEN_SECTIONS = ["probability", "fixtures"];
+const DEFAULT_OPEN_SECTIONS = [ "fixtures"];
 
 const SECTIONS = [
   {

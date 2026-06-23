@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, Eye, Save } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, Eye, Save, Brain, Cpu, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -76,7 +76,7 @@ export default function TeamsClient({
   initialPlayers: PlayerStats[];
   flagMap: Record<string, string>;
 }) {
-  const { isInitialized, initializeData, teams, players } = useSimulationStore();
+  const { isInitialized, initializeData, teams, players, selectedModel } = useSimulationStore();
   const appTeams = useTeams();
   const groupsConfig = useGroupsConfig();
   const router = useRouter();
@@ -114,6 +114,10 @@ export default function TeamsClient({
   };
 
   const subTier = session?.user?.subscriptionTier || "free";
+  const currentModelLabel =
+    selectedModel === "advanced" ? "Advanced Model" : selectedModel === "pro" ? "Pro Model" : "Base Model";
+  const CurrentModelIcon =
+    selectedModel === "advanced" ? Brain : selectedModel === "pro" ? Sparkles : Cpu;
 
   useEffect(() => {
     setMounted(true);
@@ -337,26 +341,44 @@ export default function TeamsClient({
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <Tabs defaultValue="list" className="space-y-6">
-        <TabsList className="h-auto rounded-full border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
-          <TabsTrigger
-            value="list"
-            className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
-          >
-            Teams List
-          </TabsTrigger>
-          <TabsTrigger
-            value="rankings"
-            className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
-          >
-            Team Rankings
-          </TabsTrigger>
-          <TabsTrigger
-            value="players"
-            className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
-          >
-            Player Rankings
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <TabsList className="h-auto rounded-full border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
+            <TabsTrigger
+              value="list"
+              className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+            >
+              Teams List
+            </TabsTrigger>
+            <TabsTrigger
+              value="rankings"
+              className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+            >
+              Team Rankings
+            </TabsTrigger>
+            <TabsTrigger
+              value="players"
+              className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+            >
+              Player Rankings
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="xl:ml-auto">
+            <div className="flex items-center gap-3 rounded-[1.6rem] border border-slate-200 bg-white px-4 py-3 shadow-[0_14px_36px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+                <CurrentModelIcon className="h-5.5 w-5.5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 dark:text-white">
+                  Simulation Engine
+                </div>
+                <div className="mt-0.5 text-xl font-display font-bold text-slate-900 dark:text-white">
+                  {currentModelLabel}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <TabsContent value="list" className="space-y-8">
           <div className="relative max-w-md">
