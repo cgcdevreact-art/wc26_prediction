@@ -274,9 +274,9 @@ const KO_DETAILS: Record<string, { venue: string; date: string }[]> = {
 const MODEL_META = {
   base: {
     label: "Base",
-    title: "Simulation Engine",
-    description: "Elo, attack, and defense drive the current match prediction logic.",
-    summary: "Elo / Att / Def",
+    title: "Base Model",
+    description: "",
+    summary: "",
     accent: "text-emerald-600 dark:text-neon",
     border: "border-emerald-200/80 dark:border-emerald-400/20",
     glow: "from-emerald-500/12 via-transparent to-transparent dark:from-emerald-400/10",
@@ -285,9 +285,9 @@ const MODEL_META = {
   },
   advanced: {
     label: "Advanced",
-    title: "Simulation Engine",
-    description: "Adds squad quality and player rating balance on top of the base engine.",
-    summary: "Base + Squad",
+    title: "Advanced Model",
+    description: "",
+    summary: "",
     accent: "text-sky-700 dark:text-sky-300",
     border: "border-sky-200/80 dark:border-sky-400/20",
     glow: "from-sky-500/12 via-transparent to-transparent dark:from-sky-400/10",
@@ -296,9 +296,9 @@ const MODEL_META = {
   },
   pro: {
     label: "Pro",
-    title: "Simulation Engine",
-    description: "Uses player form, fitness, creativity, discipline, and experience signals too.",
-    summary: "Advanced + Player Aspects",
+    title: "Pro Model",
+    description: "",
+    summary: "",
     accent: "text-cyan-700 dark:text-cyan-300",
     border: "border-cyan-200/80 dark:border-cyan-400/20",
     glow: "from-cyan-500/12 via-transparent to-transparent dark:from-cyan-400/10",
@@ -416,6 +416,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const [confirmSimOpen, setConfirmSimOpen] = useState(false);
   const [confirmSimType, setConfirmSimType] = useState<"all" | "group" | null>(null);
   const [confirmSimGroup, setConfirmSimGroup] = useState<string | null>(null);
+  const [deleteGroupTarget, setDeleteGroupTarget] = useState<string | null>(null);
 
   const handleConfirmSimulation = () => {
     if (confirmSimType === "all") {
@@ -2294,8 +2295,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         </div>
       )}
 
-      <div className="mb-8 flex justify-start">
-        <SimulationEngineBadge model={selectedModel} />
+      <div className="mb-8 flex justify-end">
+        <div className="max-w-md">
+          <SimulationEngineBadge model={selectedModel} />
+        </div>
       </div>
 
       {/* Group Stage View */}
@@ -2328,7 +2331,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               <Check className="h-3 w-3" /> Simulated
                             </span>
                             <button
-                              onClick={() => resetGroup(groupName)}
+                              onClick={() => setDeleteGroupTarget(groupName)}
                               title="Reset Group"
                               className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded-full transition"
                             >
@@ -3832,6 +3835,37 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset Group Confirmation Dialog */}
+      <AlertDialog open={!!deleteGroupTarget} onOpenChange={(open) => !open && setDeleteGroupTarget(null)}>
+        <AlertDialogContent className="bg-white text-slate-900 border border-slate-200 shadow-xl rounded-2xl dark:bg-slate-950 dark:text-white dark:border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display font-bold text-xl text-slate-950 dark:text-white flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-rose-500" />
+              <span>Confirm Group Reset</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500 dark:text-slate-400 mt-2 text-sm leading-relaxed">
+              Are you sure you want to reset matches for Group {deleteGroupTarget}? This will clear all predicted scores and outcomes for this group.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 flex gap-2">
+            <AlertDialogCancel className="px-4 py-2 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 dark:border-white/10 dark:text-white dark:hover:bg-white/5 cursor-pointer">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteGroupTarget) {
+                  resetGroup(deleteGroupTarget);
+                  setDeleteGroupTarget(null);
+                }
+              }}
+              className="px-4 py-2 text-xs font-black rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer"
+            >
+              Reset Group
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -3841,21 +3875,17 @@ function SimulationEngineBadge({ model }: { model: keyof typeof MODEL_META }) {
   const Icon = meta.Icon;
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border bg-white/70 px-4 py-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:bg-slate-900/70 ${meta.border}`}>
-      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-r ${meta.glow}`} />
-      <div className="relative flex flex-wrap items-center gap-3">
-        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-black/6 bg-black/4 dark:border-white/10 dark:bg-white/5 ${meta.accent}`}>
-          <Icon className="h-4 w-4" />
+    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-slate-900/50">
+      <div className="flex items-start gap-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+          <Icon className="h-4.5 w-4.5" />
         </div>
         <div className="min-w-0">
-          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
-            {meta.title}
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400">
+            Simulation Engine
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`font-display text-lg font-black leading-none ${meta.accent}`}>{meta.label}</span>
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] ${meta.badge}`}>
-              {meta.summary}
-            </span>
+          <div className="text-base font-bold text-slate-900 dark:text-white">
+            {meta.title}
           </div>
         </div>
       </div>

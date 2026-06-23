@@ -277,7 +277,7 @@ export default function SubscriptionPage() {
           })}
         </div>
 
-        <section className="mx-auto mt-16 max-w-6xl">
+        <section id="compare-plans" className="mx-auto mt-16 max-w-6xl scroll-mt-28">
           <div className="mb-6 text-center">
             <h2 className="font-display text-3xl font-bold tracking-tight text-foreground dark:text-white sm:text-4xl">
               Compare Plans
