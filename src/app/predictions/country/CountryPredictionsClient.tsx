@@ -1169,7 +1169,10 @@ export default function CountryPredictionsClient({
 
   // Sort and filter teams list in sidebar
   const sortedTeams = useMemo(() => {
-    const baseList = [...appTeams].sort((a, b) => b.elo - a.elo);
+    const replacedCodes = new Set(customCountries.map((cc) => cc.replacedCode));
+    const baseList = [...appTeams]
+      .filter((team) => !replacedCodes.has(team.code))
+      .sort((a, b) => b.elo - a.elo);
     const customList = customCountries.map((cc) => {
       const orig = appTeams.find((t) => t.code === cc.replacedCode);
       return {
@@ -1183,6 +1186,9 @@ export default function CountryPredictionsClient({
         defense: cc.defense,
         squadValueM: orig?.squadValueM || 100,
         confederation: orig?.confederation || "UEFA",
+        replacedCode: cc.replacedCode,
+        replacedName: orig?.name || cc.replacedCode,
+        isCustom: true,
       } as any;
     });
     return [...customList, ...baseList];
@@ -1389,9 +1395,14 @@ export default function CountryPredictionsClient({
           >
             <AccordionItem value="country-list" className="border-none data-[state=open]:flex data-[state=open]:flex-col data-[state=open]:lg:h-[820px]">
               <AccordionTrigger className="shrink-0 px-5 pt-5 pb-3 hover:no-underline">
-                <div>
-                  <div className="font-display text-lg font-bold text-foreground">Country Rankings</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Browse and simulate every national team</div>
+                <div className="flex w-full items-start justify-between gap-3 pr-4">
+                  <div>
+                    <div className="font-display text-lg font-bold text-foreground">Country Rankings</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Browse and simulate every national team</div>
+                  </div>
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
+                    {filteredTeams.length} teams
+                  </span>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="min-h-0 px-5 pb-5 data-[state=open]:flex data-[state=open]:flex-1 [&>div]:flex [&>div]:h-full [&>div]:min-h-0 [&>div]:flex-1 [&>div]:flex-col [&>div]:pb-0">
@@ -1429,10 +1440,21 @@ export default function CountryPredictionsClient({
                               className="h-6 w-8 shrink-0 drop-shadow-md group-hover:scale-105 transition-transform duration-300 object-cover rounded"
                               emojiClassName="text-xl shrink-0 drop-shadow-md group-hover:scale-105 transition-transform duration-300 select-none"
                             />
-                            <span className="truncate tracking-wide">{t.name}</span>
-                            {active && (
-                              <PencilLine className="w-3.5 h-3.5 text-cyan-600 dark:text-neon shrink-0 animate-pulse" />
-                            )}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="truncate tracking-wide">{t.name}</span>
+                                {active && (
+                                  <PencilLine className="w-3.5 h-3.5 text-cyan-600 dark:text-neon shrink-0 animate-pulse" />
+                                )}
+                              </div>
+                              {"isCustom" in t && t.isCustom && (
+                                <div className="mt-1">
+                                  <span className="inline-flex max-w-full truncate rounded-full border border-fuchsia-200 bg-fuchsia-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-fuchsia-700 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10 dark:text-fuchsia-300">
+                                    Replaced with {t.replacedName}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div className="flex items-center gap-2.5 z-10">
                             <div className="text-xs font-mono font-bold text-fuchsia-600 text-right opacity-90 dark:text-neon-2">

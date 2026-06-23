@@ -874,36 +874,6 @@ export function WildcardCountrySection() {
                   </select>
                 </div>
 
-                {/* Replacement Choice */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-neon-2 uppercase tracking-widest block flex items-center">
-                    <span>Replacement Team (Slots in)</span>
-                    <InfoTooltip content="The original tournament team that will be replaced by your custom country in the final brackets." />
-                  </label>
-                  <select
-                    value={replacedCode}
-                    onChange={(e) => setReplacedCode(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
-                  >
-                    <optgroup label="Suggested (Same Confederation)" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
-                      {suggestedReplacements.map((team) => (
-                        <option key={team.code} value={team.code}>
-                          Replace: {team.name} ({team.code})
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="All World Cup Teams" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
-                      {teams
-                        .filter((t) => worldCupCodes.includes(t.code))
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((team) => (
-                          <option key={team.code} value={team.code}>
-                            Replace: {team.name} ({team.code})
-                          </option>
-                        ))}
-                    </optgroup>
-                  </select>
-                </div>
                      {/* Ratings Sliders (Elo, Att, Def) */}
                 <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-white/5">
                   <div>
@@ -957,6 +927,37 @@ export function WildcardCountrySection() {
                       className="w-full accent-neon cursor-pointer"
                     />
                   </div>
+                </div>
+
+                {/* Replacement Choice */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neon-2 uppercase tracking-widest block flex items-center">
+                    <span>Replacement Team (Slots in)</span>
+                    <InfoTooltip content="The original tournament team that will be replaced by your custom country in the final brackets." />
+                  </label>
+                  <select
+                    value={replacedCode}
+                    onChange={(e) => setReplacedCode(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                  >
+                    <optgroup label="Suggested (Same Confederation)" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
+                      {suggestedReplacements.map((team) => (
+                        <option key={team.code} value={team.code}>
+                          Replace: {team.name} ({team.code})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="All World Cup Teams" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
+                      {teams
+                        .filter((t) => worldCupCodes.includes(t.code))
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((team) => (
+                          <option key={team.code} value={team.code}>
+                            Replace: {team.name} ({team.code})
+                          </option>
+                        ))}
+                    </optgroup>
+                  </select>
                 </div>
               </div>
 

@@ -2271,35 +2271,35 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
       {/* Tab Selectors */}
       {!onlyKnockout && (
-        <div className="flex border-b border-border dark:border-white/10 mb-8">
-          <button
-            onClick={() => setActiveTab("group")}
-            className={`px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "group"
-              ? "border-neon text-neon"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-          >
-            Group Stage
-          </button>
-          {isGroupStageComplete && (
+        <div className="mb-8 flex flex-col gap-4 border-b border-border pb-6 dark:border-white/10 md:flex-row md:items-start md:justify-between">
+          <div className="flex">
             <button
-              onClick={() => setActiveTab("knockout")}
-              className={`flex items-center gap-2 px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "knockout"
+              onClick={() => setActiveTab("group")}
+              className={`px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "group"
                 ? "border-neon text-neon"
                 : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
             >
-              Knockout Bracket
+              Group Stage
             </button>
-          )}
+            {isGroupStageComplete && (
+              <button
+                onClick={() => setActiveTab("knockout")}
+                className={`flex items-center gap-2 px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "knockout"
+                  ? "border-neon text-neon"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+              >
+                Knockout Bracket
+              </button>
+            )}
+          </div>
+
+          <div className="md:max-w-md">
+            <SimulationEngineBadge model={selectedModel} />
+          </div>
         </div>
       )}
-
-      <div className="mb-8 flex justify-end">
-        <div className="max-w-md">
-          <SimulationEngineBadge model={selectedModel} />
-        </div>
-      </div>
 
       {/* Group Stage View */}
       {activeTab === "group" && (
