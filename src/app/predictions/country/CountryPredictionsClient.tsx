@@ -323,6 +323,7 @@ export default function CountryPredictionsClient({
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [upgradeModalReason, setUpgradeModalReason] = useState<"plus" | "pro" | "credits" | "guest">("plus");
   const [subscriptionTier, setSubscriptionTier] = useState<string>("free");
+  const [customCountryDeleteTarget, setCustomCountryDeleteTarget] = useState<CustomCountry | null>(null);
   const [pendingModelSwitch, setPendingModelSwitch] = useState<{
     feature: string;
     targetModel: SimulationModel;
@@ -417,6 +418,7 @@ export default function CountryPredictionsClient({
   const hasAppliedSearchSelection = useRef(false);
   const hasInitializedCustomizer = useRef(false);
   const ignoreResetRef = useRef(false);
+  const deletedCustomCodesRef = useRef<Set<string>>(new Set());
   const formattedModelName = selectedModel ? selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1) : "";
   const activePlan = (subscriptionTier || session?.user?.subscriptionTier || "free").toLowerCase();
   const canEditTeamCore = true;
@@ -491,11 +493,16 @@ export default function CountryPredictionsClient({
         .then((res) => res.json())
         .then(async (data) => {
           if (data.success && Array.isArray(data.customCountries)) {
-            const dbList = data.customCountries;
+            const dbList = data.customCountries.filter(
+              (team: CustomCountry) => !deletedCustomCodesRef.current.has(team.code)
+            );
             const merged = [...dbList];
             const uploadPromises = [];
 
             for (const localTeam of localList) {
+              if (deletedCustomCodesRef.current.has(localTeam.code)) {
+                continue;
+              }
               const existsInDb = dbList.some((dbTeam: any) => dbTeam.code === localTeam.code);
               if (!existsInDb) {
                 merged.push(localTeam);
@@ -522,9 +529,7 @@ export default function CountryPredictionsClient({
   }, [initializeData, initialTeams, initialPlayers, session]);
 
   const handleDeleteCustomCountry = (code: string) => {
-    if (!confirm("Are you sure you want to delete this custom country?")) {
-      return;
-    }
+    deletedCustomCodesRef.current.add(code);
     const updated = customCountries.filter((c) => c.code !== code);
     localStorage.setItem("wc26_custom_countries", JSON.stringify(updated));
     setCustomCountries(updated);
@@ -594,7 +599,10 @@ export default function CountryPredictionsClient({
   }, [selectedCode, activeCustomCountry, appTeams]);
 
   const getTeam = (code: string): SimTeam => {
-    const custom = customCountries.find((cc) => cc.replacedCode === code || cc.code === code);
+    const custom = activeCustomCountry &&
+      (activeCustomCountry.replacedCode === code || activeCustomCountry.code === code)
+      ? activeCustomCountry
+      : null;
     if (custom) {
       const isSelected = (custom.replacedCode === effectiveCode) || (custom.code === effectiveCode);
       return {
@@ -726,7 +734,10 @@ export default function CountryPredictionsClient({
   }, [players, selectedCode, customPlayerRatingDelta, playersIn, playersOut, canEditPlayerRatings, canEditPlayerAvailability, activeCustomCountry]);
 
   const getTeamPlayers = (teamCode: string) => {
-    const custom = customCountries.find((cc) => cc.code === teamCode || cc.replacedCode === teamCode);
+    const custom = activeCustomCountry &&
+      (activeCustomCountry.code === teamCode || activeCustomCountry.replacedCode === teamCode)
+      ? activeCustomCountry
+      : null;
     const sourceCode = custom ? custom.baselineCode : teamCode;
     const rawPlayers = Object.values(customizedPlayers)
       .filter((p) => p["Team Code"] === sourceCode);
@@ -1432,7 +1443,10 @@ export default function CountryPredictionsClient({
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeleteCustomCountry(t.code);
+                                  const customCountry = customCountries.find((country) => country.code === t.code);
+                                  if (customCountry) {
+                                    setCustomCountryDeleteTarget(customCountry);
+                                  }
                                 }}
                                 className="p-1 rounded-md text-muted-foreground hover:text-red-500 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors cursor-pointer animate-in fade-in"
                                 title="Delete custom country"
@@ -2565,6 +2579,35 @@ export default function CountryPredictionsClient({
               className="cursor-pointer rounded-xl bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] px-4 py-2 text-xs font-black text-white hover:opacity-95"
             >
               Switch Model
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={!!customCountryDeleteTarget} onOpenChange={(open) => !open && setCustomCountryDeleteTarget(null)}>
+        <AlertDialogContent className="rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl dark:border-white/10 dark:bg-slate-950 dark:text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl font-bold text-slate-950 dark:text-white">
+              Delete Custom Country?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              {customCountryDeleteTarget
+                ? `This will remove ${customCountryDeleteTarget.name} from your custom country list and prediction setup.`
+                : "This will remove this custom country from your custom country list and prediction setup."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 flex gap-2">
+            <AlertDialogCancel className="cursor-pointer rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:text-white dark:hover:bg-white/5">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!customCountryDeleteTarget) return;
+                handleDeleteCustomCountry(customCountryDeleteTarget.code);
+                setCustomCountryDeleteTarget(null);
+              }}
+              className="cursor-pointer rounded-xl bg-red-600 px-4 py-2 text-xs font-black text-white hover:bg-red-700"
+            >
+              Delete Country
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

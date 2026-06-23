@@ -98,6 +98,7 @@ export function WildcardCountrySection() {
   const [countriesList, setCountriesList] = useState<any[]>(ALL_COUNTRIES);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [confirmRunOpen, setConfirmRunOpen] = useState(false);
+  const [customCountryDeleteTarget, setCustomCountryDeleteTarget] = useState<CustomCountry | null>(null);
 
   useEffect(() => {
     fetch("https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/index.json")
@@ -196,9 +197,6 @@ export function WildcardCountrySection() {
   }, [session]);
 
   const handleDeleteCustomCountry = (code: string) => {
-    if (!confirm("Are you sure you want to delete this custom country?")) {
-      return;
-    }
     const updated = customCountries.filter((c) => c.code !== code);
     localStorage.setItem("wc26_custom_countries", JSON.stringify(updated));
     setCustomCountries(updated);
@@ -578,7 +576,7 @@ export function WildcardCountrySection() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteCustomCountry(cc.code);
+                          setCustomCountryDeleteTarget(cc);
                         }}
                         className="p-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-muted-foreground hover:text-red-500 transition-colors z-20 cursor-pointer ml-1"
                         title="Delete custom country"
@@ -631,7 +629,7 @@ export function WildcardCountrySection() {
                 <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold">FIFA Rank / Region</span>
                   <span className="text-sm font-extrabold text-slate-900 dark:text-white mt-1 block">
-                    {previewDetails.rank} ({previewDetails.confederation})
+                    {previewDetails.isCustom ? previewDetails.rank : `${previewDetails.rank} (${previewDetails.confederation})`}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
@@ -1009,6 +1007,35 @@ export function WildcardCountrySection() {
               className="rounded-xl bg-gradient-to-r from-neon to-neon-2 px-4 py-2 text-xs font-black text-background hover:opacity-95"
             >
               Confirm & Run
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={!!customCountryDeleteTarget} onOpenChange={(open) => !open && setCustomCountryDeleteTarget(null)}>
+        <AlertDialogContent className="rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl dark:border-white/10 dark:bg-slate-950 dark:text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl font-bold text-slate-950 dark:text-white">
+              Delete Custom Country?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              {customCountryDeleteTarget
+                ? `This will remove ${customCountryDeleteTarget.name} from your custom country list.`
+                : "This will remove this custom country from your custom country list."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 flex gap-2">
+            <AlertDialogCancel className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:text-white dark:hover:bg-white/5">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!customCountryDeleteTarget) return;
+                handleDeleteCustomCountry(customCountryDeleteTarget.code);
+                setCustomCountryDeleteTarget(null);
+              }}
+              className="rounded-xl bg-red-600 px-4 py-2 text-xs font-black text-white hover:bg-red-700"
+            >
+              Delete Country
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
