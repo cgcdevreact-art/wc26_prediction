@@ -93,7 +93,7 @@ export default function SubscriptionPage() {
       price: "$9.99",
       period: "/month",
       description: "Ultimate simulation engine with tactical variables.",
-      icon: <Trophy className="h-6 w-6 text-amber-500 animate-float" />,
+      icon: <Trophy className="h-6 w-6 text-amber-500" />,
       features: [
         "Access to Pro Model (+Aspects & Pitch details)",
         "Unlimited simulations & bracket runs",
