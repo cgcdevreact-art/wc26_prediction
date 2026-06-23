@@ -1,6 +1,6 @@
 "use client";
 
-import { Trophy } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 export function Footer() {
@@ -9,7 +9,15 @@ export function Footer() {
       <div className="mx-auto container mx-auto px-4 py-10   grid gap-6 md:grid-cols-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-md bg-gradient-to-br from-neon to-neon-2 text-background"><Trophy className="h-4 w-4" /></span>
+            <span className="flex h-8 items-center">
+              <Image
+                src="/wc26-logo.png"
+                alt="WC26 Predict"
+                width={58}
+                height={32}
+                className="h-8 w-auto"
+              />
+            </span>
             <div className="font-semibold">WC26 <span className="text-gradient">PREDICT</span></div>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">The most engaging way to predict World Cup 2026. Probabilities. Picks. Glory.</p>
