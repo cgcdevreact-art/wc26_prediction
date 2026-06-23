@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, ReactNode } from "react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { useSimulationStore, PlayerStats, TeamStats } from "@/lib/store/simulationStore";
 import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
 import { getMatchExpectedGoals, SimTeam } from "@/lib/simulation/model";
-import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check } from "lucide-react";
+import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check, PencilLine, Lock, Trash2, X, Info, Minus, Plus, Shield, Zap, Coins, Cpu, Award, Route } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { UpgradeModal } from "@/components/site/UpgradeModal";
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
+import { CustomCountry } from "@/components/site/WildcardCountrySection";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { readPredictionPayload } from "@/lib/predictionWinner";
 
 // Poisson score generator
 function getPoisson(lambda: number) {
@@ -30,6 +33,76 @@ function getPoisson(lambda: number) {
   return k - 1;
 }
 
+function formatTeamScaleRating(value: number | undefined | null) {
+  if (value === undefined || value === null) return 75;
+  if (value < 10) {
+    const minM = 0.75;
+    const maxM = 1.1;
+    const minR = 50;
+    const maxR = 95;
+    const rating = ((value - minM) / (maxM - minM)) * (maxR - minR) + minR;
+    return Math.max(15, Math.min(99, Math.round(rating)));
+  }
+  return Math.max(15, Math.min(99, Math.round(value)));
+}
+
+function clampRating(value: number, min = 1, max = 99) {
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function InfoTooltip({ content }: { content: string }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button 
+            type="button"
+            onClick={(e) => e.stopPropagation()} 
+            className="inline-block ml-1.5 align-middle cursor-help select-none bg-transparent border-none p-0 outline-none focus:outline-none"
+          >
+            <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-slate-900 dark:hover:text-white transition-colors" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent 
+          side="top" 
+          className="max-w-[200px] bg-slate-950 text-white border border-white/10 px-2.5 py-1.5 text-[11px] font-medium normal-case tracking-normal leading-normal text-center shadow-xl rounded-lg z-50"
+        >
+          {content}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+const CustomCompareTooltip = ({ active, payload, label, mode }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-950/95 text-white border border-white/10 px-3 py-2 text-xs rounded-xl shadow-xl backdrop-blur-md">
+        <p className="font-bold border-b border-white/10 pb-1 mb-1">{label}</p>
+        <div className="space-y-1">
+          {payload.map((pld: any) => {
+            const countryName = pld.name;
+            const value = pld.value;
+            const rawVal = mode === "attributes" && pld.payload ? pld.payload[`${countryName}_raw`] : null;
+            return (
+              <div key={countryName} className="flex items-center justify-between gap-4 font-medium">
+                <span className="flex items-center gap-1.5" style={{ color: pld.color }}>
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: pld.color }} />
+                  {countryName}
+                </span>
+                <span className="font-bold font-mono">
+                  {mode === "progression" ? `${value}%` : (rawVal ?? value)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function CountryPredictionsClient({
   initialTeams,
   initialPlayers,
@@ -39,7 +112,7 @@ export default function CountryPredictionsClient({
   initialPlayers: PlayerStats[],
   flagMap: Record<string, string>
 }) {
-  const { isInitialized, initializeData, players, selectedModel } = useSimulationStore();
+  const { isInitialized, initializeData, players, selectedModel, setSelectedModel } = useSimulationStore();
   const appTeams = useTeams();
   const GROUPS_CONFIG = useGroupsConfig();
   const { theme } = useTheme();
@@ -50,6 +123,127 @@ export default function CountryPredictionsClient({
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [zoomScale, setZoomScale] = useState(85);
+
+  // Saved predictions state & logic
+  const [savedPredictions, setSavedPredictions] = useState<any[]>([]);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [selectedCompareIds, setSelectedCompareIds] = useState<string[]>([]);
+  const [compareChartTab, setCompareChartTab] = useState<"progression" | "attributes">("progression");
+
+  const fetchSavedPredictions = async () => {
+    if (!session?.user?.id) return;
+    setIsLoadingSaved(true);
+    try {
+      const res = await fetch("/api/predictions");
+      if (res.ok) {
+        const data = await res.json();
+        const countryProjs = data.filter((p: any) => p.type === "COUNTRY_PROJECTION");
+        setSavedPredictions(countryProjs);
+      }
+    } catch (err) {
+      console.error("Error fetching saved predictions:", err);
+    } finally {
+      setIsLoadingSaved(false);
+    }
+  };
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchSavedPredictions();
+    }
+  }, [session]);
+
+  const handleLoadPrediction = (prediction: any) => {
+    try {
+      ignoreResetRef.current = true;
+      const data = readPredictionPayload<any>(prediction.predictedPayload, prediction.predictedWinner);
+
+      if (!data) {
+        ignoreResetRef.current = false;
+        return;
+      }
+
+      setSelectedCode(data.code);
+
+      if (data.modelName) {
+        setSelectedModel(data.modelName);
+      }
+
+      setCustomElo(data.customElo ?? data.elo ?? 1500);
+      setCustomAttack(data.customAttack ?? 75);
+      setCustomDefense(data.customDefense ?? 75);
+      setCustomPlayerRatingDelta(data.customPlayerRatingDelta ?? 0);
+      setPlayersIn(data.playersIn ?? []);
+      setPlayersOut(data.playersOut ?? []);
+
+      if (data.simResults) {
+        setSimResults(data.simResults);
+      } else {
+        const reconstructedStages = data.stages || {
+          group: 1000,
+          r32: 0,
+          r16: 0,
+          qf: 0,
+          sf: 0,
+          final: 0,
+          champion: (data.championProb ?? 0) * 10
+        };
+        setSimResults({
+          stages: reconstructedStages,
+          opponents: {},
+          mockTournament: null
+        });
+      }
+
+      toast.success(`Loaded saved simulation for ${data.name}!`);
+
+      // Delay resetting the ref to allow React to flush state updates
+      setTimeout(() => {
+        ignoreResetRef.current = false;
+      }, 100);
+    } catch (err) {
+      ignoreResetRef.current = false;
+      console.error("Error loading prediction:", err);
+      toast.error("Failed to load prediction. Data may be corrupted.");
+    }
+  };
+
+  const handleDeletePrediction = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete the saved prediction for ${name}?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/predictions?id=${id}`, {
+        method: "DELETE"
+      });
+
+      if (res.ok) {
+        toast.success(`Deleted prediction for ${name}`);
+        setSelectedCompareIds(prev => prev.filter(cid => cid !== id));
+        fetchSavedPredictions();
+      } else {
+        throw new Error("Failed to delete");
+      }
+    } catch (err) {
+      console.error("Error deleting prediction:", err);
+      toast.error("Failed to delete prediction.");
+    }
+  };
+
+  const toggleCompareSelect = (id: string) => {
+    setSelectedCompareIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((cid) => cid !== id);
+      }
+      if (prev.length >= 4) {
+        toast.error("You can select a maximum of 4 predictions for comparison.");
+        return prev;
+      }
+      return [...prev, id];
+    });
+  };
 
   // Credit limits states
   const [creditsUsed, setCreditsUsed] = useState<number>(0);
@@ -107,7 +301,7 @@ export default function CountryPredictionsClient({
     try {
       const res = await fetch("/api/user/credits", { method: "POST" });
       const data = await res.json();
-      
+
       if (res.status === 403) {
         setUpgradeModalReason("credits");
         setUpgradeModalOpen(true);
@@ -145,7 +339,14 @@ export default function CountryPredictionsClient({
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
   const hasSeenSelectionChange = useRef(false);
+  const hasAppliedSearchSelection = useRef(false);
+  const hasInitializedCustomizer = useRef(false);
+  const ignoreResetRef = useRef(false);
   const formattedModelName = selectedModel ? selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1) : "";
+  const activePlan = (subscriptionTier || session?.user?.subscriptionTier || "free").toLowerCase();
+  const canEditTeamCore = true;
+  const canEditPlayerRatings = activePlan === "plus" || activePlan === "pro";
+  const canEditPlayerAvailability = activePlan === "pro";
 
   const openAuthModal = (mode: "signin" | "signup" = "signin") => {
     router.push(buildAuthModalHref({
@@ -163,21 +364,155 @@ export default function CountryPredictionsClient({
     mockTournament?: any;
   } | null>(null);
 
+  const [customCountries, setCustomCountries] = useState<CustomCountry[]>([]);
+
   useEffect(() => {
     setMounted(true);
     initializeData(initialTeams, initialPlayers);
-  }, [initializeData, initialTeams, initialPlayers]);
+    let localList: CustomCountry[] = [];
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("wc26_custom_countries");
+        if (stored) {
+          localList = JSON.parse(stored);
+          setCustomCountries(localList);
+        }
+      } catch (e) {
+        console.error("Failed to load custom countries", e);
+      }
+    }
+
+    if (session?.user?.id) {
+      fetch("/api/user/custom-countries")
+        .then((res) => res.json())
+        .then(async (data) => {
+          if (data.success && Array.isArray(data.customCountries)) {
+            const dbList = data.customCountries;
+            const merged = [...dbList];
+            const uploadPromises = [];
+
+            for (const localTeam of localList) {
+              const existsInDb = dbList.some((dbTeam: any) => dbTeam.code === localTeam.code);
+              if (!existsInDb) {
+                merged.push(localTeam);
+                uploadPromises.push(
+                  fetch("/api/user/custom-countries", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(localTeam),
+                  }).catch((err) => console.error("Error uploading custom team:", err))
+                );
+              }
+            }
+
+            if (uploadPromises.length > 0) {
+              await Promise.all(uploadPromises);
+            }
+
+            setCustomCountries(merged);
+            localStorage.setItem("wc26_custom_countries", JSON.stringify(merged));
+          }
+        })
+        .catch((err) => console.error("Error fetching custom countries from DB:", err));
+    }
+  }, [initializeData, initialTeams, initialPlayers, session]);
+
+  const handleDeleteCustomCountry = (code: string) => {
+    if (!confirm("Are you sure you want to delete this custom country?")) {
+      return;
+    }
+    const updated = customCountries.filter((c) => c.code !== code);
+    localStorage.setItem("wc26_custom_countries", JSON.stringify(updated));
+    setCustomCountries(updated);
+    if (selectedCode === code) {
+      setSelectedCode("ARG");
+      // Update URL query parameters
+      const params = new URLSearchParams(window.location.search);
+      params.set("team", "ARG");
+      window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+    }
+
+    if (session?.user?.id) {
+      fetch("/api/user/custom-countries", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      }).catch((err) => console.error("Error deleting custom country from DB:", err));
+    }
+  };
+
+  useEffect(() => {
+    if (hasAppliedSearchSelection.current || appTeams.length === 0) return;
+
+    const requestedTeam = searchParams.get("team") || searchParams.get("country");
+    if (!requestedTeam) {
+      hasAppliedSearchSelection.current = true;
+      return;
+    }
+
+    const normalizedCode = requestedTeam.trim().toUpperCase();
+    const isCustom = normalizedCode.startsWith("CC_") || customCountries.some(cc => cc.code === normalizedCode);
+    const teamExists = isCustom || appTeams.some((team) => team.code === normalizedCode);
+
+    hasAppliedSearchSelection.current = true;
+
+    if (!teamExists || normalizedCode === selectedCode) return;
+
+    hasSeenSelectionChange.current = false;
+    setSelectedCode(normalizedCode);
+    setSearchQuery("");
+  }, [appTeams, searchParams, selectedCode, customCountries]);
+
+  const activeCustomCountry = useMemo(() => {
+    return customCountries.find((cc) => cc.code === selectedCode);
+  }, [selectedCode, customCountries]);
+
+  const effectiveCode = useMemo(() => {
+    return activeCustomCountry ? activeCustomCountry.replacedCode : selectedCode;
+  }, [activeCustomCountry, selectedCode]);
+
+  const selectedTeam = useMemo(() => {
+    if (activeCustomCountry) {
+      const origTeam = appTeams.find((t) => t.code === activeCustomCountry.replacedCode) || appTeams[0];
+      return {
+        code: activeCustomCountry.code,
+        name: activeCustomCountry.name,
+        flag: activeCustomCountry.flag,
+        rank: origTeam?.rank || 99,
+        elo: activeCustomCountry.elo,
+        attack: activeCustomCountry.attack,
+        defense: activeCustomCountry.defense,
+        power: origTeam?.power || 75,
+        squadValueM: origTeam?.squadValueM || 100,
+      };
+    }
+    return appTeams.find((t) => t.code === selectedCode) || appTeams[0];
+  }, [selectedCode, activeCustomCountry, appTeams]);
 
   const getTeam = (code: string): SimTeam => {
+    const custom = customCountries.find((cc) => cc.replacedCode === code || cc.code === code);
+    if (custom) {
+      const isSelected = (custom.replacedCode === effectiveCode) || (custom.code === effectiveCode);
+      return {
+        code: custom.replacedCode,
+        name: custom.name,
+        flag: custom.flag,
+        elo: isSelected ? customElo : custom.elo,
+        attack: isSelected ? customAttack : custom.attack,
+        defense: isSelected ? customDefense : custom.defense,
+        power: appTeams.find((t) => t.code === custom.baselineCode)?.power || 75,
+      };
+    }
     const appTeam = appTeams.find((t) => t.code === code);
     if (appTeam) {
+      const isSelected = code === effectiveCode;
       return {
         code: appTeam.code,
         name: appTeam.name,
         flag: appTeam.flag,
-        elo: appTeam.elo,
-        attack: appTeam.attack,
-        defense: appTeam.defense,
+        elo: isSelected ? customElo : appTeam.elo,
+        attack: isSelected ? customAttack : appTeam.attack,
+        defense: isSelected ? customDefense : appTeam.defense,
         power: appTeam.power,
       };
     }
@@ -191,20 +526,125 @@ export default function CountryPredictionsClient({
     };
   };
 
+  const [customElo, setCustomElo] = useState<number>(selectedTeam?.elo || 1500);
+  const [customAttack, setCustomAttack] = useState<number>(formatTeamScaleRating(selectedTeam?.attack));
+  const [customDefense, setCustomDefense] = useState<number>(formatTeamScaleRating(selectedTeam?.defense));
+  const [customPlayerRatingDelta, setCustomPlayerRatingDelta] = useState<number>(0);
+  const [playersIn, setPlayersIn] = useState<string[]>([]);
+  const [playersOut, setPlayersOut] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (ignoreResetRef.current) return;
+    if (!selectedTeam) return;
+    setCustomElo(Math.round(selectedTeam.elo));
+    setCustomAttack(formatTeamScaleRating(selectedTeam.attack));
+    setCustomDefense(formatTeamScaleRating(selectedTeam.defense));
+    setCustomPlayerRatingDelta(0);
+    setPlayersIn([]);
+    setPlayersOut([]);
+    setSimResults(null);
+  }, [selectedCode, selectedTeam]);
+
+  useEffect(() => {
+    if (ignoreResetRef.current) return;
+    if (!hasInitializedCustomizer.current) {
+      hasInitializedCustomizer.current = true;
+      return;
+    }
+    setSimResults(null);
+  }, [customElo, customAttack, customDefense, customPlayerRatingDelta, playersIn, playersOut]);
+
+  const togglePlayerSelection = (bucket: "in" | "out", playerId: string) => {
+    if (!canEditPlayerAvailability) {
+      setUpgradeModalReason("pro");
+      setUpgradeModalOpen(true);
+      return;
+    }
+
+    if (bucket === "in") {
+      setPlayersIn((prev) => {
+        const next = prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId];
+        return next;
+      });
+      setPlayersOut((prev) => prev.filter((id) => id !== playerId));
+      return;
+    }
+
+    setPlayersOut((prev) => {
+      const next = prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId];
+      return next;
+    });
+    setPlayersIn((prev) => prev.filter((id) => id !== playerId));
+  };
+
+  const customizedPlayers = useMemo(() => {
+    if (!selectedCode) return players;
+
+    const nextPlayers = { ...players };
+
+    Object.entries(players).forEach(([playerId, player]) => {
+      const targetTeamCode = activeCustomCountry ? activeCustomCountry.baselineCode : selectedCode;
+      if (player["Team Code"] !== targetTeamCode) return;
+
+      const currentOverall = parseInt(player["Overall Rating"]?.replace("%", "") || "75", 10);
+      const currentForm = parseInt(player["Recent Form"]?.replace("%", "") || "70", 10);
+      const currentFitness = parseInt(player["Fitness / Availability"]?.replace("%", "") || "80", 10);
+
+      let ratingDelta = canEditPlayerRatings ? customPlayerRatingDelta : 0;
+      let formDelta = 0;
+      let fitnessValue = currentFitness;
+
+      if (canEditPlayerAvailability && playersIn.includes(playerId)) {
+        ratingDelta += 4;
+        formDelta += 8;
+        fitnessValue = 99;
+      }
+
+      if (canEditPlayerAvailability && playersOut.includes(playerId)) {
+        ratingDelta -= 18;
+        formDelta -= 18;
+        fitnessValue = 25;
+      }
+
+      nextPlayers[playerId] = {
+        ...player,
+        "Overall Rating": String(clampRating(currentOverall + ratingDelta)),
+        "Recent Form": String(clampRating(currentForm + formDelta)),
+        "Fitness / Availability": String(clampRating(fitnessValue)),
+      };
+    });
+
+    return nextPlayers;
+  }, [players, selectedCode, customPlayerRatingDelta, playersIn, playersOut, canEditPlayerRatings, canEditPlayerAvailability, activeCustomCountry]);
+
   const getTeamPlayers = (teamCode: string) => {
-    return Object.values(players)
-      .filter((p) => p["Team Code"] === teamCode)
-      .sort((a, b) => {
+    const custom = customCountries.find((cc) => cc.code === teamCode || cc.replacedCode === teamCode);
+    const sourceCode = custom ? custom.baselineCode : teamCode;
+    const rawPlayers = Object.values(customizedPlayers)
+      .filter((p) => p["Team Code"] === sourceCode);
+
+    if (custom) {
+      return rawPlayers.map((p) => ({
+        ...p,
+        "Team Code": teamCode,
+      })).sort((a, b) => {
         const ratingA = parseInt(a["Overall Rating"]?.replace("%", "") || "0", 10);
         const ratingB = parseInt(b["Overall Rating"]?.replace("%", "") || "0", 10);
         return ratingB - ratingA;
       });
+    }
+
+    return rawPlayers.sort((a, b) => {
+      const ratingA = parseInt(a["Overall Rating"]?.replace("%", "") || "0", 10);
+      const ratingB = parseInt(b["Overall Rating"]?.replace("%", "") || "0", 10);
+      return ratingB - ratingA;
+    });
   };
 
   const getTopPlayer = (teamCode: string) => {
     const teamPlayers = getTeamPlayers(teamCode);
     const topPlayer = teamPlayers[0];
-    const name = topPlayer ? (topPlayer["Name on Shirt"] || topPlayer["Player Name"]) : "";
+    const name = topPlayer ? cleanPlayerName(topPlayer["Name on Shirt"] || topPlayer["Player Name"]) : "";
     const rating = topPlayer ? (topPlayer["Overall Rating"] || "") : "";
     return name ? `${name} (${rating})` : "N/A";
   };
@@ -238,7 +678,7 @@ export default function CountryPredictionsClient({
     };
 
     const trackMatch = (stage: string, team: string, opponent: string, gf: number, ga: number, won: boolean) => {
-      if (team !== selectedCode) return;
+      if (team !== effectiveCode) return;
       if (!stageOpponents[stage][opponent]) {
         stageOpponents[stage][opponent] = { count: 0, gfSum: 0, gaSum: 0, wins: 0 };
       }
@@ -251,7 +691,7 @@ export default function CountryPredictionsClient({
     const simulateKo = (home: string, away: string) => {
       const homeTeam = getTeam(home);
       const awayTeam = getTeam(away);
-      const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, players, selectedModel);
+      const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, customizedPlayers, selectedModel);
       let hs = getPoisson(homeLambda);
       let as = getPoisson(awayLambda);
       if (hs === as) {
@@ -296,7 +736,7 @@ export default function CountryPredictionsClient({
               const playMatch = (t1Idx: number, t2Idx: number) => {
                 const t1 = getTeam(standings[t1Idx].code);
                 const t2 = getTeam(standings[t2Idx].code);
-                const { homeLambda, awayLambda } = getMatchExpectedGoals(t1, t2, players, selectedModel);
+                const { homeLambda, awayLambda } = getMatchExpectedGoals(t1, t2, customizedPlayers, selectedModel);
                 const hs = getPoisson(homeLambda);
                 const as = getPoisson(awayLambda);
 
@@ -413,7 +853,7 @@ export default function CountryPredictionsClient({
             }).filter((pair) => pair.home && pair.away && pair.home !== pair.away);
 
             // Check if selected country is in R32
-            const inR32 = r32Pairings.some(p => p.home === selectedCode || p.away === selectedCode);
+            const inR32 = r32Pairings.some(p => p.home === effectiveCode || p.away === effectiveCode);
             if (inR32) currentScore = 1;
             if (inR32) stageCounts.r32 += 1;
 
@@ -430,7 +870,7 @@ export default function CountryPredictionsClient({
             });
 
             // Check if selected country is in R16
-            const inR16 = r16Teams.includes(selectedCode);
+            const inR16 = r16Teams.includes(effectiveCode);
             if (inR16) currentScore = 2;
             if (inR16) stageCounts.r16 += 1;
 
@@ -449,7 +889,7 @@ export default function CountryPredictionsClient({
             }
 
             // Check QF
-            const inQF = qfTeams.includes(selectedCode);
+            const inQF = qfTeams.includes(effectiveCode);
             if (inQF) currentScore = 3;
             if (inQF) stageCounts.qf += 1;
 
@@ -468,7 +908,7 @@ export default function CountryPredictionsClient({
             }
 
             // Check SF
-            const inSF = sfTeams.includes(selectedCode);
+            const inSF = sfTeams.includes(effectiveCode);
             if (inSF) currentScore = 4;
             if (inSF) stageCounts.sf += 1;
 
@@ -487,7 +927,7 @@ export default function CountryPredictionsClient({
             }
 
             // Check Final
-            const inFinal = finalTeams.includes(selectedCode);
+            const inFinal = finalTeams.includes(effectiveCode);
             if (inFinal) currentScore = 5;
             if (inFinal) stageCounts.final += 1;
 
@@ -501,7 +941,7 @@ export default function CountryPredictionsClient({
               trackMatch("final", awayTeam, homeTeam, as, hs, winner === awayTeam);
             }
 
-            if (winner === selectedCode) {
+            if (winner === effectiveCode) {
               stageCounts.champion += 1;
               currentScore = 6;
             }
@@ -547,6 +987,15 @@ export default function CountryPredictionsClient({
         elo: Math.round(selectedTeam.elo),
         championProb: Math.round((simResults.stages.champion / 1000) * 100),
         stages: simResults.stages,
+        modelName: selectedModel,
+        customElo: customElo,
+        customAttack: customAttack,
+        customDefense: customDefense,
+        squadValueM: selectedTeam.squadValueM,
+        customPlayerRatingDelta: customPlayerRatingDelta,
+        playersIn: playersIn,
+        playersOut: playersOut,
+        simResults: simResults,
         path: pathStepInfo.map(step => ({
           stage: step.stage,
           opponentCode: step.opponent?.code || null,
@@ -569,6 +1018,8 @@ export default function CountryPredictionsClient({
 
       setSaveSuccess(true);
       toast.success(`Successfully saved simulation for ${selectedTeam.name}!`);
+      // Refresh saved predictions list
+      fetchSavedPredictions();
     } catch (err) {
       console.error(err);
       toast.error("Error saving prediction. Please try again.");
@@ -595,23 +1046,49 @@ export default function CountryPredictionsClient({
     }
   }, [selectedCode, selectedModel, mounted]);
 
+  // Auto-run simulation if autorun=true is present in the URL
   useEffect(() => {
     if (!mounted || !isInitialized) return;
 
-    if (!hasSeenSelectionChange.current) {
-      hasSeenSelectionChange.current = true;
-      return;
-    }
+    const autorun = searchParams.get("autorun") === "true";
+    if (autorun) {
+      // Clear autorun from the URL so it doesn't re-run on subsequent page loads/refreshes
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("autorun");
+      const cleanUrl = `${pathname}?${params.toString()}`;
+      window.history.replaceState(null, "", cleanUrl);
 
-    if (session) {
-      setShowConfirmPopup(true);
+      // Execute simulation automatically
+      const executeAutoSim = async () => {
+        const allowed = await consumeCredit();
+        if (allowed) {
+          runSimulations();
+        }
+      };
+      executeAutoSim();
     }
-  }, [selectedCode, selectedModel, mounted, isInitialized, session]);
+  }, [mounted, isInitialized, searchParams, pathname]);
 
   // Sort and filter teams list in sidebar
   const sortedTeams = useMemo(() => {
-    return [...appTeams].sort((a, b) => b.elo - a.elo);
-  }, [appTeams]);
+    const baseList = [...appTeams].sort((a, b) => b.elo - a.elo);
+    const customList = customCountries.map((cc) => {
+      const orig = appTeams.find((t) => t.code === cc.replacedCode);
+      return {
+        code: cc.code,
+        name: cc.name,
+        flag: cc.flag,
+        elo: cc.elo,
+        rank: orig?.rank || 99,
+        power: orig?.power || 75,
+        attack: cc.attack,
+        defense: cc.defense,
+        squadValueM: orig?.squadValueM || 100,
+        confederation: orig?.confederation || "UEFA",
+      } as any;
+    });
+    return [...customList, ...baseList];
+  }, [appTeams, customCountries]);
 
   const filteredTeams = useMemo(() => {
     if (!searchQuery) return sortedTeams;
@@ -619,20 +1096,18 @@ export default function CountryPredictionsClient({
     return sortedTeams.filter(t => t.name.toLowerCase().includes(q) || t.code.toLowerCase().includes(q));
   }, [searchQuery, sortedTeams]);
 
-  const selectedTeam = appTeams.find((t) => t.code === selectedCode) || appTeams[0];
-
   // Dynamic calculations for Radar chart
   const radarData = useMemo(() => {
     if (!selectedTeam) return [];
     return [
-      { axis: "Attack", v: selectedTeam.attack > 10 ? selectedTeam.attack : Math.round(selectedTeam.attack * 80) },
-      { axis: "Defense", v: selectedTeam.defense > 10 ? selectedTeam.defense : Math.round(selectedTeam.defense * 80) },
+      { axis: "Attack", v: formatTeamScaleRating(customAttack) },
+      { axis: "Defense", v: formatTeamScaleRating(customDefense) },
       { axis: "Power", v: selectedTeam.power || 70 },
       { axis: "Form", v: Math.min(99, (selectedTeam.power || 70) + 4) },
       { axis: "Squad", v: Math.min(99, 50 + (selectedTeam.squadValueM || 500) / 15) },
-      { axis: "Elo", v: Math.round(((selectedTeam.elo || 1500) - 1300) / 6) },
+      { axis: "Elo", v: Math.round(((customElo || 1500) - 1300) / 6) },
     ];
-  }, [selectedTeam]);
+  }, [selectedTeam, customAttack, customDefense, customElo]);
 
   // Dynamic calculations for squad stats
   const squadStats = useMemo(() => {
@@ -669,7 +1144,7 @@ export default function CountryPredictionsClient({
       average,
       weak,
     };
-  }, [selectedCode, players, selectedTeam]);
+  }, [selectedCode, customizedPlayers, selectedTeam]);
 
   const squadTiers = useMemo(() => ([
     { label: "Elite", count: squadStats.elite, color: "from-amber-400 via-yellow-400 to-lime-300" },
@@ -693,7 +1168,7 @@ export default function CountryPredictionsClient({
       { key: "final", label: "Final" }
     ] as const;
 
-    let currentCode = selectedCode;
+    let currentCode = effectiveCode;
 
     return stagesOrdered.flatMap((stage) => {
       const stageMatches =
@@ -731,9 +1206,9 @@ export default function CountryPredictionsClient({
       currentCode = match.winner;
       return [step];
     });
-  }, [selectedCode, simResults]);
+  }, [effectiveCode, simResults]);
 
-  const selectedGroup = Object.entries(GROUPS_CONFIG).find(([_, list]) => list.includes(selectedCode))?.[0] || "-";
+  const selectedGroup = Object.entries(GROUPS_CONFIG).find(([_, list]) => list.includes(effectiveCode))?.[0] || "-";
   const championProbability = simResults ? (simResults.stages.champion / 1000) * 100 : 0;
   const stageCards = [
     { key: "group", label: "Group Stage", icon: "G" },
@@ -746,7 +1221,7 @@ export default function CountryPredictionsClient({
   ] as const;
 
   const getBracketRowClasses = (teamCode: string, isWinner: boolean, accent: "blue" | "gold" = "blue") => {
-    const isSelected = teamCode === selectedCode;
+    const isSelected = teamCode === effectiveCode;
     if (isSelected) {
       return "bg-gradient-to-r from-amber-100 to-yellow-50 border border-amber-300 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.12)] dark:from-amber-500/25 dark:to-yellow-400/10 dark:border-amber-400/40";
     }
@@ -760,7 +1235,7 @@ export default function CountryPredictionsClient({
   };
 
   const getBracketScoreClasses = (teamCode: string) =>
-    teamCode === selectedCode
+    teamCode === effectiveCode
       ? "bg-amber-50 text-amber-900 dark:bg-amber-300/15 dark:text-amber-100"
       : "bg-white/75 text-slate-700 dark:bg-black/50 dark:text-white";
 
@@ -782,7 +1257,7 @@ export default function CountryPredictionsClient({
               Path to Glory Explorer
             </h1>
             <p className="mt-2 text-muted-foreground text-sm max-w-2xl leading-relaxed">
-              Simulate the entire tournament 1,000 times dynamically based on the active model. 
+              Simulate the entire tournament 1,000 times dynamically based on the active model.
               {selectedModel === "base" && " Uses Elo / Att / Def stats."}
               {selectedModel === "advanced" && " Includes Squad value & stats."}
               {selectedModel === "pro" && " Incorporates Player aspects & form."}
@@ -806,72 +1281,282 @@ export default function CountryPredictionsClient({
       </div>
 
       <div className="mb-6 grid items-start gap-6 lg:grid-cols-[320px_1fr]">
-        {/* Left list of countries: Futuristic Sidebar Control */}
-        <Accordion
-          type="multiple"
-          defaultValue={["country-list"]}
-          className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900"
-        >
-          <AccordionItem value="country-list" className="border-none data-[state=open]:flex data-[state=open]:flex-col data-[state=open]:lg:h-[920px]">
-            <AccordionTrigger className="shrink-0 px-5 pt-5 pb-3 hover:no-underline">
-              <div>
-                <div className="font-display text-lg font-bold text-foreground">Country Rankings</div>
-                <div className="text-xs text-muted-foreground mt-0.5">Browse and simulate every national team</div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="min-h-0 px-5 pb-5 data-[state=open]:flex data-[state=open]:flex-1 [&>div]:flex [&>div]:h-full [&>div]:min-h-0 [&>div]:flex-1 [&>div]:flex-col [&>div]:pb-0">
-              <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="relative mb-5 group">
-                  <Search className="absolute inset-y-0 left-3.5 h-4 w-4 my-auto text-muted-foreground group-focus-within:text-neon transition-colors" />
-                  <Input
-                    placeholder="Search country..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-11 border-slate-200 bg-slate-50 text-foreground text-sm focus-visible:ring-cyan-500 focus-visible:border-cyan-500 rounded-xl h-11 transition-all dark:border-white/10 dark:bg-white/5 dark:focus-visible:ring-neon dark:focus-visible:border-neon dark:focus-visible:bg-white/[0.08]"
-                  />
+        {/* Left Column: Stacked Sidebar */}
+        <div className="space-y-6 lg:w-[320px] shrink-0">
+          {/* Left list of countries: Futuristic Sidebar Control */}
+          <Accordion
+            type="multiple"
+            defaultValue={["country-list"]}
+            className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900"
+          >
+            <AccordionItem value="country-list" className="border-none data-[state=open]:flex data-[state=open]:flex-col data-[state=open]:lg:h-[820px]">
+              <AccordionTrigger className="shrink-0 px-5 pt-5 pb-3 hover:no-underline">
+                <div>
+                  <div className="font-display text-lg font-bold text-foreground">Country Rankings</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Browse and simulate every national team</div>
                 </div>
+              </AccordionTrigger>
+              <AccordionContent className="min-h-0 px-5 pb-5 data-[state=open]:flex data-[state=open]:flex-1 [&>div]:flex [&>div]:h-full [&>div]:min-h-0 [&>div]:flex-1 [&>div]:flex-col [&>div]:pb-0">
+                <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <div className="relative mb-5 group">
+                    <Search className="absolute inset-y-0 left-3.5 h-4 w-4 my-auto text-muted-foreground group-focus-within:text-neon transition-colors" />
+                    <Input
+                      placeholder="Search country..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-11 border-slate-200 bg-slate-50 text-foreground text-sm focus-visible:ring-cyan-500 focus-visible:border-cyan-500 rounded-xl h-11 transition-all dark:border-white/10 dark:bg-white/5 dark:focus-visible:ring-neon dark:focus-visible:border-neon dark:focus-visible:bg-white/[0.08]"
+                    />
+                  </div>
 
-                <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-custom ">
-                  {filteredTeams.map((t) => {
-                    const active = t.code === selectedCode;
-                    return (
-                      <button
-                        key={t.code}
-                        onClick={() => setSelectedCode(t.code)}
-                        className={`w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${active
-                          ? "bg-gradient-to-r from-cyan-50 to-fuchsia-50 border-cyan-300 text-slate-950 shadow-[0_12px_30px_rgba(14,165,233,0.12)] font-bold dark:from-neon/10 dark:to-neon-2/10 dark:border-neon/30 dark:text-white dark:shadow-[0_0_15px_rgba(6,182,212,0.1)]"
-                          : "border-slate-200 bg-slate-50 text-muted-foreground hover:bg-slate-100 hover:text-slate-950 dark:border-white/5 dark:bg-white/[0.01] dark:hover:bg-white/5 dark:hover:text-white"
-                          }`}
-                      >
-                        {active && (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-cyan-500 to-fuchsia-500 dark:from-neon dark:to-neon-2" />
-                        )}
-                        <div className="flex items-center gap-3 min-w-0 z-10">
-                          <CountryFlag
-                            code={t.code}
-                            flag={t.flag}
-                            name={t.name}
-                            className="h-7 w-9 shrink-0 drop-shadow-md group-hover:scale-110 transition-transform duration-300"
-                            emojiClassName="text-2xl shrink-0 drop-shadow-md group-hover:scale-110 transition-transform duration-300 select-none"
-                          />
-                          <span className="truncate tracking-wide">{t.name}</span>
+                  <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-custom ">
+                    {filteredTeams.map((t) => {
+                      const active = t.code === selectedCode;
+                      return (
+                        <div
+                          key={t.code}
+                          onClick={() => setSelectedCode(t.code)}
+                          className={`w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition-all duration-300 border relative overflow-hidden group cursor-pointer ${active
+                            ? "bg-gradient-to-r from-cyan-50 to-fuchsia-50 border-cyan-300 text-slate-950 shadow-[0_12px_30px_rgba(14,165,233,0.12)] font-bold dark:from-neon/10 dark:to-neon-2/10 dark:border-neon/30 dark:text-white dark:shadow-[0_0_15px_rgba(6,182,212,0.1)]"
+                            : "border-slate-200 bg-slate-50 text-muted-foreground hover:bg-slate-100 hover:text-slate-950 dark:border-white/5 dark:bg-white/[0.01] dark:hover:bg-white/5 dark:hover:text-white"
+                            }`}
+                        >
+                          {active && (
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-gradient-to-b from-cyan-500 to-fuchsia-500 dark:from-neon dark:to-neon-2" />
+                          )}
+                          <div className="flex items-center gap-2.5 min-w-0 z-10">
+                            <CountryFlag
+                              code={t.code}
+                              flag={t.flag}
+                              name={t.name}
+                              className="h-6 w-8 shrink-0 drop-shadow-md group-hover:scale-105 transition-transform duration-300 object-cover rounded"
+                              emojiClassName="text-xl shrink-0 drop-shadow-md group-hover:scale-105 transition-transform duration-300 select-none"
+                            />
+                            <span className="truncate tracking-wide">{t.name}</span>
+                            {active && (
+                              <PencilLine className="w-3.5 h-3.5 text-cyan-600 dark:text-neon shrink-0 animate-pulse" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2.5 z-10">
+                            <div className="text-xs font-mono font-bold text-fuchsia-600 text-right opacity-90 dark:text-neon-2">
+                              {Math.round(t.elo)}
+                            </div>
+                            {t.code.startsWith("CC_") && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteCustomCountry(t.code);
+                                }}
+                                className="p-1 rounded-md text-muted-foreground hover:text-red-500 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors cursor-pointer animate-in fade-in"
+                                title="Delete custom country"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-xs font-mono font-bold text-fuchsia-600 text-right z-10 opacity-90 dark:text-neon-2">
-                          {Math.round(t.elo)}
-                        </div>
-                      </button>
-                    );
-                  })}
-                  {filteredTeams.length === 0 && (
-                    <div className="text-center py-12 text-xs text-muted-foreground">
-                      No country matches &quot;{searchQuery}&quot;
-                    </div>
-                  )}
+                      );
+                    })}
+                    {filteredTeams.length === 0 && (
+                      <div className="text-center py-12 text-xs text-muted-foreground">
+                        No country matches &quot;{searchQuery}&quot;
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+
+          {/* Simulation Lab Accordion */}
+          <Accordion
+            id="country-simulation-lab"
+            type="multiple"
+            defaultValue={["simulation-lab"]}
+            className="rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] relative dark:border-white/10 dark:bg-slate-900"
+          >
+            <AccordionItem value="simulation-lab" className="border-none">
+              <AccordionTrigger className="px-5 pt-5 pb-3 hover:no-underline">
+                <div className="flex items-center justify-between w-full pr-4">
+                  <div>
+                    <div className="font-display font-bold text-lg text-foreground">Simulation Lab</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Tune strength, rating, and availability.</div>
+                  </div>
+                  <span className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full border ${activePlan === "pro"
+                    ? "bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20"
+                    : activePlan === "plus"
+                      ? "bg-cyan-500/10 text-cyan-500 border-cyan-500/20"
+                      : "bg-slate-500/10 text-slate-500 border-slate-500/20"
+                    }`}>
+                    {activePlan === "pro" ? "Pro" : activePlan === "plus" ? "Plus" : "Free"}
+                  </span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-white/5">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70 flex items-center">
+                        <span>Elo Rating</span>
+                        <InfoTooltip content="Overall skill rating of the country. Higher ELO increases the probability of winning matches." />
+                      </span>
+                      <input
+                        type="number"
+                        min={1200}
+                        max={2200}
+                        value={customElo}
+                        disabled={!canEditTeamCore}
+                        onChange={(e) => setCustomElo(clampRating(Number(e.target.value || 1200), 1200, 2200))}
+                        className="w-24 h-9 rounded-lg border border-slate-200 bg-white text-center text-sm font-mono font-bold text-slate-950 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-white/5">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70 flex items-center">
+                        <span>Attack Power</span>
+                        <InfoTooltip content="Influences the average number of goals scored per match by this team." />
+                      </span>
+                      <input
+                        type="number"
+                        min={15}
+                        max={99}
+                        value={customAttack}
+                        disabled={!canEditTeamCore}
+                        onChange={(e) => setCustomAttack(clampRating(Number(e.target.value || 15), 15, 99))}
+                        className="w-24 h-9 rounded-lg border border-slate-200 bg-white text-center text-sm font-mono font-bold text-slate-950 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-white/5">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70 flex items-center">
+                        <span>Defense Strength</span>
+                        <InfoTooltip content="Influences the average number of goals conceded per match by this team." />
+                      </span>
+                      <input
+                        type="number"
+                        min={15}
+                        max={99}
+                        value={customDefense}
+                        disabled={!canEditTeamCore}
+                        onChange={(e) => setCustomDefense(clampRating(Number(e.target.value || 15), 15, 99))}
+                        className="w-24 h-9 rounded-lg border border-slate-200 bg-white text-center text-sm font-mono font-bold text-slate-950 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="py-2.5 border-b border-slate-100 dark:border-white/5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-white/70 flex items-center gap-1.5">
+                        <span>Player Rating Boost</span>
+                        <InfoTooltip content="Increases or decreases the overall rating of all individual players in the squad." />
+                        <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded-md border bg-cyan-500/10 text-cyan-600 border-cyan-500/20 dark:bg-neon/10 dark:text-neon dark:border-neon/20 shrink-0 select-none">
+                          Plus
+                        </span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {!canEditPlayerRatings && <Lock className="w-3 h-3 text-amber-500" />}
+                        <span className="text-xs font-mono font-bold text-cyan-600 dark:text-neon">
+                          {customPlayerRatingDelta > 0 ? `+${customPlayerRatingDelta}` : customPlayerRatingDelta}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min={-10}
+                        max={10}
+                        value={customPlayerRatingDelta}
+                        disabled={!canEditPlayerRatings}
+                        onChange={(e) => setCustomPlayerRatingDelta(Number(e.target.value))}
+                        className="w-full accent-cyan-600 disabled:opacity-45"
+                        onClick={() => {
+                          if (!canEditPlayerRatings) {
+                            setUpgradeModalReason("plus");
+                            setUpgradeModalOpen(true);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="players-in" className="border-b border-slate-100 dark:border-white/5">
+                      <AccordionTrigger className="py-2.5 text-xs font-semibold text-slate-700 dark:text-white/70 hover:no-underline">
+                        <span className="flex items-center justify-between w-full pr-4">
+                          <span className="flex items-center gap-1.5">
+                            <span>Players In</span>
+                            <InfoTooltip content="Choose reserve players to sub into the active starting lineup/squad." />
+                            <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded-md border bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-500/20 dark:bg-neon-2/10 dark:text-neon-2 dark:border-neon-2/20 shrink-0 select-none">
+                              Pro
+                            </span>
+                            {playersIn.length > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-cyan-100 text-cyan-800 text-[10px] font-bold dark:bg-neon/20 dark:text-neon ml-1">
+                                {playersIn.length}
+                              </span>
+                            )}
+                          </span>
+                          {!canEditPlayerAvailability && <Lock className="w-3 h-3 text-amber-500" />}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-2 pb-3">
+                        <PlayerBucketCompact
+                          players={getTeamPlayers(selectedTeam.code).slice(0, 12)}
+                          activeIds={playersIn}
+                          disabled={!canEditPlayerAvailability}
+                          onToggle={(playerId) => togglePlayerSelection("in", playerId)}
+                          onLockedClick={() => {
+                            setUpgradeModalReason("pro");
+                            setUpgradeModalOpen(true);
+                          }}
+                        />
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="players-out" className="border-none">
+                      <AccordionTrigger className="py-2.5 text-xs font-semibold text-slate-700 dark:text-white/70 hover:no-underline">
+                        <span className="flex items-center justify-between w-full pr-4">
+                          <span className="flex items-center gap-1.5">
+                            <span>Players Out</span>
+                            <InfoTooltip content="Select active players to sideline or remove from the matches." />
+                            <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded-md border bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-500/20 dark:bg-neon-2/10 dark:text-neon-2 dark:border-neon-2/20 shrink-0 select-none">
+                              Pro
+                            </span>
+                            {playersOut.length > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold dark:bg-rose-500/20 dark:text-rose-400">
+                                {playersOut.length}
+                              </span>
+                            )}
+                          </span>
+                          {!canEditPlayerAvailability && <Lock className="w-3 h-3 text-amber-500" />}
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-2 pb-3">
+                        <PlayerBucketCompact
+                          players={getTeamPlayers(selectedTeam.code).slice(0, 12)}
+                          activeIds={playersOut}
+                          disabled={!canEditPlayerAvailability}
+                          onToggle={(playerId) => togglePlayerSelection("out", playerId)}
+                          onLockedClick={() => {
+                            setUpgradeModalReason("pro");
+                            setUpgradeModalOpen(true);
+                          }}
+                        />
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+
+                  <button
+                    type="button"
+                    onClick={handleRunSimulationClick}
+                    disabled={isSimulating || !isInitialized}
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] px-5 text-sm font-black text-white shadow-[0_10px_25px_rgba(44,124,135,0.2)] transition hover:opacity-95 active:scale-[0.98] disabled:opacity-50 mt-3"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Run Customized Simulation
+                  </button>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
 
         {/* Right main analysis panel */}
         <div className="space-y-6 min-w-0">
@@ -892,12 +1577,12 @@ export default function CountryPredictionsClient({
                 <div className="relative">
                   <div className="absolute -right-16 -top-16 w-56 h-56 bg-emerald-100/70 rounded-full filter blur-3xl pointer-events-none dark:bg-neon/10" />
                   <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-fuchsia-100/70 rounded-full filter blur-3xl pointer-events-none dark:bg-neon-2/10" />
-                  <div className="flex flex-col lg:flex-row justify-between items-stretch gap-6 border-b border-slate-200 pb-6 mb-6 dark:border-white/5">
+                  <div className="flex flex-col xl:flex-row justify-between items-stretch gap-6 border-b border-slate-200 pb-6 mb-6 dark:border-white/5">
                     {/* Team Profile Basic Details */}
-                    <div className="flex flex-col justify-between flex-grow gap-4">
+                    <div className="flex flex-col justify-between flex-grow gap-4 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-                        <div className="flex items-center gap-5">
-                          <div className="filter transition-transform duration-300 hover:scale-105">
+                        <div className="flex items-center gap-5 min-w-0">
+                          <div className="filter transition-transform duration-300 hover:scale-105 shrink-0">
                             <CountryFlag
                               code={selectedTeam.code}
                               flag={selectedTeam.flag}
@@ -906,21 +1591,31 @@ export default function CountryPredictionsClient({
                               emojiClassName="text-7xl drop-shadow-lg leading-none select-none"
                             />
                           </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-[0.25em] text-slate-600 dark:text-muted-foreground font-extrabold flex items-center gap-1.5">
+                          <div className="min-w-0">
+                            <div className="text-[10px] uppercase tracking-[0.25em] text-slate-600 dark:text-muted-foreground font-extrabold flex items-center gap-1.5 truncate">
                               <span>FIFA Rank #{selectedTeam.rank}</span>
                               <span className="text-slate-300 dark:text-white/20">&bull;</span>
                               <span className="text-fuchsia-600 dark:text-neon-2">Group {selectedGroup}</span>
                             </div>
-                            <h2 className="text-4xl font-extrabold font-display text-slate-950 dark:text-foreground mt-1 tracking-tight">
-                              {selectedTeam.name}
-                            </h2>
+                            <div className="mt-1 flex items-center gap-2">
+                              <h2 className="text-4xl font-extrabold font-display text-slate-950 dark:text-foreground tracking-tight truncate">
+                                {selectedTeam.name}
+                              </h2>
+                              <button
+                                type="button"
+                                onClick={() => document.getElementById("country-simulation-lab")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:border-cyan-400 hover:text-cyan-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:border-neon dark:hover:text-neon shrink-0"
+                                title="Edit simulation settings"
+                              >
+                                <PencilLine className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
 
                         {/* Save Projections Action Button */}
                         {simResults && (
-                          <div className="flex items-center self-start sm:self-auto gap-2">
+                          <div className="flex items-center self-start sm:self-auto gap-2 shrink-0">
                             {session ? (
                               <button
                                 onClick={handleSavePrediction}
@@ -961,23 +1656,27 @@ export default function CountryPredictionsClient({
                       </div>
 
                       {/* Core Attributes Mini Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-                        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">FIFA Elo Rating</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{Math.round(selectedTeam.elo)}</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mt-2">
+                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Elo Rating</span>
+                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">{Math.round(customElo)}</span>
                         </div>
-                        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Power Index</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{selectedTeam.power || 70}</span>
+                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Power Index</span>
+                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">{selectedTeam.power || 70}</span>
                         </div>
-                        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Squad Value</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">
+                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Squad Value</span>
+                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">
                             {selectedTeam.squadValueM ? `€${selectedTeam.squadValueM}M` : "N/A"}
                           </span>
                         </div>
-                        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium">Top Player</span>
+                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Attack / Defense</span>
+                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">{customAttack} / {customDefense}</span>
+                        </div>
+                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Top Player</span>
                           <span className="text-xs font-bold text-emerald-700 mt-1.5 block truncate dark:text-neon" title={getTopPlayer(selectedTeam.code)}>
                             {getTopPlayer(selectedTeam.code)}
                           </span>
@@ -986,7 +1685,7 @@ export default function CountryPredictionsClient({
                     </div>
 
                     {/* Circular Gauge for Champion Probability */}
-                    <div className="flex flex-col items-center justify-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 min-w-[200px] text-center shadow-sm relative group overflow-hidden dark:border-white/10 dark:bg-white/[0.02] dark:shadow-glass">
+                    <div className="flex flex-col items-center justify-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 min-w-[200px] max-w-sm w-full mx-auto xl:mx-0 text-center shadow-sm relative group overflow-hidden dark:border-white/10 dark:bg-white/[0.02] dark:shadow-glass shrink-0">
                       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-cyan-100/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 dark:to-neon/5" />
                       <span className="text-[10px] uppercase tracking-wider text-slate-700 dark:text-muted-foreground font-extrabold relative z-10">
                         Championship Prob
@@ -1038,7 +1737,7 @@ export default function CountryPredictionsClient({
                   </div>
 
                   {/* Stages Progression Matrix */}
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3">
                     {stageCards.map((s) => {
                       const count = simResults?.stages[s.key] || 0;
                       const pct = (count / 1000) * 100;
@@ -1106,23 +1805,23 @@ export default function CountryPredictionsClient({
           </Accordion>
 
           {/* Dual Charts Row */}
-          <div className="grid items-start gap-6 md:grid-cols-2">
+          <div className="grid items-stretch gap-6 md:grid-cols-2">
             {/* Radar Attributes Card */}
-            <Accordion type="multiple" defaultValue={["performance-attributes"]} className="rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
-              <AccordionItem value="performance-attributes" className="border-none">
+            <Accordion type="multiple" defaultValue={["performance-attributes"]} className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="performance-attributes" className="flex h-full flex-col border-none">
                 <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
                   <div>
                     <div className="font-display font-bold text-lg text-foreground">Performance Attributes</div>
                     <div className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</div>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="px-6 pb-6">
+                <AccordionContent className="flex-1 px-6 pb-6">
                   <div className="flex justify-end mb-6">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30">
                       Attributes
                     </span>
                   </div>
-                  <div className="h-64 flex items-center justify-center">
+                  <div className="flex h-64 min-h-[280px] items-center justify-center">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} outerRadius={85}>
                         <PolarGrid stroke={activeTheme === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.14)"} />
@@ -1136,44 +1835,46 @@ export default function CountryPredictionsClient({
             </Accordion>
 
             {/* Squad Quality Tiers Card */}
-            <Accordion type="multiple" defaultValue={["squad-quality"]} className="rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
-              <AccordionItem value="squad-quality" className="border-none">
+            <Accordion type="multiple" defaultValue={["squad-quality"]} className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="squad-quality" className="flex h-full flex-col border-none">
                 <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
                   <div>
                     <div className="font-display font-bold text-lg text-foreground">Squad Quality Tiers</div>
                     <div className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</div>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="px-6 pb-6">
+                <AccordionContent className="flex-1 px-6 pb-6">
                   <div className="flex justify-end mb-6">
                     <span className="self-start rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-fuchsia-700 dark:border-neon-2/30 dark:bg-neon-2/10 dark:text-neon-2">
                       Squad Profile
                     </span>
                   </div>
 
-                  <div className="mt-6 grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start">
-                    <div className="flex min-h-[220px] flex-col justify-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/5 dark:bg-white/[0.02]">
+                  <div className="mt-6 flex flex-col gap-6">
+                    <div className="flex min-h-[140px] w-full flex-col justify-center items-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/5 dark:bg-white/[0.02]">
                       <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</span>
-                      <span className="mt-3 text-5xl font-black font-mono text-foreground">
+                      <span className="mt-2 text-5xl font-black font-mono text-foreground">
                         {squadStats.avgRating || "--"}
                         {squadStats.avgRating ? <span className="text-2xl align-top">%</span> : null}
                       </span>
-                      <span className="mt-4 text-sm font-semibold text-emerald-700 dark:text-neon">{squadStats.total} Players</span>
+                      <span className="mt-3 text-sm font-semibold text-emerald-700 dark:text-neon">{squadStats.total} Players</span>
                     </div>
 
-                    <div className="space-y-5">
+                    <div className="space-y-4 w-full">
                       {squadTiers.map((tier) => (
-                        <div key={tier.label} className="grid grid-cols-[minmax(110px,140px)_minmax(0,1fr)_auto] items-center gap-4">
-                          <div className="text-sm font-semibold text-foreground">{tier.label}</div>
-                          <div className="h-4 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/8">
+                        <div key={tier.label} className="flex items-center gap-3 w-full">
+                          <div className="text-xs font-semibold text-foreground w-28 shrink-0 truncate">
+                            {tier.label}
+                          </div>
+                          <div className="flex-1 h-3 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/8">
                             <div
                               className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
                               style={{ width: `${Math.max(tier.pct, tier.count > 0 ? 4 : 0)}%` }}
                             />
                           </div>
-                          <div className="min-w-[72px] text-right font-mono text-sm font-bold tabular-nums text-foreground">
+                          <div className="w-20 shrink-0 text-right font-mono text-xs font-bold tabular-nums text-foreground">
                             {tier.count}
-                            <span className="ml-2 text-xs text-muted-foreground">({tier.pct}%)</span>
+                            <span className="ml-1.5 text-[10px] text-muted-foreground font-medium">({tier.pct}%)</span>
                           </div>
                         </div>
                       ))}
@@ -1210,7 +1911,7 @@ export default function CountryPredictionsClient({
                     </span>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto pb-4 scrollbar-custom">
+                  <div className="overflow-x-auto overflow-y-hidden pb-4 scrollbar-custom [scrollbar-gutter:stable]">
                     <div className="flex items-stretch gap-4 min-w-max py-2 px-1">
                       {/* Start Node */}
                       <div className="flex flex-col justify-center items-center bg-gradient-to-br from-cyan-50 to-fuchsia-50 border border-cyan-200 rounded-[1.75rem] px-5 py-4 min-w-[140px] shadow-sm relative overflow-hidden group dark:from-neon/20 dark:to-neon-2/10 dark:border-neon/40 dark:shadow-glass">
@@ -1298,18 +1999,54 @@ export default function CountryPredictionsClient({
               <div className="absolute right-0 top-0 w-96 h-96 bg-cyan-100/60 dark:bg-[#00c6ff]/5 rounded-full filter blur-3xl pointer-events-none" />
 
               {simResults?.mockTournament && (
-                <div className="w-full overflow-x-auto scrollbar-custom pb-8 relative z-10">
-                  {/* Header Row at the top of the bracket columns */}
-                  <div className="flex items-center justify-start min-w-max gap-12 px-4 mb-6">
-                    <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Round of 32</div>
-                    <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Round of 16</div>
-                    <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Quarter-Finals</div>
-                    <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Semi-Finals</div>
-                    <div className="w-56 text-[10px] uppercase font-bold text-yellow-600 dark:text-yellow-500 tracking-widest pb-2 border-b border-border dark:border-white/10 text-center">Finals & Champion</div>
+                <>
+                  {/* Zoom Controls */}
+                  <div className="flex justify-end mb-6 relative z-20">
+                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setZoomScale(prev => Math.max(50, prev - 10))}
+                        className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                        title="Zoom Out"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span className="text-xs font-mono font-bold w-12 text-center text-foreground dark:text-white">
+                        {zoomScale}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setZoomScale(prev => Math.min(150, prev + 10))}
+                        className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                        title="Zoom In"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setZoomScale(85)}
+                        className="text-[10px] font-bold px-2 py-1 rounded-md hover:bg-white dark:hover:bg-white/10 text-[#00c6ff] dark:text-neon transition cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Bracket Content Row */}
-                  <div className="flex items-start justify-start min-w-max gap-12 px-4">
+                  <div className="w-full overflow-x-auto scrollbar-custom pb-8 relative z-10">
+                    {/* Header Row at the top of the bracket columns */}
+                    <div className="flex items-center justify-start min-w-max gap-12 px-4 mb-6" style={{ zoom: zoomScale / 100 }}>
+                      <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Round of 32</div>
+                      <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Round of 16</div>
+                      <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Quarter-Finals</div>
+                      <div className="w-56 text-[10px] uppercase font-bold text-[#00c6ff] tracking-widest pb-2 border-b border-border dark:border-white/10">Semi-Finals</div>
+                      <div className="w-56 text-[10px] uppercase font-bold text-yellow-600 dark:text-yellow-500 tracking-widest pb-2 border-b border-border dark:border-white/10 text-center">Finals & Champion</div>
+                    </div>
+
+                    {/* Bracket Content Row */}
+                    <div 
+                      className="flex items-start justify-start min-w-max gap-12 px-4 transition-transform duration-300 origin-top-left"
+                      style={{ zoom: zoomScale / 100 }}
+                    >
                     {/* R32 Column */}
                     <div className="flex flex-col shrink-0">
                       {simResults.mockTournament.r32.map((m: any, i: number) => {
@@ -1555,8 +2292,700 @@ export default function CountryPredictionsClient({
                     </div>
                   </div>
                 </div>
+                </>
               )}
             </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      {/* Saved Projections & Comparison Accordion */}
+      <Accordion
+        type="multiple"
+        defaultValue={["saved-comparison"]}
+        className="w-full bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-[2rem] relative shadow-[0_18px_50px_rgba(15,23,42,0.08)] mt-8"
+      >
+        <AccordionItem value="saved-comparison" className="border-none">
+          <AccordionTrigger className="px-6 md:px-8 pt-6 md:pt-8 pb-3 hover:no-underline">
+            <div>
+              <div className="font-display font-extrabold text-2xl text-foreground dark:text-white tracking-tight">Saved Projections & Comparison</div>
+              <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">Load saved projections or select multiple to compare side-by-side</div>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-6 md:px-8 pb-6 md:pb-8">
+            {!session ? (
+              <div className="text-center py-10">
+                <p className="text-sm text-muted-foreground mb-4">Please sign in to view, load, and compare your saved predictions.</p>
+                <button
+                  onClick={() => openAuthModal("signin")}
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500 via-emerald-500 to-fuchsia-500 text-white px-5 py-3 rounded-2xl text-xs font-black shadow-md hover:scale-[1.02] transition-all cursor-pointer"
+                >
+                  <User className="w-4 h-4" />
+                  <span>Sign In to Access</span>
+                </button>
+              </div>
+            ) : isLoadingSaved ? (
+              <div className="flex flex-col justify-center items-center py-12 gap-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+                <span className="text-xs text-muted-foreground">Fetching saved simulations...</span>
+              </div>
+            ) : savedPredictions.length === 0 ? (
+              <div className="text-center py-12 text-sm text-muted-foreground border border-dashed border-slate-200 dark:border-white/10 rounded-[1.75rem] p-6 bg-slate-50/50 dark:bg-white/[0.01]">
+                <Sparkles className="w-8 h-8 text-cyan-500 mx-auto mb-3 opacity-60 animate-pulse" />
+                <p className="font-bold text-foreground">No country projections saved yet.</p>
+                <p className="text-xs mt-1.5 max-w-md mx-auto">Adjust team attributes in the Simulation Lab, run the simulator, and click &quot;Save to Predictions&quot; to begin building your comparison library.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="overflow-x-auto rounded-[1.5rem] border border-slate-200 dark:border-white/10 bg-slate-50/30 dark:bg-black/20">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        <th className="py-3 px-4 w-12 text-center">Compare</th>
+                        <th className="py-3 px-4 min-w-[150px]">Country</th>
+                        <th className="py-3 px-4">Elo Rating</th>
+                        <th className="py-3 px-4">Model Engine</th>
+                        <th className="py-3 px-4">Championship Odds</th>
+                        <th className="py-3 px-4">Saved On</th>
+                        <th className="py-3 px-4 text-right pr-6">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-white/5">
+                      {savedPredictions.map((p) => {
+                        let data: any = null;
+                        try {
+                          data = readPredictionPayload(p.predictedPayload, p.predictedWinner);
+                        } catch (e) {
+                          console.error(e);
+                        }
+
+                        if (!data) return null;
+                        const isChecked = selectedCompareIds.includes(p.id);
+                        const isDisableCompare = !isChecked && selectedCompareIds.length >= 4;
+                        const savedDate = new Date(p.updatedAt).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        });
+
+                        return (
+                          <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+                            <td className="py-3.5 px-4 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                disabled={isDisableCompare}
+                                onChange={() => toggleCompareSelect(p.id)}
+                                className="w-4.5 h-4.5 rounded border-slate-350 accent-cyan-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              />
+                            </td>
+                            <td className="py-3.5 px-4 font-bold">
+                              <div className="flex items-center gap-2">
+                                <CountryFlag code={data.code} flag={data.flag} name={data.name} className="h-5 w-7 shrink-0 rounded object-cover shadow-sm" emojiClassName="text-lg leading-none" />
+                                <span className="text-foreground">{data.name}</span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-xs text-muted-foreground">
+                              {Math.round(data.customElo ?? data.elo ?? 1500)}
+                            </td>
+                            <td className="py-3.5 px-4 text-xs font-semibold text-cyan-600 dark:text-neon uppercase">
+                              {data.modelName || "base"}
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-foreground">
+                              {data.championProb}%
+                            </td>
+                            <td className="py-3.5 px-4 text-xs text-muted-foreground">
+                              {savedDate}
+                            </td>
+                            <td className="py-3.5 px-4 text-right pr-6">
+                              <div className="flex items-center justify-end gap-2.5">
+                                <button
+                                  onClick={() => handleLoadPrediction(p)}
+                                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 hover:border-cyan-400 hover:text-cyan-500 bg-white hover:bg-slate-50 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 dark:text-white transition cursor-pointer"
+                                  title="Load this simulation results and setup"
+                                >
+                                  Load
+                                </button>
+                                <button
+                                  onClick={() => handleDeletePrediction(p.id, data.name)}
+                                  className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition cursor-pointer"
+                                  title="Delete saved projection"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Compare Section */}
+                {selectedCompareIds.length < 2 ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-4 rounded-[1.25rem]">
+                    <Info className="w-4.5 h-4.5 text-cyan-500 shrink-0" />
+                    <span>Select at least 2 saved country projections above to compare their performance parameters and tournament outcomes side-by-side.</span>
+                  </div>
+                ) : (
+                  <div className="border-t border-slate-200 dark:border-white/10 pt-6">
+                    {(() => {
+                      const lineColors = [
+                        "#06b6d4", // Cyan
+                        "#d946ef", // Fuchsia
+                        "#10b981", // Emerald
+                        "#f59e0b", // Amber
+                        "#8b5cf6", // Violet
+                        "#3b82f6", // Blue
+                      ];
+
+                      const parsedCompareData = savedPredictions
+                        .filter(p => selectedCompareIds.includes(p.id))
+                        .map((p, idx) => {
+                          let data: any = null;
+                          try {
+                            data = readPredictionPayload(p.predictedPayload, p.predictedWinner);
+                          } catch (e) {
+                            console.error(e);
+                          }
+                          return { id: p.id, raw: p, data, color: lineColors[idx % lineColors.length] };
+                        })
+                        .filter(item => item.data !== null);
+
+                      const progressionChartData = [
+                        { stage: "Group Stage", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: 100 }), {}) },
+                        { stage: "Round of 32", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.r32 ?? 0) / 10).toFixed(1)) }), {}) },
+                        { stage: "Round of 16", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.r16 ?? 0) / 10).toFixed(1)) }), {}) },
+                        { stage: "Quarter Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.qf ?? 0) / 10).toFixed(1)) }), {}) },
+                        { stage: "Semi Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.sf ?? 0) / 10).toFixed(1)) }), {}) },
+                        { stage: "Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.final ?? 0) / 10).toFixed(1)) }), {}) },
+                        { stage: "Champion", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.champion ?? (c.data.championProb * 10 || 0)) / 10).toFixed(1)) }), {}) }
+                      ];
+
+                      const attributesChartData = [
+                        {
+                          attribute: "Elo Rating",
+                          ...parsedCompareData.reduce((acc, c) => {
+                            const rawElo = c.data.customElo ?? c.data.elo ?? 1500;
+                            const scaledElo = Math.round((rawElo - 1300) / 6);
+                            return {
+                              ...acc,
+                              [c.data.name]: Math.max(0, Math.min(100, scaledElo)),
+                              [`${c.data.name}_raw`]: rawElo
+                            };
+                          }, {})
+                        },
+                        {
+                          attribute: "Attack Rating",
+                          ...parsedCompareData.reduce((acc, c) => {
+                            const rawAttack = c.data.customAttack ?? 75;
+                            return {
+                              ...acc,
+                              [c.data.name]: rawAttack,
+                              [`${c.data.name}_raw`]: rawAttack
+                            };
+                          }, {})
+                        },
+                        {
+                          attribute: "Defense Rating",
+                          ...parsedCompareData.reduce((acc, c) => {
+                            const rawDefense = c.data.customDefense ?? 75;
+                            return {
+                              ...acc,
+                              [c.data.name]: rawDefense,
+                              [`${c.data.name}_raw`]: rawDefense
+                            };
+                          }, {})
+                        },
+                        {
+                          attribute: "Squad Value",
+                          ...parsedCompareData.reduce((acc, c) => {
+                            const rawSquadValue = c.data.squadValueM ?? appTeams.find(t => t.code === c.data.code)?.squadValueM ?? 100;
+                            // Map 0 - 1500M squad value to 0-100
+                            const scaledSquad = Math.round(rawSquadValue / 15);
+                            return {
+                              ...acc,
+                              [c.data.name]: Math.max(0, Math.min(100, scaledSquad)),
+                              [`${c.data.name}_raw`]: `€${rawSquadValue}M`
+                            };
+                          }, {})
+                        },
+                        {
+                          attribute: "Championship Odds",
+                          ...parsedCompareData.reduce((acc, c) => {
+                            const ch = c.data.stages?.champion ?? (c.data.championProb * 10 || 0);
+                            const rawChamp = parseFloat((ch / 10).toFixed(1));
+                            return {
+                              ...acc,
+                              [c.data.name]: rawChamp,
+                              [`${c.data.name}_raw`]: `${rawChamp}%`
+                            };
+                          }, {})
+                        }
+                      ];
+
+                      return (
+                        <>
+                          {/* Line Chart Card */}
+                          <div className="mb-8 p-5 rounded-[2rem] border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900 shadow-[0_16px_40px_rgba(15,23,42,0.04)]">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                              <div>
+                                <h4 className="font-display font-extrabold text-base text-foreground flex items-center gap-2">
+                                  <TrendingUp className="w-5 h-5 text-cyan-500" />
+                                  <span>Comparison Metrics Projection</span>
+                                </h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">Visualize side-by-side attributes or progression probabilities</p>
+                              </div>
+                              <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200/50 dark:border-white/5 self-stretch sm:self-auto justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setCompareChartTab("progression")}
+                                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                                    compareChartTab === "progression"
+                                      ? "bg-white text-cyan-600 shadow-sm dark:bg-slate-800 dark:text-neon"
+                                      : "text-muted-foreground hover:text-foreground"
+                                  }`}
+                                >
+                                  Progression Curve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCompareChartTab("attributes")}
+                                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                                    compareChartTab === "attributes"
+                                      ? "bg-white text-cyan-600 shadow-sm dark:bg-slate-800 dark:text-neon"
+                                      : "text-muted-foreground hover:text-foreground"
+                                  }`}
+                                >
+                                  Attribute Profile
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="h-80 w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <LineChart
+                                  data={compareChartTab === "progression" ? progressionChartData : attributesChartData}
+                                  margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
+                                >
+                                  <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    stroke={activeTheme === "light" ? "rgba(15,23,42,0.06)" : "rgba(255,255,255,0.05)"}
+                                  />
+                                  <XAxis
+                                    dataKey={compareChartTab === "progression" ? "stage" : "attribute"}
+                                    tick={{
+                                      fill: activeTheme === "light" ? "rgba(15,23,42,0.6)" : "rgba(255,255,255,0.6)",
+                                      fontSize: 10,
+                                      fontFamily: "var(--font-display)",
+                                      fontWeight: "bold"
+                                    }}
+                                    stroke={activeTheme === "light" ? "rgba(15,23,42,0.1)" : "rgba(255,255,255,0.1)"}
+                                  />
+                                  <YAxis
+                                    domain={[0, 100]}
+                                    tick={{
+                                      fill: activeTheme === "light" ? "rgba(15,23,42,0.6)" : "rgba(255,255,255,0.6)",
+                                      fontSize: 10,
+                                      fontFamily: "var(--font-mono)"
+                                    }}
+                                    stroke={activeTheme === "light" ? "rgba(15,23,42,0.1)" : "rgba(255,255,255,0.1)"}
+                                    tickFormatter={(val) => compareChartTab === "progression" ? `${val}%` : val}
+                                  />
+                                  <RechartsTooltip
+                                    content={<CustomCompareTooltip mode={compareChartTab} />}
+                                  />
+                                  <Legend
+                                    wrapperStyle={{
+                                      fontSize: "11px",
+                                      fontFamily: "var(--font-display)",
+                                      fontWeight: "bold",
+                                      paddingTop: "16px"
+                                    }}
+                                  />
+                                  {parsedCompareData.map((c) => (
+                                    <Line
+                                      key={c.id}
+                                      type="monotone"
+                                      dataKey={c.data.name}
+                                      stroke={c.color}
+                                      activeDot={{ r: 6, strokeWidth: 0 }}
+                                      strokeWidth={3}
+                                      dot={{ r: 4, strokeWidth: 1.5, fill: "white" }}
+                                    />
+                                  ))}
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+
+                          {/* Side-by-Side Table Comparison */}
+                          {(() => {
+                            const compareLen = parsedCompareData.length;
+                            const maxElo = compareLen > 0 ? Math.max(...parsedCompareData.map(c => Math.round(c.data.customElo ?? c.data.elo ?? 1500))) : 0;
+                            const maxAttack = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.customAttack ?? 75)) : 0;
+                            const maxDefense = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.customDefense ?? 75)) : 0;
+                            const maxSquadValue = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.squadValueM ?? appTeams.find(t => t.code === c.data.code)?.squadValueM ?? 0)) : 0;
+                            const maxChampionshipOdds = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.champion ?? (c.data.championProb * 10 || 0))) : 0;
+                            const maxReachFinal = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.final ?? 0)) : 0;
+                            const maxReachSF = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.sf ?? 0)) : 0;
+                            const maxReachQF = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.qf ?? 0)) : 0;
+                            const maxReachR16 = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.r16 ?? 0)) : 0;
+                            const maxReachR32 = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.r32 ?? 0)) : 0;
+
+                            const renderStageRow = (label: string, icon: ReactNode, stageKey: string, maxVal: number) => {
+                              return (
+                                <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                  <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                    <div className="flex items-center gap-2">
+                                      {icon}
+                                      <span>{label}</span>
+                                    </div>
+                                  </td>
+                                  {parsedCompareData.map((c) => {
+                                    const rawVal = c.data.stages?.[stageKey] ?? 0;
+                                    const prob = parseFloat((rawVal / 10).toFixed(1));
+                                    const isBest = rawVal === maxVal && parsedCompareData.length > 1 && rawVal > 0;
+                                    return (
+                                      <td key={c.id} className={`py-4 px-5 transition-colors ${
+                                        isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
+                                      }`}>
+                                        <div className="space-y-1.5 max-w-[180px]">
+                                          <div className="flex items-center justify-between text-xs font-bold font-mono">
+                                            <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
+                                              {prob}%
+                                            </span>
+                                            {isBest && <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Best</span>}
+                                          </div>
+                                          <div className="w-full bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                            <div 
+                                              className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-emerald-500" : "bg-cyan-500"}`} 
+                                              style={{ width: `${prob}%` }} 
+                                            />
+                                          </div>
+                                        </div>
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            };
+
+                            return (
+                              <div className="mb-8 overflow-x-auto rounded-[2rem] border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900 shadow-[0_16px_40px_rgba(15,23,42,0.04)] scrollbar-custom relative">
+                                <table className="w-full text-left border-separate border-spacing-0 text-xs md:text-sm">
+                                  <thead>
+                                    <tr className="border-b border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
+                                      <th className="py-4 px-5 font-display font-extrabold text-slate-700 dark:text-muted-foreground w-48 sticky left-0 bg-slate-50 dark:bg-slate-900 z-20 border-r border-b border-slate-200/65 dark:border-white/15 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        Parameter
+                                      </th>
+                                      {parsedCompareData.map((c) => (
+                                        <th key={c.id} className="py-4 px-5 font-display font-extrabold text-foreground border-b border-slate-200 dark:border-white/10 min-w-[220px]">
+                                          <div className="flex flex-col gap-2 p-3 rounded-2xl bg-slate-50/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 relative overflow-hidden">
+                                            {/* Accent color bar mapping to line chart */}
+                                            <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: c.color }} />
+                                            <div className="flex items-center gap-2 mt-1.5">
+                                              <CountryFlag code={c.data.code} flag={c.data.flag} name={c.data.name} className="h-5 w-7 rounded object-cover shadow-md border border-slate-200/50 dark:border-white/10 shrink-0" emojiClassName="text-lg leading-none" />
+                                              <span className="text-sm font-extrabold truncate text-foreground">{c.data.name}</span>
+                                            </div>
+                                          </div>
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {/* Elo Rating */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <TrendingUp className="w-4 h-4 text-cyan-500 shrink-0" />
+                                          <span>Elo Rating</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const elo = Math.round(c.data.customElo ?? c.data.elo ?? 1500);
+                                        const isBest = elo === maxElo && parsedCompareData.length > 1;
+                                        return (
+                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 font-mono font-bold transition-colors ${
+                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
+                                          }`}>
+                                            <div className="flex items-center justify-between gap-1.5 max-w-[180px]">
+                                              <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
+                                                {elo}
+                                              </span>
+                                              {isBest && (
+                                                <span className="text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-0.5">
+                                                  <Trophy className="w-2.5 h-2.5" /> Best
+                                                </span>
+                                              )}
+                                            </div>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Attack Power */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+                                          <span>Attack Power</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const attack = c.data.customAttack ?? 75;
+                                        const isBest = attack === maxAttack && parsedCompareData.length > 1;
+                                        return (
+                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 transition-colors ${
+                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
+                                          }`}>
+                                            <div className="space-y-1.5 max-w-[180px]">
+                                              <div className="flex items-center justify-between text-xs font-bold font-mono">
+                                                <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
+                                                  {attack}
+                                                </span>
+                                                {isBest && <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Top</span>}
+                                              </div>
+                                              <div className="w-full bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                                <div 
+                                                  className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-emerald-500" : "bg-cyan-500"}`} 
+                                                  style={{ width: `${attack}%` }} 
+                                                />
+                                              </div>
+                                            </div>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Defense Strength */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
+                                          <span>Defense Strength</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const defense = c.data.customDefense ?? 75;
+                                        const isBest = defense === maxDefense && parsedCompareData.length > 1;
+                                        return (
+                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 transition-colors ${
+                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
+                                          }`}>
+                                            <div className="space-y-1.5 max-w-[180px]">
+                                              <div className="flex items-center justify-between text-xs font-bold font-mono">
+                                                <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
+                                                  {defense}
+                                                </span>
+                                                {isBest && <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Top</span>}
+                                              </div>
+                                              <div className="w-full bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                                <div 
+                                                  className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-emerald-500" : "bg-cyan-500"}`} 
+                                                  style={{ width: `${defense}%` }} 
+                                                />
+                                              </div>
+                                            </div>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Squad Value */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Coins className="w-4 h-4 text-yellow-500 shrink-0" />
+                                          <span>Squad Value</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const squadVal = c.data.squadValueM ?? appTeams.find(t => t.code === c.data.code)?.squadValueM ?? 0;
+                                        const isBest = squadVal === maxSquadValue && squadVal > 0 && parsedCompareData.length > 1;
+                                        return (
+                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 font-mono font-bold transition-colors ${
+                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
+                                          }`}>
+                                            <div className="flex items-center justify-between gap-1.5 max-w-[180px]">
+                                              <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
+                                                {squadVal ? `€${squadVal}M` : "N/A"}
+                                              </span>
+                                              {isBest && (
+                                                <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide bg-emerald-500/10 px-1 py-0.5 rounded border border-emerald-500/10">Highest</span>
+                                              )}
+                                            </div>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Model Engine */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Cpu className="w-4 h-4 text-purple-500 shrink-0" />
+                                          <span>Model Engine</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const model = c.data.modelName || "base";
+                                        let badgeClass = "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20";
+                                        if (model === "advanced") {
+                                          badgeClass = "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/20";
+                                        } else if (model === "pro") {
+                                          badgeClass = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
+                                        }
+                                        return (
+                                          <td key={c.id} className="py-4 px-5 border-b border-slate-100 dark:border-white/5">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${badgeClass}`}>
+                                              {model}
+                                            </span>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Championship Odds */}
+                                    <tr className="border-b border-slate-200 dark:border-white/10 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Award className="w-4 h-4 text-rose-500 shrink-0" />
+                                          <span>Championship Odds</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => {
+                                        const ch = c.data.stages?.champion ?? (c.data.championProb * 10 || 0);
+                                        const prob = parseFloat((ch / 10).toFixed(1));
+                                        const isBest = ch === maxChampionshipOdds && parsedCompareData.length > 1;
+                                        return (
+                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-200 dark:border-white/10 transition-colors ${
+                                            isBest ? "bg-cyan-500/[0.08] dark:bg-neon/10" : "bg-cyan-500/[0.02] dark:bg-neon/5"
+                                          }`}>
+                                            <div className="space-y-1.5 max-w-[180px]">
+                                              <div className="flex items-center justify-between text-xs font-black font-mono">
+                                                <span className={isBest ? "text-cyan-600 dark:text-neon text-sm" : "text-foreground"}>
+                                                  {prob}%
+                                                </span>
+                                                {isBest && (
+                                                  <span className="text-[9px] font-extrabold text-cyan-600 dark:text-neon uppercase tracking-wide bg-cyan-500/15 dark:bg-neon/20 px-1 py-0.2 rounded flex items-center gap-0.5 animate-pulse">
+                                                    <Trophy className="w-2.5 h-2.5" /> Favorite
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="w-full bg-slate-200 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
+                                                <div 
+                                                  className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-cyan-500 dark:bg-neon" : "bg-cyan-400"}`} 
+                                                  style={{ width: `${prob}%` }} 
+                                                />
+                                              </div>
+                                            </div>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+
+                                    {/* Reach Final */}
+                                    {renderStageRow("Reach Final", <ChevronRight className="w-4 h-4 text-cyan-500 shrink-0" />, "final", maxReachFinal)}
+
+                                    {/* Reach Semi-Final */}
+                                    {renderStageRow("Reach Semi-Final", <ChevronRight className="w-4 h-4 text-cyan-500/80 shrink-0" />, "sf", maxReachSF)}
+
+                                    {/* Reach Quarter-Final */}
+                                    {renderStageRow("Reach Quarter-Final", <ChevronRight className="w-4 h-4 text-cyan-500/60 shrink-0" />, "qf", maxReachQF)}
+
+                                    {/* Reach Round of 16 */}
+                                    {renderStageRow("Reach Round of 16", <ChevronRight className="w-4 h-4 text-cyan-500/40 shrink-0" />, "r16", maxReachR16)}
+
+                                    {/* Reach Round of 32 */}
+                                    {renderStageRow("Reach Round of 32", <ChevronRight className="w-4 h-4 text-cyan-500/20 shrink-0" />, "r32", maxReachR32)}
+
+                                    {/* Expected Path */}
+                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Route className="w-4 h-4 text-pink-500 shrink-0" />
+                                          <span>Expected Path</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => (
+                                        <td key={c.id} className="py-4 px-5">
+                                          <div className="relative pl-4 border-l border-slate-200 dark:border-white/10 space-y-3.5 my-1 max-w-[220px] ml-2">
+                                            {c.data.path?.map((step: any, sidx: number) => {
+                                              const stageShort = step.stage
+                                                .replace("Round of 32", "R32")
+                                                .replace("Round of 16", "R16")
+                                                .replace("Quarter Final", "QF")
+                                                .replace("Semi Final", "SF")
+                                                .replace("Final", "Final");
+                                              return (
+                                                <div key={sidx} className="relative text-[11px]">
+                                                  {/* Timeline Bullet Node centered on parent border-l */}
+                                                  <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-cyan-500 border-2 border-white dark:border-slate-900 shadow-sm" />
+                                                  <div className="flex flex-col gap-0.5">
+                                                    <span className="font-extrabold text-[9px] uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                                      {stageShort}
+                                                    </span>
+                                                    <div className="flex items-center gap-1.5">
+                                                      <span className="font-bold text-foreground truncate max-w-[120px]" title={step.opponentName}>
+                                                        {step.opponentFlag} {step.opponentName}
+                                                      </span>
+                                                      <span className="font-mono font-bold text-cyan-600 dark:text-neon text-[10px] bg-cyan-500/10 px-1 py-0.2 rounded shrink-0">
+                                                        {step.winPct}%
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </td>
+                                      ))}
+                                    </tr>
+
+                                    {/* Actions */}
+                                    <tr className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
+                                        <div className="flex items-center gap-2">
+                                          <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
+                                          <span>Actions</span>
+                                        </div>
+                                      </td>
+                                      {parsedCompareData.map((c) => (
+                                        <td key={c.id} className="py-4 px-5">
+                                          <div className="flex gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleLoadPrediction(c.raw)}
+                                              className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-cyan-500/10 text-cyan-700 hover:bg-cyan-500/20 dark:bg-neon/10 dark:text-neon dark:hover:bg-neon/20 transition cursor-pointer"
+                                            >
+                                              Load Settings
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleCompareSelect(c.id)}
+                                              className="text-[11px] font-bold px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                                            >
+                                              Remove
+                                            </button>
+                                          </div>
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            );
+                          })()}
+
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
           </AccordionContent>
         </AccordionItem>
       </Accordion>
@@ -1580,7 +3009,7 @@ export default function CountryPredictionsClient({
               {isSimulating ? (
                 <div className="flex w-full flex-col items-center justify-center gap-4 py-2">
                   <img
-                    src="/lottie/Footballer.svg"
+                    src="/lottie/World Cup!.svg"
                     alt="Simulation loading"
                     className="h-80 w-80 object-contain"
                   />
@@ -1650,6 +3079,186 @@ export default function CountryPredictionsClient({
         onClose={() => setUpgradeModalOpen(false)}
         reason={upgradeModalReason}
       />
+    </div>
+  );
+}
+
+function LabField({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  disabled,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={`rounded-[1.25rem] border p-3 ${disabled ? "border-slate-200/70 bg-slate-100/70 opacity-70 dark:border-white/10 dark:bg-white/[0.03]" : "border-slate-200 bg-slate-50/80 dark:border-white/10 dark:bg-white/[0.03]"}`}>
+      <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-bold text-center">{label}</div>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(clampRating(Number(e.target.value || min), min, max))}
+        className="mt-2 h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-center text-sm font-mono font-bold text-slate-950 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+      />
+    </div>
+  );
+}
+
+function PlayerBucket({
+  title,
+  description,
+  players,
+  activeIds,
+  disabled,
+  onToggle,
+  onLockedClick,
+}: {
+  title: string;
+  description: string;
+  players: PlayerStats[];
+  activeIds: string[];
+  disabled?: boolean;
+  onToggle: (playerId: string) => void;
+  onLockedClick: () => void;
+}) {
+  return (
+    <div className={`rounded-[1.4rem] border p-4 ${disabled ? "border-amber-200 bg-amber-50/60 dark:border-amber-500/20 dark:bg-amber-500/5" : "border-slate-200 bg-slate-50/80 dark:border-white/10 dark:bg-white/[0.03]"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-bold text-slate-950 dark:text-white">{title}</div>
+          <div className="text-xs text-slate-500 dark:text-white/55">{description}</div>
+        </div>
+        {disabled ? (
+          <button
+            type="button"
+            onClick={onLockedClick}
+            className="rounded-full border border-amber-300 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700 dark:border-amber-500/30 dark:text-amber-300"
+          >
+            Pro
+          </button>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex max-h-[220px] flex-wrap gap-2 overflow-y-auto pr-1 scrollbar-custom">
+        {players.map((player) => {
+          const playerId = `${player["Team Code"]}-${player["Player Name"]}`;
+          const active = activeIds.includes(playerId);
+
+          return (
+            <button
+              key={playerId}
+              type="button"
+              disabled={disabled}
+              onClick={() => onToggle(playerId)}
+              className={`rounded-full border px-3 py-2 text-xs font-semibold transition ${active
+                ? "border-cyan-400 bg-cyan-500/10 text-cyan-700 dark:text-neon"
+                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:hover:border-white/20"
+                }`}
+            >
+              {player["Name on Shirt"] || player["Player Name"]}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function cleanPlayerName(name: string) {
+  if (!name) return "";
+  return name
+    .replace(/MARTNEZ/g, "MARTÍNEZ")
+    .replace(/ALVAREZ/g, "ÁLVAREZ")
+    .replace(/GONZALEZ/g, "GONZÁLEZ")
+    .replace(/DI MARA/g, "DI MARÍA")
+    .replace(/FERNANDEZ/g, "FERNÁNDEZ")
+    // Fix Croatia / Balkan names corrupted by encoding issues (replacing both ? and replacement chars)
+    .replace(/KOVA[?\uFFFD]I[?\uFFFD]/gi, "KOVACIC")
+    .replace(/STANI[?\uFFFD]I[?\uFFFD]/gi, "STANISIC")
+    .replace(/PONGRA[?\uFFFD]I[?\uFFFD]/gi, "PONGRACIC")
+    .replace(/MODRI[?\uFFFD]/gi, "MODRIC")
+    .replace(/[?\uFFFD]ALETA-CAR/gi, "CALETA-CAR")
+    .replace(/PA[?\uFFFD]ALI[?\uFFFD]/gi, "PASALIC")
+    .replace(/P\.\s*SU[?\uFFFD]I[?\uFFFD]/gi, "P. SUCIC")
+    .replace(/[?\uFFFD]UTALO/gi, "SUTALO")
+    .replace(/VLA[?\uFFFD]I[?\uFFFD]/gi, "VLASIC")
+    .replace(/PERI[?\uFFFD]I[?\uFFFD]/gi, "PERISIC")
+    .replace(/KRAMARI[?\uFFFD]/gi, "KRAMARIC")
+    .replace(/LIVAKOVI[?\uFFFD]/gi, "LIVAKOVIC")
+    .replace(/PJA[?\uFFFD]A/gi, "PJACA")
+    .replace(/SU[?\uFFFD]I[?\uFFFD]/gi, "SUCIC")
+    .replace(/GON[?\uFFFD]LEZ/gi, "GONZALEZ")
+    .replace(/MART[?\uFFFD]NEZ/gi, "MARTINEZ")
+    .replace(/ALV[?\uFFFD]H?REZ/gi, "ALVAREZ")
+    .replace(/DI MAR[?\uFFFD]A/gi, "DI MARIA")
+    .replace(/FERN[?\uFFFD]NDEZ/gi, "FERNANDEZ")
+    .replace(/S[?\uFFFD]NCHEZ/gi, "SANCHEZ")
+    .replace(/GIM[?\uFFFD]NEZ/gi, "GIMENEZ")
+    .replace(/NU[?\uFFFD]EZ/gi, "NUNEZ")
+    .replace(/VI[?\uFFFD]A/gi, "VINA")
+    .replace(/R[?\uFFFD]DIGER/gi, "RUDIGER")
+    .replace(/GRO[?\uFFFD]/gi, "GROSS")
+    .replace(/SAN[?\uFFFD]/gi, "SANE")
+    .replace(/N[?\uFFFD]BEL/gi, "NUBEL")
+    .replace(/KONAT[?\uFFFD]/gi, "KONATE")
+    .replace(/ZA[?\uFFFD]RE-EMERY/gi, "ZAIRE-EMERY")
+    .replace(/[\uFFFD]/g, "")
+    .replace(/\?/g, "");
+}
+
+function PlayerBucketCompact({
+  players,
+  activeIds,
+  disabled,
+  onToggle,
+  onLockedClick,
+}: {
+  players: PlayerStats[];
+  activeIds: string[];
+  disabled?: boolean;
+  onToggle: (playerId: string) => void;
+  onLockedClick: () => void;
+}) {
+  return (
+    <div
+      className="flex max-h-[160px] flex-wrap gap-1.5 overflow-y-auto pr-1 scrollbar-custom"
+      onClick={() => {
+        if (disabled) onLockedClick();
+      }}
+    >
+      {players.map((player) => {
+        const playerId = `${player["Team Code"]}-${player["Player Name"]}`;
+        const active = activeIds.includes(playerId);
+        const name = cleanPlayerName(player["Name on Shirt"] || player["Player Name"] || "");
+
+        return (
+          <button
+            key={playerId}
+            type="button"
+            disabled={disabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(playerId);
+            }}
+            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition cursor-pointer select-none ${active
+              ? "border-cyan-400 bg-cyan-500/10 text-cyan-700 dark:text-neon"
+              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:hover:border-white/20"
+              } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            {name}
+          </button>
+        );
+      })}
     </div>
   );
 }

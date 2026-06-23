@@ -41,6 +41,13 @@ export function Header() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
+  const isActiveRoute = (href: string) => {
+    if (href === "/") return pathname === "/";
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
+  const isPredictionSectionActive = SIMULATOR_NAV.some((item) => isActiveRoute(item.to));
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -132,9 +139,13 @@ export function Header() {
           >
             <button
               onClick={() => setSimulatorMenuOpen((open) => !open)}
-              className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm text-muted-foreground transition hover:text-foreground"
+              className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm transition ${
+                isPredictionSectionActive
+                  ? "bg-black/6 dark:bg-white/6 text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
-              <span>Simulator</span>
+              <span>Prediction</span>
               <ChevronDown className="h-3.5 w-3.5 opacity-60" />
             </button>
             {simulatorMenuOpen && (
@@ -146,7 +157,11 @@ export function Header() {
                       key={item.to}
                       href={item.to}
                       onClick={() => setSimulatorMenuOpen(false)}
-                      className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
+                      className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition ${
+                        isActiveRoute(item.to)
+                          ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
+                          : "text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
+                      }`}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
                       <span>{item.label}</span>
@@ -161,7 +176,11 @@ export function Header() {
             <Link
               key={n.to}
               href={n.to}
-              className="rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm text-muted-foreground transition hover:text-foreground data-[status=active]:bg-white/5 data-[status=active]:text-foreground whitespace-nowrap"
+              className={`rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm transition whitespace-nowrap ${
+                isActiveRoute(n.to)
+                  ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
               {n.label}
             </Link>
@@ -353,7 +372,11 @@ export function Header() {
                   key={n.to}
                   href={n.to}
                   onClick={() => setOpen(false)}
-                  className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                  className={`rounded-md px-3 py-2 text-sm transition ${
+                    isActiveRoute(n.to)
+                      ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
+                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                  }`}
                 >
                   {n.label}
                 </Link>
@@ -361,7 +384,18 @@ export function Header() {
             </div>
           </div>
           {NAV.map((n) => (
-            <Link key={n.to} href={n.to} onClick={() => setOpen(false)} className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-white/5 hover:text-foreground">{n.label}</Link>
+            <Link
+              key={n.to}
+              href={n.to}
+              onClick={() => setOpen(false)}
+              className={`rounded-md px-3 py-2 text-sm transition ${
+                isActiveRoute(n.to)
+                  ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
+                  : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+              }`}
+            >
+              {n.label}
+            </Link>
           ))}
           
           <button

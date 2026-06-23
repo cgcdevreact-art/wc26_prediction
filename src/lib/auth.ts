@@ -90,12 +90,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Fetch fresh subscription info from DB
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: {
-            subscriptionTier: true,
-            freeModelUsageCount: true,
-            stripeCurrentPeriodEnd: true,
-            role: true,
-          }
         });
 
         if (dbUser) {

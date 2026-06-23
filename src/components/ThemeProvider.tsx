@@ -17,7 +17,7 @@ type ThemeProviderState = {
 };
 
 const initialState: ThemeProviderState = {
-  theme: "system",
+  theme: "light",
   setTheme: () => null,
 };
 
@@ -25,9 +25,9 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = "light",
   storageKey = "wc26-ui-theme",
-  enableSystem = true,
+  enableSystem = false,
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(defaultTheme);
@@ -35,13 +35,13 @@ export function ThemeProvider({
 
   useEffect(() => {
     const savedTheme = localStorage.getItem(storageKey) as Theme | null;
-    if (savedTheme) {
+    if (savedTheme === "dark" || savedTheme === "light") {
       setTheme(savedTheme);
-    } else if (enableSystem) {
-      setTheme("system");
+    } else {
+      setTheme(defaultTheme);
     }
     setMounted(true);
-  }, [storageKey, enableSystem]);
+  }, [storageKey, defaultTheme]);
 
   useEffect(() => {
     if (!mounted) return;

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { Search, Calendar, MapPin, Trophy } from "lucide-react";
+import { Search, Calendar, MapPin } from "lucide-react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { EmptyFixturesState } from "./EmptyFixturesState";
 
@@ -74,7 +74,7 @@ export function FixturesExplorer() {
 
   // Filter fixtures based on selected dropdown options and search query
   const filteredFixtures = useMemo(() => {
-    return processedFixtures.filter((f) => {
+    const nextFixtures = processedFixtures.filter((f) => {
       // Group Filter
       if (activeStage === "group" && selectedGroup !== "ALL" && f.group !== selectedGroup) {
         return false;
@@ -114,6 +114,16 @@ export function FixturesExplorer() {
       
       return true;
     });
+
+    if (selectedStatus === "COMPLETED") {
+      nextFixtures.sort((a, b) => {
+        const matchA = Number(a.match_no || 0);
+        const matchB = Number(b.match_no || 0);
+        return matchB - matchA;
+      });
+    }
+
+    return nextFixtures;
   }, [processedFixtures, selectedGroup, selectedDate, selectedStatus, selectedLocation, search, activeStage]);
 
   // Format Dates List for filter dropdown
@@ -173,6 +183,24 @@ export function FixturesExplorer() {
     return `In ${seconds}s`;
   };
 
+  const formatMatchupCountdown = (kickoffAtIso?: string, status?: string) => {
+    if (status !== "UPCOMING" || !kickoffAtIso) return null;
+
+    const diffMs = new Date(kickoffAtIso).getTime() - now;
+    if (diffMs <= 0) return "00s";
+
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (days > 0) return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
+  };
+
   return (
     <section className="container mx-auto px-4 py-16  ">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
@@ -217,7 +245,11 @@ export function FixturesExplorer() {
       </div>
 
       {/* Filter panel */}
-      <div className="glass-strong rounded-2xl p-4 mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-center">
+      <div
+        className={`glass-strong rounded-2xl p-4 mb-6 grid gap-4 items-center ${
+          activeStage === "group" ? "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6" : "sm:grid-cols-2 lg:grid-cols-5"
+        }`}
+      >
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-4.5 w-4.5 text-muted-foreground/60" />
@@ -259,12 +291,7 @@ export function FixturesExplorer() {
               ))}
             </select>
           </div>
-        ) : (
-          <div className="text-xs text-muted-foreground/60 flex items-center gap-1.5 px-3">
-            <Trophy className="h-4 w-4 text-neon" />
-            <span>Knockout placeholders</span>
-          </div>
-        )}
+        ) : null}
 
         {/* Location Filter */}
         <div className="relative">
@@ -420,6 +447,9 @@ export function FixturesExplorer() {
                                 VS
                               </span>
                               <span className="text-[8px] uppercase font-bold text-muted-foreground/40 mt-1">Upcoming</span>
+                              <span className="mt-1 text-[10px] font-mono font-bold text-cyan-700 dark:text-neon whitespace-nowrap tabular-nums">
+                                {formatMatchupCountdown(f.kickoffAtIso, f.status)}
+                              </span>
                             </div>
                           )}
 

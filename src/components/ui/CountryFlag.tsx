@@ -1,6 +1,6 @@
 "use client";
 
-import { getFlagImageSrc, isFlagImage } from "@/lib/flag-utils";
+import { getFlagImageSrc, isFlagImage, emojiToCountryCode } from "@/lib/flag-utils";
 
 export function CountryFlag({
   code,
@@ -15,14 +15,27 @@ export function CountryFlag({
   className?: string;
   emojiClassName?: string;
 }) {
-  const src = isFlagImage(flag) ? flag : getFlagImageSrc(code);
+  let src: string | null = null;
+
+  if (isFlagImage(flag)) {
+    src = flag;
+  } else if (flag) {
+    const codeFromEmoji = emojiToCountryCode(flag);
+    if (codeFromEmoji) {
+      src = `https://flagcdn.com/w80/${codeFromEmoji}.png`;
+    }
+  }
+
+  if (!src && code) {
+    src = getFlagImageSrc(code);
+  }
 
   if (src) {
     return (
       <img
         src={src}
         alt={name ? `${name} flag` : "Country flag"}
-        className={className}
+        className={`${className} object-cover rounded-[2px]`}
         loading="lazy"
       />
     );
@@ -30,3 +43,4 @@ export function CountryFlag({
 
   return <span className={emojiClassName}>{flag || "🏳️"}</span>;
 }
+

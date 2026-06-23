@@ -9,7 +9,6 @@ export async function adminLoginAction(email: string, password: string) {
     // First verify the user is an admin before attempting sign in
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { role: true },
     });
 
     if (!user || user.role !== "admin") {

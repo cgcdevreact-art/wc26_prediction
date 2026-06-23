@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
-import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle } from "lucide-react";
+import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle, Brain, Cpu } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { StaminaBar, AlignmentGauge, TemperatureSlider } from "@/components/ui/SciFiControls";
 import { useSimulationStore } from "@/lib/store/simulationStore";
@@ -14,6 +14,17 @@ import { UpgradeModal } from "./UpgradeModal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
 import { CountryFlag } from "@/components/ui/CountryFlag";
+import { readPredictionPayload } from "@/lib/predictionWinner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PredictorMatch {
   id: string; // group-X-index
@@ -22,6 +33,14 @@ interface PredictorMatch {
   awayCode: string;
   homeScore: number | "";
   awayScore: number | "";
+}
+
+function clearPredictorMatchScores(match: PredictorMatch): PredictorMatch {
+  return {
+    ...match,
+    homeScore: "",
+    awayScore: "",
+  };
 }
 
 interface TeamStanding {
@@ -252,6 +271,42 @@ const KO_DETAILS: Record<string, { venue: string; date: string }[]> = {
   ]
 };
 
+const MODEL_META = {
+  base: {
+    label: "Base",
+    title: "Simulation Engine",
+    description: "Elo, attack, and defense drive the current match prediction logic.",
+    summary: "Elo / Att / Def",
+    accent: "text-emerald-600 dark:text-neon",
+    border: "border-emerald-200/80 dark:border-emerald-400/20",
+    glow: "from-emerald-500/12 via-transparent to-transparent dark:from-emerald-400/10",
+    badge: "bg-emerald-100/80 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-300",
+    Icon: Cpu,
+  },
+  advanced: {
+    label: "Advanced",
+    title: "Simulation Engine",
+    description: "Adds squad quality and player rating balance on top of the base engine.",
+    summary: "Base + Squad",
+    accent: "text-sky-700 dark:text-sky-300",
+    border: "border-sky-200/80 dark:border-sky-400/20",
+    glow: "from-sky-500/12 via-transparent to-transparent dark:from-sky-400/10",
+    badge: "bg-sky-100/80 text-sky-800 dark:bg-sky-400/10 dark:text-sky-300",
+    Icon: Brain,
+  },
+  pro: {
+    label: "Pro",
+    title: "Simulation Engine",
+    description: "Uses player form, fitness, creativity, discipline, and experience signals too.",
+    summary: "Advanced + Player Aspects",
+    accent: "text-cyan-700 dark:text-cyan-300",
+    border: "border-cyan-200/80 dark:border-cyan-400/20",
+    glow: "from-cyan-500/12 via-transparent to-transparent dark:from-cyan-400/10",
+    badge: "bg-cyan-100/80 text-cyan-800 dark:bg-cyan-400/10 dark:text-cyan-300",
+    Icon: Sparkles,
+  },
+} as const;
+
 interface GroupPredictorProps {
   defaultTab?: "group" | "knockout";
   onlyKnockout?: boolean;
@@ -356,6 +411,20 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const [upgradeModalReason, setUpgradeModalReason] = useState<"plus" | "pro" | "credits" | "guest">("plus");
   const [creditsUsed, setCreditsUsed] = useState<number>(0);
   const [guestCreditsUsed, setGuestCreditsUsed] = useState<number>(0);
+
+  // Confirmation state for simulations
+  const [confirmSimOpen, setConfirmSimOpen] = useState(false);
+  const [confirmSimType, setConfirmSimType] = useState<"all" | "group" | null>(null);
+  const [confirmSimGroup, setConfirmSimGroup] = useState<string | null>(null);
+
+  const handleConfirmSimulation = () => {
+    if (confirmSimType === "all") {
+      handleAiPredictWithCredits();
+    } else if (confirmSimType === "group" && confirmSimGroup) {
+      predictGroup(confirmSimGroup);
+    }
+    setConfirmSimOpen(false);
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -467,13 +536,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   };
 
   const resetGroup = (groupName: string) => {
-    const resetMatches = matches.map((m) => {
+    const resetMatches = matches.map((m): PredictorMatch => {
       if (m.group !== groupName) return m;
-      return {
-        ...m,
-        homeScore: "",
-        awayScore: "",
-      };
+      return clearPredictorMatchScores(m);
     });
     setMatches(resetMatches);
 
@@ -795,10 +860,12 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       const slotId = p.matchId - 999000;
       if (slotId >= 0 && slotId <= 5) {
         try {
-          const meta = JSON.parse(p.predictedWinner);
-          if (meta?.name && slotId > 0) names[slotId] = meta.name;
-          if (meta?.updatedAt) dates[slotId] = new Date(meta.updatedAt).toLocaleString();
-          if (meta?.summary) summaries[slotId] = meta.summary;
+          const meta = readPredictionPayload<{ name?: string; updatedAt?: string; summary?: unknown }>(p.predictedPayload, p.predictedWinner);
+          if (meta && typeof meta === "object") {
+            if ("name" in meta && meta.name && slotId > 0) names[slotId] = meta.name;
+            if ("updatedAt" in meta && meta.updatedAt) dates[slotId] = new Date(meta.updatedAt).toLocaleString();
+            if ("summary" in meta && meta.summary) summaries[slotId] = meta.summary;
+          }
         } catch (e) {
           // ignore
         }
@@ -1781,13 +1848,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   // Clear Board
   const handleReset = () => {
-    const resetMatches = matches.map((m) => {
-      return {
-        ...m,
-        homeScore: "",
-        awayScore: "",
-      };
-    });
+    const resetMatches = matches.map(clearPredictorMatchScores);
     setMatches(resetMatches);
 
     const clearedWinners = {
@@ -2104,7 +2165,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           ) : (
             <>
               <button
-                onClick={() => handleAiPredictWithCredits()}
+                onClick={() => {
+                  setConfirmSimType("all");
+                  setConfirmSimGroup(null);
+                  setConfirmSimOpen(true);
+                }}
                 className={primaryToolbarButtonClass}
               >
                 <Sparkles className="h-4 w-4" />
@@ -2229,6 +2294,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         </div>
       )}
 
+      <div className="mb-8 flex justify-start">
+        <SimulationEngineBadge model={selectedModel} />
+      </div>
+
       {/* Group Stage View */}
       {activeTab === "group" && (
         <div className="space-y-12">
@@ -2268,7 +2337,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           </>
                         ) : (
                           <button
-                            onClick={() => predictGroup(groupName)}
+                            onClick={() => {
+                              setConfirmSimType("group");
+                              setConfirmSimGroup(groupName);
+                              setConfirmSimOpen(true);
+                            }}
                             title="Predict Group"
                             className="text-cyan-500 hover:text-cyan-400 hover:underline transition font-black"
                           >
@@ -3731,6 +3804,61 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         </div>,
         document.body
       )}
+
+      {/* Simulation Confirmation Dialog */}
+      <AlertDialog open={confirmSimOpen} onOpenChange={setConfirmSimOpen}>
+        <AlertDialogContent className="bg-white text-slate-900 border border-slate-200 shadow-xl rounded-2xl dark:bg-slate-950 dark:text-white dark:border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display font-bold text-xl text-slate-950 dark:text-white flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-cyan-500" />
+              <span>Confirm Simulation</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500 dark:text-slate-400 mt-2 text-sm leading-relaxed">
+              {confirmSimType === "all"
+                ? "Are you sure you want to simulate all group stage matches? This will use your model configuration to predict and overwrite current scores for all groups."
+                : `Are you sure you want to simulate matches for Group ${confirmSimGroup}? This will predict and overwrite current scores for this group.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 flex gap-2">
+            <AlertDialogCancel className="px-4 py-2 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 dark:border-white/10 dark:text-white dark:hover:bg-white/5 cursor-pointer">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSimulation}
+              className="px-4 py-2 text-xs font-black rounded-xl bg-gradient-to-r from-cyan-600 to-fuchsia-600 text-white hover:scale-[1.02] active:scale-95 transition cursor-pointer"
+            >
+              Run Simulation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function SimulationEngineBadge({ model }: { model: keyof typeof MODEL_META }) {
+  const meta = MODEL_META[model];
+  const Icon = meta.Icon;
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl border bg-white/70 px-4 py-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:bg-slate-900/70 ${meta.border}`}>
+      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-r ${meta.glow}`} />
+      <div className="relative flex flex-wrap items-center gap-3">
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-black/6 bg-black/4 dark:border-white/10 dark:bg-white/5 ${meta.accent}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+            {meta.title}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`font-display text-lg font-black leading-none ${meta.accent}`}>{meta.label}</span>
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] ${meta.badge}`}>
+              {meta.summary}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

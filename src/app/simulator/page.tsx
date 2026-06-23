@@ -1,6 +1,7 @@
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { GroupPredictor } from "@/components/site/GroupPredictor";
+import { ModelGuideAccordion } from "@/components/site/ModelGuideAccordion";
 
 export const metadata = {
   title: "Tournament Simulator — WC26 Predict",
@@ -12,6 +13,9 @@ export default function Page() {
     <div className="min-h-screen bg-hero">
       <Header />
       <main className="pt-6">
+        <section className="container mx-auto px-4 pb-6">
+          <ModelGuideAccordion />
+        </section>
         <GroupPredictor />
       </main>
       <Footer />
