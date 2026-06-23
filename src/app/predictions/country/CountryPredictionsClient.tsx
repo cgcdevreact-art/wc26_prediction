@@ -120,7 +120,7 @@ export default function CountryPredictionsClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
+  const [mounted, setMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [zoomScale, setZoomScale] = useState(85);
@@ -130,6 +130,8 @@ export default function CountryPredictionsClient({
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
   const [selectedCompareIds, setSelectedCompareIds] = useState<string[]>([]);
   const [compareChartTab, setCompareChartTab] = useState<"progression" | "attributes">("progression");
+  const [pendingAutorun, setPendingAutorun] = useState(false);
+  const [hasProcessedLoadUrl, setHasProcessedLoadUrl] = useState(false);
 
   const fetchSavedPredictions = async () => {
     if (!session?.user?.id) return;
@@ -138,7 +140,7 @@ export default function CountryPredictionsClient({
       const res = await fetch("/api/predictions");
       if (res.ok) {
         const data = await res.json();
-        const countryProjs = data.filter((p: any) => p.type === "COUNTRY_PROJECTION");
+        const countryProjs = data.filter((p: any) => p.type.startsWith("COUNTRY_PROJECTION"));
         setSavedPredictions(countryProjs);
       }
     } catch (err) {
@@ -153,6 +155,67 @@ export default function CountryPredictionsClient({
       fetchSavedPredictions();
     }
   }, [session]);
+
+  // Handle auto-loading and auto-running from URL params
+  useEffect(() => {
+    if (!mounted || !isInitialized || hasProcessedLoadUrl) return;
+
+    const loadId = searchParams.get("load");
+    const autorun = searchParams.get("autorun") === "true";
+
+    if (!loadId) {
+      if (autorun) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("autorun");
+        window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+
+        const executeAutoSim = async () => {
+          const allowed = await consumeCredit();
+          if (allowed) {
+            runSimulations();
+          }
+        };
+        executeAutoSim();
+      }
+      setHasProcessedLoadUrl(true);
+      return;
+    }
+
+    if (savedPredictions.length === 0 && isLoadingSaved) return;
+
+    const pred = savedPredictions.find(p => p.id === loadId);
+    if (!pred) {
+      if (!isLoadingSaved) {
+        setHasProcessedLoadUrl(true);
+      }
+      return;
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("load");
+    params.delete("autorun");
+    window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+
+    setHasProcessedLoadUrl(true);
+    handleLoadPrediction(pred);
+
+    if (autorun) {
+      setPendingAutorun(true);
+    }
+  }, [mounted, isInitialized, savedPredictions, isLoadingSaved, searchParams, pathname, hasProcessedLoadUrl]);
+
+  useEffect(() => {
+    if (pendingAutorun && mounted && isInitialized) {
+      setPendingAutorun(false);
+      const executeAutoSim = async () => {
+        const allowed = await consumeCredit();
+        if (allowed) {
+          runSimulations();
+        }
+      };
+      executeAutoSim();
+    }
+  }, [pendingAutorun, mounted, isInitialized]);
 
   const handleLoadPrediction = (prediction: any) => {
     try {
@@ -332,7 +395,6 @@ export default function CountryPredictionsClient({
     return theme;
   }, [theme]);
 
-  const [mounted, setMounted] = useState(false);
   const [selectedCode, setSelectedCode] = useState("ARG");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
@@ -979,7 +1041,7 @@ export default function CountryPredictionsClient({
 
     const predictionData = {
       matchId: teamNumericId,
-      type: "COUNTRY_PROJECTION",
+      type: "COUNTRY_PROJECTION_" + Date.now(),
       predictedWinner: JSON.stringify({
         code: selectedTeam.code,
         name: selectedTeam.name,
@@ -1046,28 +1108,7 @@ export default function CountryPredictionsClient({
     }
   }, [selectedCode, selectedModel, mounted]);
 
-  // Auto-run simulation if autorun=true is present in the URL
-  useEffect(() => {
-    if (!mounted || !isInitialized) return;
-
-    const autorun = searchParams.get("autorun") === "true";
-    if (autorun) {
-      // Clear autorun from the URL so it doesn't re-run on subsequent page loads/refreshes
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete("autorun");
-      const cleanUrl = `${pathname}?${params.toString()}`;
-      window.history.replaceState(null, "", cleanUrl);
-
-      // Execute simulation automatically
-      const executeAutoSim = async () => {
-        const allowed = await consumeCredit();
-        if (allowed) {
-          runSimulations();
-        }
-      };
-      executeAutoSim();
-    }
-  }, [mounted, isInitialized, searchParams, pathname]);
+  // Note: Auto-run and loading of saved predictions is handled by the useEffect hooks near fetchSavedPredictions.
 
   // Sort and filter teams list in sidebar
   const sortedTeams = useMemo(() => {
@@ -2293,696 +2334,7 @@ export default function CountryPredictionsClient({
         </AccordionItem>
       </Accordion>
 
-      {/* Saved Projections & Comparison Accordion */}
-      <Accordion
-        type="multiple"
-        defaultValue={["saved-comparison"]}
-        className="w-full bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-[2rem] relative shadow-[0_18px_50px_rgba(15,23,42,0.08)] mt-8"
-      >
-        <AccordionItem value="saved-comparison" className="border-none">
-          <AccordionTrigger className="px-6 md:px-8 pt-6 md:pt-8 pb-3 hover:no-underline">
-            <div>
-              <div className="font-display font-extrabold text-2xl text-foreground dark:text-white tracking-tight">Saved Predictions & Comparison</div>
-              <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">Load saved Prediction or select multiple to compare side-by-side</div>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent className="px-6 md:px-8 pb-6 md:pb-8">
-            {!session ? (
-              <div className="text-center py-10">
-                <p className="text-sm text-muted-foreground mb-4">Please sign in to view, load, and compare your saved predictions.</p>
-                <button
-                  onClick={() => openAuthModal("signin")}
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500 via-emerald-500 to-fuchsia-500 text-white px-5 py-3 rounded-2xl text-xs font-black shadow-md hover:scale-[1.02] transition-all cursor-pointer"
-                >
-                  <User className="w-4 h-4" />
-                  <span>Sign In to Access</span>
-                </button>
-              </div>
-            ) : isLoadingSaved ? (
-              <div className="flex flex-col justify-center items-center py-12 gap-3">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
-                <span className="text-xs text-muted-foreground">Fetching saved simulations...</span>
-              </div>
-            ) : savedPredictions.length === 0 ? (
-              <div className="text-center py-12 text-sm text-muted-foreground border border-dashed border-slate-200 dark:border-white/10 rounded-[1.75rem] p-6 bg-slate-50/50 dark:bg-white/[0.01]">
-                <Sparkles className="w-8 h-8 text-cyan-500 mx-auto mb-3 opacity-60 animate-pulse" />
-                <p className="font-bold text-foreground">No country projections saved yet.</p>
-                <p className="text-xs mt-1.5 max-w-md mx-auto">Adjust team attributes in the Simulation Lab, run the simulator, and click &quot;Save to Predictions&quot; to begin building your comparison library.</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="overflow-x-auto rounded-[1.5rem] border border-slate-200 dark:border-white/10 bg-slate-50/30 dark:bg-black/20">
-                  <table className="w-full text-left border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        <th className="py-3 px-4 w-12 text-center">Compare</th>
-                        <th className="py-3 px-4 min-w-[150px]">Country</th>
-                        <th className="py-3 px-4">Elo Rating</th>
-                        <th className="py-3 px-4">Model Engine</th>
-                        <th className="py-3 px-4">Championship Odds</th>
-                        <th className="py-3 px-4">Saved On</th>
-                        <th className="py-3 px-4 text-right pr-6">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-white/5">
-                      {savedPredictions.map((p) => {
-                        let data: any = null;
-                        try {
-                          data = readPredictionPayload(p.predictedPayload, p.predictedWinner);
-                        } catch (e) {
-                          console.error(e);
-                        }
 
-                        if (!data) return null;
-                        const isChecked = selectedCompareIds.includes(p.id);
-                        const isDisableCompare = !isChecked && selectedCompareIds.length >= 4;
-                        const savedDate = new Date(p.updatedAt).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        });
-
-                        return (
-                          <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
-                            <td className="py-3.5 px-4 text-center">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                disabled={isDisableCompare}
-                                onChange={() => toggleCompareSelect(p.id)}
-                                className="w-4.5 h-4.5 rounded border-slate-350 accent-cyan-500 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                              />
-                            </td>
-                            <td className="py-3.5 px-4 font-bold">
-                              <div className="flex items-center gap-2">
-                                <CountryFlag code={data.code} flag={data.flag} name={data.name} className="h-5 w-7 shrink-0 rounded object-cover shadow-sm" emojiClassName="text-lg leading-none" />
-                                <span className="text-foreground">{data.name}</span>
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 font-mono text-xs text-muted-foreground">
-                              {Math.round(data.customElo ?? data.elo ?? 1500)}
-                            </td>
-                            <td className="py-3.5 px-4 text-xs font-semibold text-cyan-600 dark:text-neon uppercase">
-                              {data.modelName || "base"}
-                            </td>
-                            <td className="py-3.5 px-4 font-bold text-foreground">
-                              {data.championProb}%
-                            </td>
-                            <td className="py-3.5 px-4 text-xs text-muted-foreground">
-                              {savedDate}
-                            </td>
-                            <td className="py-3.5 px-4 text-right pr-6">
-                              <div className="flex items-center justify-end gap-2.5">
-                                <button
-                                  onClick={() => handleLoadPrediction(p)}
-                                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 hover:border-cyan-400 hover:text-cyan-500 bg-white hover:bg-slate-50 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 dark:text-white transition cursor-pointer"
-                                  title="Load this simulation results and setup"
-                                >
-                                  Load
-                                </button>
-                                <button
-                                  onClick={() => handleDeletePrediction(p.id, data.name)}
-                                  className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition cursor-pointer"
-                                  title="Delete saved projection"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Compare Section */}
-                {selectedCompareIds.length < 2 ? (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 p-4 rounded-[1.25rem]">
-                    <Info className="w-4.5 h-4.5 text-cyan-500 shrink-0" />
-                    <span>Select at least 2 saved country projections above to compare their performance parameters and tournament outcomes side-by-side.</span>
-                  </div>
-                ) : (
-                  <div className="border-t border-slate-200 dark:border-white/10 pt-6">
-                    {(() => {
-                      const lineColors = [
-                        "#06b6d4", // Cyan
-                        "#d946ef", // Fuchsia
-                        "#10b981", // Emerald
-                        "#f59e0b", // Amber
-                        "#8b5cf6", // Violet
-                        "#3b82f6", // Blue
-                      ];
-
-                      const parsedCompareData = savedPredictions
-                        .filter(p => selectedCompareIds.includes(p.id))
-                        .map((p, idx) => {
-                          let data: any = null;
-                          try {
-                            data = readPredictionPayload(p.predictedPayload, p.predictedWinner);
-                          } catch (e) {
-                            console.error(e);
-                          }
-                          return { id: p.id, raw: p, data, color: lineColors[idx % lineColors.length] };
-                        })
-                        .filter(item => item.data !== null);
-
-                      const progressionChartData = [
-                        { stage: "Group Stage", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: 100 }), {}) },
-                        { stage: "Round of 32", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.r32 ?? 0) / 10).toFixed(1)) }), {}) },
-                        { stage: "Round of 16", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.r16 ?? 0) / 10).toFixed(1)) }), {}) },
-                        { stage: "Quarter Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.qf ?? 0) / 10).toFixed(1)) }), {}) },
-                        { stage: "Semi Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.sf ?? 0) / 10).toFixed(1)) }), {}) },
-                        { stage: "Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.final ?? 0) / 10).toFixed(1)) }), {}) },
-                        { stage: "Champion", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.champion ?? (c.data.championProb * 10 || 0)) / 10).toFixed(1)) }), {}) }
-                      ];
-
-                      const attributesChartData = [
-                        {
-                          attribute: "Elo Rating",
-                          ...parsedCompareData.reduce((acc, c) => {
-                            const rawElo = c.data.customElo ?? c.data.elo ?? 1500;
-                            const scaledElo = Math.round((rawElo - 1300) / 6);
-                            return {
-                              ...acc,
-                              [c.data.name]: Math.max(0, Math.min(100, scaledElo)),
-                              [`${c.data.name}_raw`]: rawElo
-                            };
-                          }, {})
-                        },
-                        {
-                          attribute: "Attack Rating",
-                          ...parsedCompareData.reduce((acc, c) => {
-                            const rawAttack = c.data.customAttack ?? 75;
-                            return {
-                              ...acc,
-                              [c.data.name]: rawAttack,
-                              [`${c.data.name}_raw`]: rawAttack
-                            };
-                          }, {})
-                        },
-                        {
-                          attribute: "Defense Rating",
-                          ...parsedCompareData.reduce((acc, c) => {
-                            const rawDefense = c.data.customDefense ?? 75;
-                            return {
-                              ...acc,
-                              [c.data.name]: rawDefense,
-                              [`${c.data.name}_raw`]: rawDefense
-                            };
-                          }, {})
-                        },
-                        {
-                          attribute: "Squad Value",
-                          ...parsedCompareData.reduce((acc, c) => {
-                            const rawSquadValue = c.data.squadValueM ?? appTeams.find(t => t.code === c.data.code)?.squadValueM ?? 100;
-                            // Map 0 - 1500M squad value to 0-100
-                            const scaledSquad = Math.round(rawSquadValue / 15);
-                            return {
-                              ...acc,
-                              [c.data.name]: Math.max(0, Math.min(100, scaledSquad)),
-                              [`${c.data.name}_raw`]: `€${rawSquadValue}M`
-                            };
-                          }, {})
-                        },
-                        {
-                          attribute: "Championship Odds",
-                          ...parsedCompareData.reduce((acc, c) => {
-                            const ch = c.data.stages?.champion ?? (c.data.championProb * 10 || 0);
-                            const rawChamp = parseFloat((ch / 10).toFixed(1));
-                            return {
-                              ...acc,
-                              [c.data.name]: rawChamp,
-                              [`${c.data.name}_raw`]: `${rawChamp}%`
-                            };
-                          }, {})
-                        }
-                      ];
-
-                      return (
-                        <>
-                          {/* Line Chart Card */}
-                          <div className="mb-8 p-5 rounded-[2rem] border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900 shadow-[0_16px_40px_rgba(15,23,42,0.04)]">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                              <div>
-                                <h4 className="font-display font-extrabold text-base text-foreground flex items-center gap-2">
-                                  <TrendingUp className="w-5 h-5 text-cyan-500" />
-                                  <span>Comparison Metrics Projection</span>
-                                </h4>
-                                <p className="text-xs text-muted-foreground mt-0.5">Visualize side-by-side attributes or progression probabilities</p>
-                              </div>
-                              <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200/50 dark:border-white/5 self-stretch sm:self-auto justify-center">
-                                <button
-                                  type="button"
-                                  onClick={() => setCompareChartTab("progression")}
-                                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                                    compareChartTab === "progression"
-                                      ? "bg-white text-cyan-600 shadow-sm dark:bg-slate-800 dark:text-neon"
-                                      : "text-muted-foreground hover:text-foreground"
-                                  }`}
-                                >
-                                  Progression Curve
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setCompareChartTab("attributes")}
-                                  className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                                    compareChartTab === "attributes"
-                                      ? "bg-white text-cyan-600 shadow-sm dark:bg-slate-800 dark:text-neon"
-                                      : "text-muted-foreground hover:text-foreground"
-                                  }`}
-                                >
-                                  Attribute Profile
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="h-80 w-full">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <LineChart
-                                  data={compareChartTab === "progression" ? progressionChartData : attributesChartData}
-                                  margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
-                                >
-                                  <CartesianGrid
-                                    strokeDasharray="3 3"
-                                    stroke={activeTheme === "light" ? "rgba(15,23,42,0.06)" : "rgba(255,255,255,0.05)"}
-                                  />
-                                  <XAxis
-                                    dataKey={compareChartTab === "progression" ? "stage" : "attribute"}
-                                    tick={{
-                                      fill: activeTheme === "light" ? "rgba(15,23,42,0.6)" : "rgba(255,255,255,0.6)",
-                                      fontSize: 10,
-                                      fontFamily: "var(--font-display)",
-                                      fontWeight: "bold"
-                                    }}
-                                    stroke={activeTheme === "light" ? "rgba(15,23,42,0.1)" : "rgba(255,255,255,0.1)"}
-                                  />
-                                  <YAxis
-                                    domain={[0, 100]}
-                                    tick={{
-                                      fill: activeTheme === "light" ? "rgba(15,23,42,0.6)" : "rgba(255,255,255,0.6)",
-                                      fontSize: 10,
-                                      fontFamily: "var(--font-mono)"
-                                    }}
-                                    stroke={activeTheme === "light" ? "rgba(15,23,42,0.1)" : "rgba(255,255,255,0.1)"}
-                                    tickFormatter={(val) => compareChartTab === "progression" ? `${val}%` : val}
-                                  />
-                                  <RechartsTooltip
-                                    content={<CustomCompareTooltip mode={compareChartTab} />}
-                                  />
-                                  <Legend
-                                    wrapperStyle={{
-                                      fontSize: "11px",
-                                      fontFamily: "var(--font-display)",
-                                      fontWeight: "bold",
-                                      paddingTop: "16px"
-                                    }}
-                                  />
-                                  {parsedCompareData.map((c) => (
-                                    <Line
-                                      key={c.id}
-                                      type="monotone"
-                                      dataKey={c.data.name}
-                                      stroke={c.color}
-                                      activeDot={{ r: 6, strokeWidth: 0 }}
-                                      strokeWidth={3}
-                                      dot={{ r: 4, strokeWidth: 1.5, fill: "white" }}
-                                    />
-                                  ))}
-                                </LineChart>
-                              </ResponsiveContainer>
-                            </div>
-                          </div>
-
-                          {/* Side-by-Side Table Comparison */}
-                          {(() => {
-                            const compareLen = parsedCompareData.length;
-                            const maxElo = compareLen > 0 ? Math.max(...parsedCompareData.map(c => Math.round(c.data.customElo ?? c.data.elo ?? 1500))) : 0;
-                            const maxAttack = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.customAttack ?? 75)) : 0;
-                            const maxDefense = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.customDefense ?? 75)) : 0;
-                            const maxSquadValue = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.squadValueM ?? appTeams.find(t => t.code === c.data.code)?.squadValueM ?? 0)) : 0;
-                            const maxChampionshipOdds = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.champion ?? (c.data.championProb * 10 || 0))) : 0;
-                            const maxReachFinal = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.final ?? 0)) : 0;
-                            const maxReachSF = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.sf ?? 0)) : 0;
-                            const maxReachQF = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.qf ?? 0)) : 0;
-                            const maxReachR16 = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.r16 ?? 0)) : 0;
-                            const maxReachR32 = compareLen > 0 ? Math.max(...parsedCompareData.map(c => c.data.stages?.r32 ?? 0)) : 0;
-
-                            const renderStageRow = (label: string, icon: ReactNode, stageKey: string, maxVal: number) => {
-                              return (
-                                <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                                  <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                    <div className="flex items-center gap-2">
-                                      {icon}
-                                      <span>{label}</span>
-                                    </div>
-                                  </td>
-                                  {parsedCompareData.map((c) => {
-                                    const rawVal = c.data.stages?.[stageKey] ?? 0;
-                                    const prob = parseFloat((rawVal / 10).toFixed(1));
-                                    const isBest = rawVal === maxVal && parsedCompareData.length > 1 && rawVal > 0;
-                                    return (
-                                      <td key={c.id} className={`py-4 px-5 transition-colors ${
-                                        isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
-                                      }`}>
-                                        <div className="space-y-1.5 max-w-[180px]">
-                                          <div className="flex items-center justify-between text-xs font-bold font-mono">
-                                            <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
-                                              {prob}%
-                                            </span>
-                                            {isBest && <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Best</span>}
-                                          </div>
-                                          <div className="w-full bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
-                                            <div 
-                                              className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-emerald-500" : "bg-cyan-500"}`} 
-                                              style={{ width: `${prob}%` }} 
-                                            />
-                                          </div>
-                                        </div>
-                                      </td>
-                                    );
-                                  })}
-                                </tr>
-                              );
-                            };
-
-                            return (
-                              <div className="mb-8 overflow-x-auto rounded-[2rem] border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900 shadow-[0_16px_40px_rgba(15,23,42,0.04)] scrollbar-custom relative">
-                                <table className="w-full text-left border-separate border-spacing-0 text-xs md:text-sm">
-                                  <thead>
-                                    <tr className="border-b border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
-                                      <th className="py-4 px-5 font-display font-extrabold text-slate-700 dark:text-muted-foreground w-48 sticky left-0 bg-slate-50 dark:bg-slate-900 z-20 border-r border-b border-slate-200/65 dark:border-white/15 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                        Parameter
-                                      </th>
-                                      {parsedCompareData.map((c) => (
-                                        <th key={c.id} className="py-4 px-5 font-display font-extrabold text-foreground border-b border-slate-200 dark:border-white/10 min-w-[220px]">
-                                          <div className="flex flex-col gap-2 p-3 rounded-2xl bg-slate-50/50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/5 relative overflow-hidden">
-                                            {/* Accent color bar mapping to line chart */}
-                                            <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: c.color }} />
-                                            <div className="flex items-center gap-2 mt-1.5">
-                                              <CountryFlag code={c.data.code} flag={c.data.flag} name={c.data.name} className="h-5 w-7 rounded object-cover shadow-md border border-slate-200/50 dark:border-white/10 shrink-0" emojiClassName="text-lg leading-none" />
-                                              <span className="text-sm font-extrabold truncate text-foreground">{c.data.name}</span>
-                                            </div>
-                                          </div>
-                                        </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {/* Elo Rating */}
-                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                        <div className="flex items-center gap-2">
-                                          <TrendingUp className="w-4 h-4 text-cyan-500 shrink-0" />
-                                          <span>Elo Rating</span>
-                                        </div>
-                                      </td>
-                                      {parsedCompareData.map((c) => {
-                                        const elo = Math.round(c.data.customElo ?? c.data.elo ?? 1500);
-                                        const isBest = elo === maxElo && parsedCompareData.length > 1;
-                                        return (
-                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 font-mono font-bold transition-colors ${
-                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
-                                          }`}>
-                                            <div className="flex items-center justify-between gap-1.5 max-w-[180px]">
-                                              <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
-                                                {elo}
-                                              </span>
-                                              {isBest && (
-                                                <span className="text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-0.5">
-                                                  <Trophy className="w-2.5 h-2.5" /> Best
-                                                </span>
-                                              )}
-                                            </div>
-                                          </td>
-                                        );
-                                      })}
-                                    </tr>
-
-                                    {/* Attack Power */}
-                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                        <div className="flex items-center gap-2">
-                                          <Zap className="w-4 h-4 text-amber-500 shrink-0" />
-                                          <span>Attack Power</span>
-                                        </div>
-                                      </td>
-                                      {parsedCompareData.map((c) => {
-                                        const attack = c.data.customAttack ?? 75;
-                                        const isBest = attack === maxAttack && parsedCompareData.length > 1;
-                                        return (
-                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 transition-colors ${
-                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
-                                          }`}>
-                                            <div className="space-y-1.5 max-w-[180px]">
-                                              <div className="flex items-center justify-between text-xs font-bold font-mono">
-                                                <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
-                                                  {attack}
-                                                </span>
-                                                {isBest && <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Top</span>}
-                                              </div>
-                                              <div className="w-full bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
-                                                <div 
-                                                  className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-emerald-500" : "bg-cyan-500"}`} 
-                                                  style={{ width: `${attack}%` }} 
-                                                />
-                                              </div>
-                                            </div>
-                                          </td>
-                                        );
-                                      })}
-                                    </tr>
-
-                                    {/* Defense Strength */}
-                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                        <div className="flex items-center gap-2">
-                                          <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
-                                          <span>Defense Strength</span>
-                                        </div>
-                                      </td>
-                                      {parsedCompareData.map((c) => {
-                                        const defense = c.data.customDefense ?? 75;
-                                        const isBest = defense === maxDefense && parsedCompareData.length > 1;
-                                        return (
-                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 transition-colors ${
-                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
-                                          }`}>
-                                            <div className="space-y-1.5 max-w-[180px]">
-                                              <div className="flex items-center justify-between text-xs font-bold font-mono">
-                                                <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
-                                                  {defense}
-                                                </span>
-                                                {isBest && <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Top</span>}
-                                              </div>
-                                              <div className="w-full bg-slate-100 dark:bg-white/5 h-1.5 rounded-full overflow-hidden">
-                                                <div 
-                                                  className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-emerald-500" : "bg-cyan-500"}`} 
-                                                  style={{ width: `${defense}%` }} 
-                                                />
-                                              </div>
-                                            </div>
-                                          </td>
-                                        );
-                                      })}
-                                    </tr>
-
-                                    {/* Squad Value */}
-                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                        <div className="flex items-center gap-2">
-                                          <Coins className="w-4 h-4 text-yellow-500 shrink-0" />
-                                          <span>Squad Value</span>
-                                        </div>
-                                      </td>
-                                      {parsedCompareData.map((c) => {
-                                        const squadVal = c.data.squadValueM ?? appTeams.find(t => t.code === c.data.code)?.squadValueM ?? 0;
-                                        const isBest = squadVal === maxSquadValue && squadVal > 0 && parsedCompareData.length > 1;
-                                        return (
-                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 font-mono font-bold transition-colors ${
-                                            isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
-                                          }`}>
-                                            <div className="flex items-center justify-between gap-1.5 max-w-[180px]">
-                                              <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
-                                                {squadVal ? `€${squadVal}M` : "N/A"}
-                                              </span>
-                                              {isBest && (
-                                                <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide bg-emerald-500/10 px-1 py-0.5 rounded border border-emerald-500/10">Highest</span>
-                                              )}
-                                            </div>
-                                          </td>
-                                        );
-                                      })}
-                                    </tr>
-
-                                    {/* Model Engine */}
-                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                        <div className="flex items-center gap-2">
-                                          <Cpu className="w-4 h-4 text-purple-500 shrink-0" />
-                                          <span>Model Engine</span>
-                                        </div>
-                                      </td>
-                                      {parsedCompareData.map((c) => {
-                                        const model = c.data.modelName || "base";
-                                        let badgeClass = "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20";
-                                        if (model === "advanced") {
-                                          badgeClass = "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/20";
-                                        } else if (model === "pro") {
-                                          badgeClass = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
-                                        }
-                                        return (
-                                          <td key={c.id} className="py-4 px-5 border-b border-slate-100 dark:border-white/5">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${badgeClass}`}>
-                                              {model}
-                                            </span>
-                                          </td>
-                                        );
-                                      })}
-                                    </tr>
-
-                                    {/* Championship Odds */}
-                                    <tr className="border-b border-slate-200 dark:border-white/10 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                        <div className="flex items-center gap-2">
-                                          <Award className="w-4 h-4 text-rose-500 shrink-0" />
-                                          <span>Championship Odds</span>
-                                        </div>
-                                      </td>
-                                      {parsedCompareData.map((c) => {
-                                        const ch = c.data.stages?.champion ?? (c.data.championProb * 10 || 0);
-                                        const prob = parseFloat((ch / 10).toFixed(1));
-                                        const isBest = ch === maxChampionshipOdds && parsedCompareData.length > 1;
-                                        return (
-                                          <td key={c.id} className={`py-4 px-5 border-b border-slate-200 dark:border-white/10 transition-colors ${
-                                            isBest ? "bg-cyan-500/[0.08] dark:bg-neon/10" : "bg-cyan-500/[0.02] dark:bg-neon/5"
-                                          }`}>
-                                            <div className="space-y-1.5 max-w-[180px]">
-                                              <div className="flex items-center justify-between text-xs font-black font-mono">
-                                                <span className={isBest ? "text-cyan-600 dark:text-neon text-sm" : "text-foreground"}>
-                                                  {prob}%
-                                                </span>
-                                                {isBest && (
-                                                  <span className="text-[9px] font-extrabold text-cyan-600 dark:text-neon uppercase tracking-wide bg-cyan-500/15 dark:bg-neon/20 px-1 py-0.2 rounded flex items-center gap-0.5 animate-pulse">
-                                                    <Trophy className="w-2.5 h-2.5" /> Favorite
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <div className="w-full bg-slate-200 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
-                                                <div 
-                                                  className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-cyan-500 dark:bg-neon" : "bg-cyan-400"}`} 
-                                                  style={{ width: `${prob}%` }} 
-                                                />
-                                              </div>
-                                            </div>
-                                          </td>
-                                        );
-                                      })}
-                                    </tr>
-
-                                    {/* Reach Final */}
-                                    {renderStageRow("Reach Final", <ChevronRight className="w-4 h-4 text-cyan-500 shrink-0" />, "final", maxReachFinal)}
-
-                                    {/* Reach Semi-Final */}
-                                    {renderStageRow("Reach Semi-Final", <ChevronRight className="w-4 h-4 text-cyan-500/80 shrink-0" />, "sf", maxReachSF)}
-
-                                    {/* Reach Quarter-Final */}
-                                    {renderStageRow("Reach Quarter-Final", <ChevronRight className="w-4 h-4 text-cyan-500/60 shrink-0" />, "qf", maxReachQF)}
-
-                                    {/* Reach Round of 16 */}
-                                    {renderStageRow("Reach Round of 16", <ChevronRight className="w-4 h-4 text-cyan-500/40 shrink-0" />, "r16", maxReachR16)}
-
-                                    {/* Reach Round of 32 */}
-                                    {renderStageRow("Reach Round of 32", <ChevronRight className="w-4 h-4 text-cyan-500/20 shrink-0" />, "r32", maxReachR32)}
-
-                                    {/* Expected Path */}
-                                    <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                        <div className="flex items-center gap-2">
-                                          <Route className="w-4 h-4 text-pink-500 shrink-0" />
-                                          <span>Expected Path</span>
-                                        </div>
-                                      </td>
-                                      {parsedCompareData.map((c) => (
-                                        <td key={c.id} className="py-4 px-5">
-                                          <div className="relative pl-4 border-l border-slate-200 dark:border-white/10 space-y-3.5 my-1 max-w-[220px] ml-2">
-                                            {c.data.path?.map((step: any, sidx: number) => {
-                                              const stageShort = step.stage
-                                                .replace("Round of 32", "R32")
-                                                .replace("Round of 16", "R16")
-                                                .replace("Quarter Final", "QF")
-                                                .replace("Semi Final", "SF")
-                                                .replace("Final", "Final");
-                                              return (
-                                                <div key={sidx} className="relative text-[11px]">
-                                                  {/* Timeline Bullet Node centered on parent border-l */}
-                                                  <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-cyan-500 border-2 border-white dark:border-slate-900 shadow-sm" />
-                                                  <div className="flex flex-col gap-0.5">
-                                                    <span className="font-extrabold text-[9px] uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                                      {stageShort}
-                                                    </span>
-                                                    <div className="flex items-center gap-1.5">
-                                                      <span className="font-bold text-foreground truncate max-w-[120px]" title={step.opponentName}>
-                                                        {step.opponentFlag} {step.opponentName}
-                                                      </span>
-                                                      <span className="font-mono font-bold text-cyan-600 dark:text-neon text-[10px] bg-cyan-500/10 px-1 py-0.2 rounded shrink-0">
-                                                        {step.winPct}%
-                                                      </span>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        </td>
-                                      ))}
-                                    </tr>
-
-                                    {/* Actions */}
-                                    <tr className="hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
-                                      <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                        <div className="flex items-center gap-2">
-                                          <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
-                                          <span>Actions</span>
-                                        </div>
-                                      </td>
-                                      {parsedCompareData.map((c) => (
-                                        <td key={c.id} className="py-4 px-5">
-                                          <div className="flex gap-2">
-                                            <button
-                                              type="button"
-                                              onClick={() => handleLoadPrediction(c.raw)}
-                                              className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-cyan-500/10 text-cyan-700 hover:bg-cyan-500/20 dark:bg-neon/10 dark:text-neon dark:hover:bg-neon/20 transition cursor-pointer"
-                                            >
-                                              Load Settings
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => toggleCompareSelect(c.id)}
-                                              className="text-[11px] font-bold px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
-                                            >
-                                              Remove
-                                            </button>
-                                          </div>
-                                        </td>
-                                      ))}
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              </div>
-                            );
-                          })()}
-
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-            )}
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
 
       {/* Confirmation Dialog: Futuristic Styled Modal */}
       <Dialog open={showConfirmPopup} onOpenChange={(open) => {

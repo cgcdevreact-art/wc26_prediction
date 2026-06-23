@@ -3,20 +3,123 @@
 import { useTeams } from "@/components/TeamsProvider";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { Flame, TrendingUp, Zap, Users, Activity } from "lucide-react";
+import { startTransition, useEffect, useState } from "react";
+
+const PREDICTIONS_FLOOR = 100_000;
+const ACTIVE_PREDICTORS_FLOOR = 10_000;
+const POLL_INTERVAL_MS = 15_000;
+const PREDICTIONS_TICK_MS = 4_500;
+const USERS_TICK_MS = 5_500;
+
+type LiveStatsResponse = {
+  predictionCount: number;
+  predictionsToday: number;
+  activePredictorCount: number;
+  newUsersToday: number;
+};
 
 export function LiveStats() {
   const teams = useTeams();
   const sorted = [...teams].sort((a, b) => b.prob.champion - a.prob.champion);
-  const top = sorted[0];
-  const fav = sorted[1];
+  const top = sorted[0] || teams[0];
+  const fav = sorted[1] || sorted[0] || teams[0];
   const dh = teams.find((t) => t.code === "MAR") || teams[12] || teams[0];
+
+  const [stats, setStats] = useState<LiveStatsResponse>({
+    predictionCount: PREDICTIONS_FLOOR,
+    predictionsToday: 0,
+    activePredictorCount: ACTIVE_PREDICTORS_FLOOR,
+    newUsersToday: 0,
+  });
+  const [displayPredictionCount, setDisplayPredictionCount] = useState(PREDICTIONS_FLOOR);
+  const [displayActivePredictors, setDisplayActivePredictors] = useState(ACTIVE_PREDICTORS_FLOOR);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadStats = async () => {
+      try {
+        const response = await fetch("/api/live-stats", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const nextStats = (await response.json()) as LiveStatsResponse;
+
+        if (cancelled) {
+          return;
+        }
+
+        startTransition(() => {
+          setStats(nextStats);
+          setDisplayPredictionCount((current) =>
+            Math.max(current, PREDICTIONS_FLOOR, nextStats.predictionCount),
+          );
+          setDisplayActivePredictors((current) =>
+            Math.max(current, ACTIVE_PREDICTORS_FLOOR, nextStats.activePredictorCount),
+          );
+        });
+      } catch (error) {
+        console.error("Failed to refresh live stats", error);
+      }
+    };
+
+    loadStats();
+    const interval = window.setInterval(loadStats, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setDisplayPredictionCount((current) => {
+        const nextBase = Math.max(PREDICTIONS_FLOOR, stats.predictionCount);
+        const nextIncrement = Math.random() < 0.5 ? 1 : 2;
+        return Math.max(current + nextIncrement, nextBase);
+      });
+    }, PREDICTIONS_TICK_MS);
+
+    return () => window.clearInterval(interval);
+  }, [stats.predictionCount]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setDisplayActivePredictors((current) => {
+        const nextBase = Math.max(ACTIVE_PREDICTORS_FLOOR, stats.activePredictorCount);
+        const nextIncrement = Math.random() < 0.65 ? 1 : 0;
+        return Math.max(current + nextIncrement, nextBase);
+      });
+    }, USERS_TICK_MS);
+
+    return () => window.clearInterval(interval);
+  }, [stats.activePredictorCount]);
+
+  const formatNumber = (value: number) => new Intl.NumberFormat("en-US").format(value);
+
   const items = [
-    { icon: Flame, label: "Most Predicted Champion", team: top, sub: `${top.prob.champion.toFixed(1)}% chance` },
-    { icon: TrendingUp, label: "Current Favorite", team: fav, sub: `Elo ${fav.elo}` },
+    { icon: Flame, label: "Most Predicted Champion", team: top, sub: top ? `${top.prob.champion.toFixed(1)}% chance` : "Live model signal" },
+    { icon: TrendingUp, label: "Current Favorite", team: fav, sub: fav ? `Elo ${fav.elo}` : "Live Elo signal" },
     { icon: Zap, label: "Dark Horse", team: dh, sub: `Rising fast · +12% this week` },
-    { icon: Activity, label: "Predictions Submitted", value: "2,418,902", sub: "+18,212 today" },
-    { icon: Users, label: "Active Predictors", value: "184,556", sub: "Live now" },
+    {
+      icon: Activity,
+      label: "Predictions Submitted",
+      value: formatNumber(displayPredictionCount),
+      sub: stats.predictionsToday > 0 ? `+${formatNumber(stats.predictionsToday)} today` : "Updating live",
+    },
+    {
+      icon: Users,
+      label: "Active Predictors",
+      value: formatNumber(displayActivePredictors),
+      sub: stats.newUsersToday > 0 ? `+${formatNumber(stats.newUsersToday)} new users today` : "Growing live",
+    },
   ];
+
   return (
     <section className="border-y border-white/5 bg-gradient-to-b from-transparent to-white/[0.02]">
       <div className="container mx-auto px-4 py-6 ">

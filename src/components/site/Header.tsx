@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { Trophy, Menu, LogOut, Sun, Moon, ChevronDown, Check, Sparkles, Brain, Cpu, LayoutGrid, FolderKanban, UserCircle2 } from "lucide-react";
+import { Menu, LogOut, Sun, Moon, ChevronDown, Check, Sparkles, Brain, Cpu, LayoutGrid, FolderKanban, UserCircle2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "@/components/ThemeProvider";
@@ -21,6 +22,12 @@ const SIMULATOR_NAV = [
   { to: "/simulator", label: "Simulator", icon: Cpu },
   { to: "/bracket", label: "Bracket", icon: LayoutGrid },
 ];
+
+const TIER_LABELS: Record<string, string> = {
+  free: "Free Predictor",
+  plus: "Advanced Predictor",
+  pro: "Expert Predictor",
+};
 
 export function Header() {
   const [open, setOpen] = useState(false);
@@ -121,8 +128,15 @@ export function Header() {
     <header className="sticky top-0 z-40 glass">
       <div className="container mx-auto flex px-4 items-center justify-between py-3">
         <Link href="/" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-neon to-neon-2 text-background">
-            <Trophy className="h-5 w-5" strokeWidth={2.4} />
+          <span className="flex h-9 items-center">
+            <Image
+              src="/wc26-logo.png"
+              alt="WC26 Predict"
+              width={66}
+              height={36}
+              className="h-9 w-auto"
+              priority
+            />
           </span>
           <div className="leading-tight">
             <div className="text-sm font-semibold tracking-wide">WC26 <span className="text-gradient">PREDICT</span></div>
@@ -308,7 +322,7 @@ export function Header() {
                           ? "bg-purple-500/10 border border-purple-500/20 text-purple-400"
                           : "bg-blue-500/10 border border-blue-500/20 text-blue-400"
                       }`}>
-                        {session.user.subscriptionTier}
+                        {TIER_LABELS[session.user.subscriptionTier] || session.user.subscriptionTier}
                       </span>
                     )}
                   </div>
@@ -456,7 +470,7 @@ export function Header() {
                         ? "bg-purple-500/10 border border-purple-500/20 text-purple-400"
                         : "bg-blue-500/10 border border-blue-500/20 text-blue-400"
                     }`}>
-                      {session.user.subscriptionTier}
+                      {TIER_LABELS[session.user.subscriptionTier] || session.user.subscriptionTier}
                     </span>
                   )}
                 </div>

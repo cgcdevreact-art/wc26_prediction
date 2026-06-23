@@ -5,6 +5,7 @@ import { Footer } from "@/components/site/Footer";
 import { redirect } from "next/navigation";
 import { Trophy, Sparkles } from "lucide-react";
 import { getTeams } from "@/lib/data";
+import SavedPredictionsClient from "./SavedPredictionsClient";
 import {
   Accordion,
   AccordionContent,
@@ -133,7 +134,7 @@ export default async function PredictionsPage(props: {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
-      <main className="mx-auto max-w-5xl px-4 py-24 md:px-6">
+      <main className="container mx-auto px-4 py-24 md:px-6">
         <div className="mb-12">
           <h1 className="font-display text-4xl font-bold tracking-tight text-gradient sm:text-5xl">
             My Predictions
@@ -296,77 +297,7 @@ export default async function PredictionsPage(props: {
           )}
         </div>
 
-        <Accordion type="single" collapsible className="w-full space-y-6">
-          {/* Country Projections */}
-          <AccordionItem value="country-projections" className="glass-strong rounded-2xl border-none px-6 py-2">
-            <AccordionTrigger className="hover:no-underline [&[data-state=open]>svg]:rotate-180 text-left">
-              <div className="flex items-center gap-2 font-display text-2xl font-bold">
-                <Sparkles className="text-neon" /> Country Predictions
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="mt-4 overflow-x-auto">
-                {countryPreds.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No country projections saved yet.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-slate-200 dark:border-white/10 hover:bg-transparent">
-                        <TableHead className="w-[200px] text-muted-foreground">Country</TableHead>
-                        <TableHead className="text-muted-foreground">Elo</TableHead>
-                        <TableHead className="text-muted-foreground whitespace-nowrap">Champ Prob.</TableHead>
-                        <TableHead className="min-w-[300px] text-muted-foreground">Simulated Path Summary</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {countryPreds.map((p) => {
-                        let data: any = null;
-                        try {
-                          data = readPredictionPayload(p.predictedPayload, p.predictedWinner);
-                        } catch (e) {
-                          console.error("Failed to parse country projection details", e);
-                        }
-
-                        if (!data) return null;
-
-                        const pathSummary = data.path
-                          ?.filter((s: any) => s.winPct !== undefined)
-                          .map((s: any) => `${s.stage} (${s.winPct}%)`)
-                          .join(" ➔ ");
-
-                        return (
-                          <TableRow key={p.id} className="border-slate-100 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <CountryFlag
-                                  code={data.code}
-                                  flag={data.flag}
-                                  name={data.name}
-                                  className="h-6 w-8 shrink-0 rounded object-cover"
-                                  emojiClassName="text-2xl leading-none"
-                                />
-                                <span className="font-display font-bold text-gradient">{data.name}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="font-mono text-xs text-muted-foreground">
-                              {data.elo}
-                            </TableCell>
-                            <TableCell className="font-display font-bold text-slate-900 dark:text-white">
-                              {data.championProb}%
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground leading-relaxed">
-                              {pathSummary || <span className="italic opacity-50">No path data</span>}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+        <SavedPredictionsClient />
       </main>
       <Footer />
     </div>
