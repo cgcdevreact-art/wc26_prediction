@@ -5,9 +5,19 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
-import { ArrowRight, Sparkles, Plus, X, Info } from "lucide-react";
+import { ArrowRight, Sparkles, Plus, X, Info, Pencil } from "lucide-react";
 import { ALL_COUNTRIES } from "@/lib/countries-data";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function InfoTooltip({ content }: { content: string }) {
   return (
@@ -34,6 +44,17 @@ function InfoTooltip({ content }: { content: string }) {
 }
 
 const FEATURED_CODES = ["NOR", "ITA", "CHL", "NGA", "IND", "RSA"];
+const DEFAULT_FAILED_COUNTRY_CODE = "NQ-NO";
+
+function normalizeCountryName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/gi, " ")
+    .trim()
+    .toLowerCase();
+}
 
 export interface CustomCountry {
   code: string;
@@ -46,13 +67,20 @@ export interface CustomCountry {
   replacedCode: string;
 }
 
+interface FailedCountryOption {
+  code: string;
+  name: string;
+  flag: string;
+  selectionCode: string;
+}
+
 export function WildcardCountrySection() {
   const router = useRouter();
   const { data: session } = useSession();
   const teams = useTeams();
   const groupsConfig = useGroupsConfig();
 
-  const [selectedCode, setSelectedCode] = useState("NOR");
+  const [selectedCode, setSelectedCode] = useState(DEFAULT_FAILED_COUNTRY_CODE);
   const [customCountries, setCustomCountries] = useState<CustomCountry[]>([]);
 
   // Inline Builder State
@@ -68,6 +96,8 @@ export function WildcardCountrySection() {
   const [flagSearch, setFlagSearch] = useState("");
   const [isFlagDropdownOpen, setIsFlagDropdownOpen] = useState(false);
   const [countriesList, setCountriesList] = useState<any[]>(ALL_COUNTRIES);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [confirmRunOpen, setConfirmRunOpen] = useState(false);
 
   useEffect(() => {
     fetch("https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/index.json")
@@ -97,6 +127,24 @@ export function WildcardCountrySection() {
   const worldCupCodes = useMemo(() => {
     return Object.values(groupsConfig).flat();
   }, [groupsConfig]);
+
+  const failedToQualifyCountries = useMemo<FailedCountryOption[]>(() => {
+    const qualifiedNames = new Set(
+      teams
+        .filter((team) => worldCupCodes.includes(team.code))
+        .map((team) => normalizeCountryName(team.name))
+    );
+
+    return ALL_COUNTRIES
+      .filter((country) => !qualifiedNames.has(normalizeCountryName(country.name)))
+      .map((country) => ({
+        code: country.code,
+        name: country.name,
+        flag: country.emoji,
+        selectionCode: `NQ-${country.code}`,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [teams, worldCupCodes]);
 
   useEffect(() => {
     let localList: CustomCountry[] = [];
@@ -155,7 +203,7 @@ export function WildcardCountrySection() {
     localStorage.setItem("wc26_custom_countries", JSON.stringify(updated));
     setCustomCountries(updated);
     if (selectedCode === code) {
-      setSelectedCode("NOR");
+      setSelectedCode(DEFAULT_FAILED_COUNTRY_CODE);
     }
 
     if (session?.user?.id) {
@@ -172,9 +220,25 @@ export function WildcardCountrySection() {
   }, [teams]);
 
   const featuredTeams = useMemo(() => {
-    const featured = FEATURED_CODES.map((code) => teams.find((team) => team.code === code)).filter(Boolean);
-    return featured.length > 0 ? featured : sortedTeams.slice(0, 5);
-  }, [sortedTeams, teams]);
+    const featuredNameMap: Record<string, string> = {
+      NOR: "Norway",
+      ITA: "Italy",
+      CHL: "Chile",
+      NGA: "Nigeria",
+      IND: "India",
+      RSA: "South Africa",
+    };
+
+    const featured = FEATURED_CODES
+      .map((code) => failedToQualifyCountries.find((country) => country.name === featuredNameMap[code]))
+      .filter(Boolean) as FailedCountryOption[];
+
+    return featured.length > 0 ? featured : failedToQualifyCountries.slice(0, 6);
+  }, [failedToQualifyCountries]);
+
+  const selectedFailedCountry = useMemo(() => {
+    return failedToQualifyCountries.find((country) => country.selectionCode === selectedCode) || null;
+  }, [failedToQualifyCountries, selectedCode]);
 
   const selectedTeam = useMemo(() => {
     const custom = customCountries.find((cc) => cc.code === selectedCode);
@@ -185,8 +249,15 @@ export function WildcardCountrySection() {
         flag: custom.flag,
       };
     }
-    return teams.find((team) => team.code === selectedCode) || featuredTeams[0] || teams[0];
-  }, [selectedCode, customCountries, teams, featuredTeams]);
+    if (selectedFailedCountry) {
+      return {
+        code: selectedFailedCountry.selectionCode,
+        name: selectedFailedCountry.name,
+        flag: selectedFailedCountry.flag,
+      };
+    }
+    return featuredTeams[0] || null;
+  }, [selectedCode, customCountries, selectedFailedCountry, featuredTeams]);
 
   // Selected Team Details for Dashboard Preview
   const selectedTeamDetails = useMemo(() => {
@@ -208,7 +279,23 @@ export function WildcardCountrySection() {
         replacedName: orig?.name || "",
       };
     }
-    const team = teams.find((t) => t.code === selectedCode) || featuredTeams[0] || teams[0];
+    if (selectedFailedCountry) {
+      return {
+        code: selectedFailedCountry.selectionCode,
+        name: selectedFailedCountry.name,
+        flag: selectedFailedCountry.flag,
+        rank: "Wildcard",
+        elo: 1650,
+        attack: 78,
+        defense: 78,
+        power: 75,
+        squadValueM: 100,
+        confederation: "Wildcard",
+        isCustom: false,
+        replacedName: "",
+      };
+    }
+    const team = teams.find((t) => t.code === selectedCode) || teams[0];
     return {
       code: team?.code || "ARG",
       name: team?.name || "Argentina",
@@ -223,7 +310,7 @@ export function WildcardCountrySection() {
       isCustom: false,
       replacedName: "",
     };
-  }, [selectedCode, customCountries, teams, featuredTeams]);
+  }, [selectedCode, customCountries, teams, selectedFailedCountry]);
 
   // Suggested replacements based on baseline's confederation/region
   const suggestedReplacements = useMemo(() => {
@@ -246,25 +333,73 @@ export function WildcardCountrySection() {
     }
   }, [suggestedReplacements]);
 
-  const launchCountryPath = () => {
-    if (!selectedTeam) return;
-    router.push(`/predictions/country?team=${selectedTeam.code}&autorun=true`);
+  const resetBuilder = () => {
+    setIsBuilding(false);
+    setEditingCode(null);
+    setCustomName("");
+    setCustomFlag("🇳🇬");
+    setBaselineCode("ENG");
+    setFlagSearch("");
+    setIsFlagDropdownOpen(false);
+    setCustomElo(1650);
+    setCustomAttack(78);
+    setCustomDefense(78);
   };
 
-  const handleCreateCustomCountry = async () => {
+  const prefillBuilderFromFailedCountry = (country: FailedCountryOption) => {
+    setEditingCode(null);
+    setIsBuilding(true);
+    setCustomName(country.name);
+    setCustomFlag(country.flag);
+    setFlagSearch("");
+    setIsFlagDropdownOpen(false);
+  };
+
+  const handleStartCreate = () => {
+    resetBuilder();
+    setIsBuilding(true);
+  };
+
+  const handleSelectCode = (code: string) => {
+    setSelectedCode(code);
+    const failedCountry = failedToQualifyCountries.find((country) => country.selectionCode === code);
+    if (failedCountry) {
+      prefillBuilderFromFailedCountry(failedCountry);
+    }
+  };
+
+  const handleEditCustomCountry = (code: string) => {
+    const custom = customCountries.find((country) => country.code === code);
+    if (!custom) return;
+
+    setEditingCode(custom.code);
+    setIsBuilding(true);
+    setSelectedCode(custom.code);
+    setCustomName(custom.name);
+    setCustomFlag(custom.flag);
+    setBaselineCode(custom.baselineCode);
+    setReplacedCode(custom.replacedCode);
+    setCustomElo(custom.elo);
+    setCustomAttack(custom.attack);
+    setCustomDefense(custom.defense);
+    setFlagSearch("");
+    setIsFlagDropdownOpen(false);
+  };
+
+  const handleSaveCustomCountryPreview = async () => {
     if (!customName.trim()) {
       alert("Please enter a country name.");
-      return;
+      return null;
     }
 
-    const generatedCode = "CC_" + customName.trim().substring(0, 3).toUpperCase();
+    const generatedCode = editingCode || "CC_" + customName.trim().substring(0, 3).toUpperCase();
 
     const isWcConflict = teams.some(
       (t) => worldCupCodes.includes(t.code) && t.name.toLowerCase() === customName.trim().toLowerCase()
     );
     if (isWcConflict) {
       alert("This country is already in the World Cup! Please enter a wildcard country name.");
-      return;
+      return null;
     }
 
     const newCC: CustomCountry = {
@@ -299,15 +434,50 @@ export function WildcardCountrySection() {
     }
 
     setSelectedCode(generatedCode);
-
-    // Reset inline builder
-    setIsBuilding(false);
-    setCustomName("");
-    setCustomFlag("🇳🇬");
-
-    // Redirect directly to path to glory simulation for custom team with autorun
-    router.push(`/predictions/country?team=${generatedCode}&autorun=true`);
+    resetBuilder();
+    return generatedCode;
   };
+
+  const handleConfirmRun = async () => {
+    let teamCode = selectedTeam?.code || "";
+
+    if (isBuilding) {
+      const savedCode = await handleSaveCustomCountryPreview();
+      if (!savedCode) return;
+      teamCode = savedCode;
+    }
+
+    if (!teamCode) return;
+    setConfirmRunOpen(false);
+    router.push(`/predictions/country?team=${teamCode}&autorun=true`);
+  };
+
+  const editingSelectedCustom = Boolean(isBuilding && editingCode && selectedCode === editingCode);
+
+  const previewTeam = editingSelectedCustom
+    ? {
+        code: editingCode!,
+        name: customName.trim() || selectedTeam?.name || "Custom Country",
+        flag: customFlag,
+      }
+    : selectedTeam;
+
+  const previewDetails = editingSelectedCustom
+    ? {
+        ...selectedTeamDetails,
+        code: editingCode!,
+        name: customName.trim() || selectedTeamDetails.name,
+        flag: customFlag,
+        rank: "Custom",
+        elo: customElo,
+        attack: customAttack,
+        defense: customDefense,
+        confederation:
+          teams.find((team) => team.code === replacedCode)?.confederation || selectedTeamDetails.confederation,
+        isCustom: true,
+        replacedName: teams.find((team) => team.code === replacedCode)?.name || selectedTeamDetails.replacedName,
+      }
+    : selectedTeamDetails;
 
   return (
     <section className="container mx-auto px-4 py-16">
@@ -329,24 +499,36 @@ export function WildcardCountrySection() {
 
           <div className="relative z-10 space-y-6">
             <div className="flex items-center gap-5 border-b border-slate-200/50 dark:border-white/5 pb-5">
-              {selectedTeam && (
+              {previewTeam && (
                 <>
                   <div className="filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:scale-105 transition-transform duration-300">
                     <CountryFlag
-                      code={selectedTeam.code}
-                      flag={selectedTeam.flag}
-                      name={selectedTeam.name}
+                      code={previewTeam.code}
+                      flag={previewTeam.flag}
+                      name={previewTeam.name}
                       className="h-16 w-20 rounded-xl object-cover drop-shadow-md"
                       emojiClassName="text-7xl leading-none select-none drop-shadow-md"
                     />
                   </div>
-                  <div>
+                  <div className="flex min-w-0 flex-1 items-start justify-between gap-4">
+                    <div className="min-w-0">
                     <div className="text-[10px] uppercase tracking-[0.25em] text-neon font-extrabold mb-1">
                       Active Selection
                     </div>
                     <h3 className="font-display text-3xl font-black text-slate-950 dark:text-white tracking-tight">
-                      {selectedTeam.name}
+                      {previewTeam.name}
                     </h3>
+                    </div>
+                    {previewDetails.isCustom && (
+                      <button
+                        type="button"
+                        onClick={() => handleEditCustomCountry(selectedCode)}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600 transition hover:border-neon/40 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300 dark:hover:text-white"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        <span>Edit</span>
+                      </button>
+                    )}
                   </div>
                 </>
               )}
@@ -360,11 +542,11 @@ export function WildcardCountrySection() {
               <div className="flex flex-wrap gap-2.5">
                 {featuredTeams.map((team) => {
                   if (!team) return null;
-                  const active = team.code === selectedCode;
+                  const active = team.selectionCode === selectedCode;
                   return (
                     <button
-                      key={team.code}
-                      onClick={() => setSelectedCode(team.code)}
+                      key={team.selectionCode}
+                      onClick={() => handleSelectCode(team.selectionCode)}
                       className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition cursor-pointer ${active
                         ? "border-neon/40 bg-neon/10 text-slate-950 dark:text-white font-bold shadow-[0_0_12px_rgba(6,182,212,0.15)]"
                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.02] dark:text-muted-foreground dark:hover:bg-white/5 dark:hover:text-white"
@@ -387,7 +569,7 @@ export function WildcardCountrySection() {
                   return (
                     <div
                       key={cc.code}
-                      onClick={() => setSelectedCode(cc.code)}
+                      onClick={() => handleSelectCode(cc.code)}
                       className={`inline-flex items-center gap-2 rounded-xl border pl-3 pr-2 py-2 text-sm font-semibold transition cursor-pointer relative overflow-hidden group ${
                         active
                           ? "border-neon-2/45 bg-neon-2/15 text-slate-950 dark:text-white font-bold shadow-[0_0_15px_rgba(178,57,210,0.18)]"
@@ -422,12 +604,17 @@ export function WildcardCountrySection() {
 
             {/* Dropdown Selector */}
             <div className="space-y-2 max-w-md pt-2">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
-                Browse Full Country List
-              </label>
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
+                  Browse Failed-To-Qualify Nations
+                </label>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
+                  {failedToQualifyCountries.length} available
+                </span>
+              </div>
               <select
                 value={selectedCode}
-                onChange={(event) => setSelectedCode(event.target.value)}
+                onChange={(event) => handleSelectCode(event.target.value)}
                 className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-neon focus:ring-1 focus:ring-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
               >
                 {customCountries.length > 0 && (
@@ -439,10 +626,10 @@ export function WildcardCountrySection() {
                     ))}
                   </optgroup>
                 )}
-                <optgroup label="All Teams" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
-                  {sortedTeams.map((team) => (
-                    <option key={team.code} value={team.code}>
-                      {team.name} ({team.code})
+                <optgroup label="Failed To Qualify" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
+                  {failedToQualifyCountries.map((country) => (
+                    <option key={country.selectionCode} value={country.selectionCode}>
+                      {country.name}
                     </option>
                   ))}
                 </optgroup>
@@ -455,25 +642,25 @@ export function WildcardCountrySection() {
                 <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold">FIFA Rank / Region</span>
                   <span className="text-sm font-extrabold text-slate-900 dark:text-white mt-1 block">
-                    {selectedTeamDetails.rank} ({selectedTeamDetails.confederation})
+                    {previewDetails.rank} ({previewDetails.confederation})
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold">Elo Rating</span>
                   <span className="text-sm font-extrabold text-slate-900 dark:text-white mt-1 block font-mono">
-                    {selectedTeamDetails.elo}
+                    {previewDetails.elo}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold">Squad Value</span>
                   <span className="text-sm font-extrabold text-slate-900 dark:text-white mt-1 block font-mono">
-                    {selectedTeamDetails.squadValueM ? `€${selectedTeamDetails.squadValueM}M` : "N/A"}
+                    {previewDetails.squadValueM ? `€${previewDetails.squadValueM}M` : "N/A"}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold">Power Index</span>
                   <span className="text-sm font-extrabold text-slate-900 dark:text-white mt-1 block font-mono">
-                    {selectedTeamDetails.power}
+                    {previewDetails.power}
                   </span>
                 </div>
               </div>
@@ -483,28 +670,28 @@ export function WildcardCountrySection() {
                 <div>
                   <div className="flex justify-between text-[11px] text-muted-foreground font-bold mb-1.5 uppercase tracking-wide">
                     <span>Attack Power</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-white">{selectedTeamDetails.attack}</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">{previewDetails.attack}</span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-emerald-500 to-neon rounded-full" style={{ width: `${selectedTeamDetails.attack}%` }} />
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-neon rounded-full" style={{ width: `${previewDetails.attack}%` }} />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-[11px] text-muted-foreground font-bold mb-1.5 uppercase tracking-wide">
                     <span>Defense Strength</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-white">{selectedTeamDetails.defense}</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">{previewDetails.defense}</span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-emerald-500 to-neon rounded-full" style={{ width: `${selectedTeamDetails.defense}%` }} />
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-neon rounded-full" style={{ width: `${previewDetails.defense}%` }} />
                   </div>
                 </div>
               </div>
 
               {/* Custom Flag Indicator Banner */}
-              {selectedTeamDetails.isCustom && (
+              {previewDetails.isCustom && (
                 <div className="flex items-center gap-2.5 text-xs text-neon bg-neon/8 px-4 py-3 rounded-2xl border border-neon/20 font-bold transition-all">
                   <Sparkles className="w-4 h-4 text-neon shrink-0 animate-pulse" />
-                  <span>Custom wildcard team replacing {selectedTeamDetails.replacedName} (baseline cloned from {teams.find(t => t.code === customCountries.find(cc => cc.code === selectedCode)?.baselineCode)?.name})</span>
+                  <span>Custom wildcard team replacing {previewDetails.replacedName} (baseline cloned from {teams.find(t => t.code === (editingSelectedCustom ? baselineCode : customCountries.find(cc => cc.code === selectedCode)?.baselineCode))?.name})</span>
                 </div>
               )}
             </div>
@@ -513,11 +700,11 @@ export function WildcardCountrySection() {
           {/* Launch Button */}
           <div className="relative z-10 pt-8 border-t border-slate-200/50 dark:border-white/5 mt-6">
             <button
-              onClick={launchCountryPath}
+              onClick={() => setConfirmRunOpen(true)}
               className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-6 text-sm font-black text-background transition hover:opacity-95 active:scale-[0.98] shadow-lg shadow-neon/20 hover:shadow-neon/30 cursor-pointer"
             >
               <Sparkles className="h-4.5 w-4.5 fill-current" />
-              <span>Launch Path To Glory Simulation</span>
+              <span>Run Path To Glory</span>
               <ArrowRight className="h-4.5 w-4.5" />
             </button>
           </div>
@@ -548,9 +735,7 @@ export function WildcardCountrySection() {
               </div>
 
               <button
-                onClick={() => {
-                  setIsBuilding(true);
-                }}
+                onClick={handleStartCreate}
                 className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neon bg-neon/5 px-4 text-sm font-bold text-neon hover:bg-neon/10 transition cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
@@ -564,10 +749,10 @@ export function WildcardCountrySection() {
                 <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-white/5">
                   <h4 className="font-display text-lg font-bold text-slate-950 dark:text-white flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-neon" />
-                    <span>Create Country Profile</span>
+                    <span>{editingCode ? "Edit Country Profile" : "Create Country Profile"}</span>
                   </h4>
                   <button
-                    onClick={() => setIsBuilding(false)}
+                    onClick={resetBuilder}
                     className="text-xs text-muted-foreground hover:text-slate-950 dark:hover:text-white"
                   >
                     Cancel
@@ -792,23 +977,53 @@ export function WildcardCountrySection() {
               <div className="flex gap-2 pt-2 border-t border-slate-200 dark:border-white/5 mt-auto">
                 <button
                   type="button"
-                  onClick={() => setIsBuilding(false)}
+                  onClick={resetBuilder}
                   className="flex-1 px-4 py-2.5 text-xs font-bold rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 transition cursor-pointer dark:border-white/10 dark:text-white dark:hover:bg-white/5"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={handleCreateCustomCountry}
+                  onClick={handleSaveCustomCountryPreview}
                   className="flex-1.5 px-4 py-2.5 text-xs font-black rounded-xl bg-gradient-to-r from-neon to-neon-2 text-background hover:scale-[1.02] active:scale-95 transition cursor-pointer"
                 >
-                  Save & Launch Path
+                  Save & Preview
                 </button>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      <AlertDialog open={confirmRunOpen} onOpenChange={setConfirmRunOpen}>
+        <AlertDialogContent className="rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl dark:border-white/10 dark:bg-slate-950 dark:text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 font-display text-xl font-bold">
+              <Sparkles className="h-5 w-5 text-neon" />
+              <span>Run Path To Glory?</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              {isBuilding
+                ? "Your current country profile will be saved, previewed, and then launched into the simulator."
+                : `Start the simulation for ${previewTeam?.name || "this team"} now?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 flex gap-2">
+            <AlertDialogCancel className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:text-white dark:hover:bg-white/5">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleConfirmRun();
+              }}
+              className="rounded-xl bg-gradient-to-r from-neon to-neon-2 px-4 py-2 text-xs font-black text-background hover:opacity-95"
+            >
+              Confirm & Run
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

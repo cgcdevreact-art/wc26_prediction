@@ -33,21 +33,21 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
       case "credits":
         return {
           title: "Simulation Limit Reached",
-          description: "You have used all 5 of your free simulations. Upgrade to Plus or Pro for unlimited simulation capability!",
+          description: "You have used all 5 of your free simulations. Upgrade to Advanced or Expert Predictor for unlimited simulation capability!",
           highlightText: "Unlock Unlimited Simulations",
           icon: <Trophy className="h-6 w-6 text-amber-500" />,
         };
       case "plus":
         return {
           title: "Unlock Advanced Model",
-          description: "The Advanced Model incorporates squad quality metrics, recent form, and Elo weights for highly accurate results. Upgrade to Plus or Pro to unlock!",
+          description: "The Advanced Model incorporates squad quality metrics, recent form, and Elo weights for highly accurate results. Upgrade to Advanced or Expert Predictor to unlock!",
           highlightText: "Get Advanced Model",
           icon: <Sparkles className="h-6 w-6 text-blue-400" />,
         };
       case "pro":
         return {
           title: "Unlock Pro Model",
-          description: "The Pro Model simulates matches using team characteristics, pitch variables (weather, crowd support), discipline, and tactical aspects. Upgrade to Pro to unlock!",
+          description: "The Pro Model simulates matches using team characteristics, pitch variables (weather, crowd support), discipline, and tactical aspects. Upgrade to Expert Predictor to unlock!",
           highlightText: "Get Pro Model",
           icon: <Lock className="h-6 w-6 text-purple-400" />,
         };
@@ -68,14 +68,14 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
   return createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto flex justify-center p-4">
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
       />
 
       {/* Content Card */}
       <div className="relative my-auto w-full max-w-lg overflow-hidden rounded-3xl border border-border dark:border-white/10 bg-card/95 dark:bg-[#0f172a]/95 p-6 shadow-2xl md:p-8 animate-fade-in text-foreground">
-        
+
         {/* Glow Effects */}
         <div className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-neon/15 blur-2xl" />
         <div className="pointer-events-none absolute -right-16 -bottom-16 h-48 w-48 rounded-full bg-neon-2/15 blur-2xl" />
@@ -114,14 +114,14 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
             </div>
             <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 relative overflow-hidden">
               {/* <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-blue-400 animate-pulse" /> */}
-              <div className="font-semibold text-blue-600 dark:text-blue-400 mb-1">Plus</div>
+              <div className="font-semibold text-blue-600 dark:text-blue-400 mb-1">Advanced</div>
               <div className="text-muted-foreground">Advanced Model</div>
               <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mt-1.5">Unlimited</div>
             </div>
             <div className="rounded-xl bg-purple-500/10 border border-purple-500/20 p-3 relative overflow-hidden">
               {/* <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-purple-400 animate-pulse" /> */}
-              <div className="font-semibold text-purple-600 dark:text-purple-400 mb-1">Pro</div>
-              <div className="text-muted-foreground">All Models</div>
+              <div className="font-semibold text-purple-600 dark:text-purple-400 mb-1">Expert</div>
+              <div className="text-muted-foreground">Pro Model</div>
               <div className="text-[10px] text-purple-600 dark:text-purple-400 font-bold mt-1.5">Unlimited</div>
             </div>
           </div>
@@ -144,7 +144,7 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
                 {details.highlightText}
               </Link>
             )}
-            
+
             <button
               onClick={onClose}
               className="w-full rounded-xl bg-muted hover:bg-muted/80 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition duration-200"

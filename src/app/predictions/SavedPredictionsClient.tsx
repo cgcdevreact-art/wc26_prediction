@@ -13,6 +13,7 @@ import {
 import { useTeams } from "@/components/TeamsProvider";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { readPredictionPayload } from "@/lib/predictionWinner";
+import { UpgradeModal } from "@/components/site/UpgradeModal";
 import {
   Accordion,
   AccordionContent,
@@ -50,10 +51,20 @@ export default function SavedPredictionsClient() {
   const router = useRouter();
   const appTeams = useTeams();
 
+  const subTier = session?.user?.subscriptionTier || "free";
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<"plus" | "pro">("plus");
+
   const [savedPredictions, setSavedPredictions] = useState<any[]>([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
   const [selectedCompareIds, setSelectedCompareIds] = useState<string[]>([]);
-  const [compareMetricMode, setCompareMetricMode] = useState<"progression" | "attributes">("progression");
+  const [compareMetricMode, setCompareMetricMode] = useState<"progression" | "attributes">("attributes");
+
+  useEffect(() => {
+    if (subTier === "free") {
+      setCompareMetricMode("attributes");
+    }
+  }, [subTier]);
 
   const fetchSavedPredictions = async () => {
     if (!session?.user?.id) return;
@@ -83,7 +94,7 @@ export default function SavedPredictionsClient() {
   const handleLoadPrediction = (prediction: any) => {
     const data = readPredictionPayload<any>(prediction.predictedPayload, prediction.predictedWinner);
     if (!data) return;
-    router.push(`/predictions/country?team=${data.code}&load=${prediction.id}&autorun=true`);
+    router.push(`/predictions/country?team=${data.code}&load=${prediction.id}`);
   };
 
   const handleDeletePrediction = async (id: string, name: string) => {
@@ -128,11 +139,12 @@ export default function SavedPredictionsClient() {
   };
 
   return (
-    <Accordion
-      type="multiple"
-      defaultValue={["saved-comparison"]}
-      className="w-full bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-[2rem] relative shadow-[0_18px_50px_rgba(15,23,42,0.08)] mt-8"
-    >
+    <>
+      <Accordion
+        type="multiple"
+        defaultValue={["saved-comparison"]}
+        className="w-full bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-[2rem] relative shadow-[0_18px_50px_rgba(15,23,42,0.08)] mt-8"
+      >
       <AccordionItem value="saved-comparison" className="border-none">
         <AccordionTrigger className="px-6 md:px-8 pt-6 md:pt-8 pb-3 hover:no-underline">
           <div>
@@ -373,6 +385,14 @@ export default function SavedPredictionsClient() {
                       }
                     ];
 
+                    const filteredAttributesChartData = subTier === "free"
+                      ? attributesChartData.filter(d => 
+                          d.attribute === "Elo Rating" || 
+                          d.attribute === "Attack Rating" || 
+                          d.attribute === "Defense Rating"
+                        )
+                      : attributesChartData;
+
                     return (
                       <>
                         {/* Line Chart Card */}
@@ -387,7 +407,10 @@ export default function SavedPredictionsClient() {
                             </div>
                             <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200/50 dark:border-white/5 self-stretch sm:self-auto">
                               <button
-                                onClick={() => setCompareMetricMode("progression")}
+                                onClick={subTier === "free" ? () => {
+                                  setUpgradeReason("plus");
+                                  setUpgradeOpen(true);
+                                } : () => setCompareMetricMode("progression")}
                                 className={`flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition ${compareMetricMode === "progression" ? "bg-white dark:bg-white/10 text-cyan-600 dark:text-neon shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                               >
                                 Progession Curve
@@ -425,7 +448,7 @@ export default function SavedPredictionsClient() {
                               </ResponsiveContainer>
                             ) : (
                               <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={attributesChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <LineChart data={filteredAttributesChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" strokeOpacity={0.1} />
                                   <XAxis dataKey="attribute" stroke="#94a3b8" fontSize={11} tickLine={false} />
                                   <YAxis stroke="#94a3b8" fontSize={11} domain={[0, 100]} tickLine={false} />
@@ -493,9 +516,12 @@ export default function SavedPredictionsClient() {
 
                                   const renderStageRow = (label: string, icon: React.ReactNode, stageKey: string, maxValue: number) => {
                                     return (
-                                      <tr className="border-b border-slate-150 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <tr
+                                        onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : undefined}
+                                        className={`border-b border-slate-150 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors ${subTier === "free" ? "cursor-pointer" : ""}`}
+                                      >
                                         <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                          <div className="flex items-center gap-2">
+                                          <div className={`flex items-center gap-2 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                                             {icon}
                                             <span>{label}</span>
                                           </div>
@@ -507,7 +533,7 @@ export default function SavedPredictionsClient() {
                                           return (
                                             <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 font-mono font-bold transition-colors ${isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
                                               }`}>
-                                              <div className="flex items-center justify-between gap-1.5 max-w-[180px]">
+                                              <div className={`flex items-center justify-between gap-1.5 max-w-[180px] ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                                                 <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
                                                   {displayPct}%
                                                 </span>
@@ -607,9 +633,12 @@ export default function SavedPredictionsClient() {
                                       </tr>
 
                                       {/* Squad Value */}
-                                      <tr className="border-b border-slate-150 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <tr
+                                        onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : undefined}
+                                        className={`border-b border-slate-150 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors ${subTier === "free" ? "cursor-pointer" : ""}`}
+                                      >
                                         <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                          <div className="flex items-center gap-2">
+                                          <div className={`flex items-center gap-2 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                                             <Trophy className="w-4 h-4 text-yellow-500 shrink-0" />
                                             <span>Squad Value</span>
                                           </div>
@@ -620,7 +649,7 @@ export default function SavedPredictionsClient() {
                                           return (
                                             <td key={c.id} className={`py-4 px-5 border-b border-slate-100 dark:border-white/5 font-mono font-bold transition-colors ${isBest ? "bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]" : ""
                                               }`}>
-                                              <div className="flex items-center justify-between gap-1.5 max-w-[180px]">
+                                              <div className={`flex items-center justify-between gap-1.5 max-w-[180px] ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                                                 <span className={isBest ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-foreground"}>
                                                   {squadVal ? `€${squadVal}M` : "N/A"}
                                                 </span>
@@ -634,9 +663,12 @@ export default function SavedPredictionsClient() {
                                       </tr>
 
                                       {/* Model Engine */}
-                                      <tr className="border-b border-slate-150 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <tr
+                                        onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : undefined}
+                                        className={`border-b border-slate-150 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors ${subTier === "free" ? "cursor-pointer" : ""}`}
+                                      >
                                         <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                          <div className="flex items-center gap-2">
+                                          <div className={`flex items-center gap-2 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                                             <Cpu className="w-4 h-4 text-purple-500 shrink-0" />
                                             <span>Model Engine</span>
                                           </div>
@@ -651,18 +683,23 @@ export default function SavedPredictionsClient() {
                                           }
                                           return (
                                             <td key={c.id} className="py-4 px-5 border-b border-slate-100 dark:border-white/5">
-                                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${badgeClass}`}>
-                                                {model}
-                                              </span>
+                                              <div className={subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}>
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${badgeClass}`}>
+                                                  {model}
+                                                </span>
+                                              </div>
                                             </td>
                                           );
                                         })}
                                       </tr>
 
                                       {/* Championship Odds */}
-                                      <tr className="border-b border-slate-200 dark:border-white/10 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <tr
+                                        onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : undefined}
+                                        className={`border-b border-slate-200 dark:border-white/10 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors ${subTier === "free" ? "cursor-pointer" : ""}`}
+                                      >
                                         <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                          <div className="flex items-center gap-2">
+                                          <div className={`flex items-center gap-2 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                                             <Award className="w-4 h-4 text-rose-500 shrink-0" />
                                             <span>Championship Odds</span>
                                           </div>
@@ -674,13 +711,13 @@ export default function SavedPredictionsClient() {
                                           return (
                                             <td key={c.id} className={`py-4 px-5 border-b border-slate-200 dark:border-white/10 transition-colors ${isBest ? "bg-cyan-500/[0.08] dark:bg-neon/10" : "bg-cyan-500/[0.02] dark:bg-neon/5"
                                               }`}>
-                                              <div className="space-y-1.5 max-w-[180px]">
+                                              <div className={`space-y-1.5 max-w-[180px] ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                                                 <div className="flex items-center justify-between text-xs font-black font-mono">
                                                   <span className={isBest ? "text-cyan-600 dark:text-neon text-sm" : "text-foreground"}>
                                                     {prob}%
                                                   </span>
                                                   {isBest && (
-                                                    <span className="text-[9px] font-extrabold text-cyan-600 dark:text-neon uppercase tracking-wide bg-cyan-500/15 dark:bg-neon/20 px-1 py-0.2 rounded flex items-center gap-0.5 animate-pulse">
+                                                    <span className="text-[9px] font-extrabold text-cyan-600 dark:text-neon uppercase tracking-wide bg-cyan-500/15 dark:bg-neon/20 px-1 py-0.2 rounded flex items-center gap-0.5">
                                                       <Trophy className="w-2.5 h-2.5" /> Favorite
                                                     </span>
                                                   )}
@@ -713,20 +750,24 @@ export default function SavedPredictionsClient() {
                                       {renderStageRow("Reach Round of 32", <ChevronRight className="w-4 h-4 text-cyan-500/20 shrink-0" />, "r32", maxReachR32)}
 
                                       {/* Expected Path */}
-                                      <tr className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                      <tr
+                                        onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : undefined}
+                                        className={`border-b border-slate-100 dark:border-white/5 hover:bg-slate-50/50 dark:hover:bg-white/[0.01] transition-colors ${subTier === "free" ? "cursor-pointer" : ""}`}
+                                      >
                                         <td className="py-4 px-5 font-bold text-muted-foreground sticky left-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md z-10 border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]">
-                                          <div className="flex items-center gap-2">
+                                          <div className={`flex items-center gap-2 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                                             <Route className="w-4 h-4 text-pink-500 shrink-0" />
                                             <span>Expected Path</span>
                                           </div>
                                         </td>
                                         {parsedCompareData.map((c) => (
                                           <td key={c.id} className="py-4 px-5">
-                                            <div className="relative pl-4 border-l border-slate-200 dark:border-white/10 space-y-3.5 my-1 max-w-[220px] ml-2">
-                                              {c.data.path?.map((step: any, sidx: number) => {
-                                                const stageShort = step.stage
-                                                  .replace("Round of 32", "R32")
-                                                  .replace("Round of 16", "R16")
+                                            <div className={subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}>
+                                              <div className="relative pl-4 border-l border-slate-200 dark:border-white/10 space-y-3.5 my-1 max-w-[220px] ml-2">
+                                                {c.data.path?.map((step: any, sidx: number) => {
+                                                  const stageShort = step.stage
+                                                    .replace("Round of 32", "R32")
+                                                    .replace("Round of 16", "R16")
                                                   .replace("Quarter Final", "QF")
                                                   .replace("Semi Final", "SF")
                                                   .replace("Final", "Final");
@@ -749,7 +790,8 @@ export default function SavedPredictionsClient() {
                                                     </div>
                                                   </div>
                                                 );
-                                              })}
+                                                })}
+                                              </div>
                                             </div>
                                           </td>
                                         ))}
@@ -801,5 +843,7 @@ export default function SavedPredictionsClient() {
         </AccordionContent>
       </AccordionItem>
     </Accordion>
+    <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} reason={upgradeReason} />
+    </>
   );
 }
