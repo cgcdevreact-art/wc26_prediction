@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight, Check } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export function ModelGuideAccordion() {
@@ -9,13 +10,24 @@ export function ModelGuideAccordion() {
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="model-guide" className="border-none">
           <AccordionTrigger className="hover:no-underline py-5 px-6">
-            <div className="text-left">
-              <div className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-600 dark:text-neon">
-                Model Guide
+            <div className="flex w-full items-start justify-between gap-4 pr-4">
+              <div className="text-left">
+                <div className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-600 dark:text-neon">
+                  Model Guide
+                </div>
+                <h2 className="mt-1 font-display text-2xl font-bold text-foreground dark:text-white">
+                  How to use the bracket models
+                </h2>
               </div>
-              <h2 className="mt-1 font-display text-2xl font-bold text-foreground dark:text-white">
-                How to use the bracket models
-              </h2>
+
+              <Link
+                href="/subscription#compare-plans"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full bg-gradient-to-r from-cyan-500 via-sky-500 to-fuchsia-500 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_25px_rgba(14,165,233,0.22)] transition hover:scale-[1.02] hover:opacity-95 active:scale-[0.98]"
+              >
+                <span>Compare Models</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
           </AccordionTrigger>
           <AccordionContent className="pt-0 pb-6 px-6">
@@ -36,6 +48,26 @@ export function ModelGuideAccordion() {
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     Start with the base model for a quick bracket using core Elo, attack, and defense signals.
                   </p>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span>Works with the default team ratings already loaded into the simulator.</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span>Best when you want to simulate quickly without changing team or player data.</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span>Good starting point before opening the Teams section to customize ratings.</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -59,6 +91,26 @@ export function ModelGuideAccordion() {
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     Switch to advanced when you want squad strength and extra team-level context to refine the bracket.
                   </p>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span>Use after editing team Elo, attack, or defense values in the Teams section.</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span>Lets you refine bracket outcomes using the team-level customization tools you already saved.</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span>Ideal if you want more control from team edits without touching individual players yet.</span>
+                    </div>
+                  </div>
                 </div>
               </Link>
 
@@ -82,6 +134,26 @@ export function ModelGuideAccordion() {
                   <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     Use pro for the deepest bracket run, adding player-level and form-driven prediction detail.
                   </p>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300">
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span>Use after editing player ratings, stats, image links, or squad details in the Teams section.</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300">
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span>Best when you also change player availability like players in and players out.</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300">
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span>Choose this when you want the bracket to reflect your saved team and player customizations most closely.</span>
+                    </div>
+                  </div>
                 </div>
               </Link>
             </div>

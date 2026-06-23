@@ -10,6 +10,16 @@ import { getMatchExpectedGoals, SimTeam } from "@/lib/simulation/model";
 import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check, PencilLine, Lock, Trash2, X, Info, Minus, Plus, Shield, Zap, Coins, Cpu, Award, Route } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CountryFlag } from "@/components/ui/CountryFlag";
@@ -49,6 +59,8 @@ function formatTeamScaleRating(value: number | undefined | null) {
 function clampRating(value: number, min = 1, max = 99) {
   return Math.max(min, Math.min(max, Math.round(value)));
 }
+
+type SimulationModel = "base" | "advanced" | "pro";
 
 function InfoTooltip({ content }: { content: string }) {
   return (
@@ -311,6 +323,10 @@ export default function CountryPredictionsClient({
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [upgradeModalReason, setUpgradeModalReason] = useState<"plus" | "pro" | "credits" | "guest">("plus");
   const [subscriptionTier, setSubscriptionTier] = useState<string>("free");
+  const [pendingModelSwitch, setPendingModelSwitch] = useState<{
+    feature: string;
+    targetModel: SimulationModel;
+  } | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -406,6 +422,35 @@ export default function CountryPredictionsClient({
   const canEditTeamCore = true;
   const canEditPlayerRatings = activePlan === "plus" || activePlan === "pro";
   const canEditPlayerAvailability = activePlan === "pro";
+
+  const promptFeatureAccess = ({
+    feature,
+    targetModel,
+    requiredPlan,
+  }: {
+    feature: string;
+    targetModel: SimulationModel;
+    requiredPlan?: "plus" | "pro";
+  }) => {
+    if (requiredPlan === "plus" && !canEditPlayerRatings) {
+      setUpgradeModalReason("plus");
+      setUpgradeModalOpen(true);
+      return false;
+    }
+
+    if (requiredPlan === "pro" && !canEditPlayerAvailability) {
+      setUpgradeModalReason("pro");
+      setUpgradeModalOpen(true);
+      return false;
+    }
+
+    if (selectedModel !== targetModel) {
+      setPendingModelSwitch({ feature, targetModel });
+      return false;
+    }
+
+    return true;
+  };
 
   const openAuthModal = (mode: "signin" | "signup" = "signin") => {
     router.push(buildAuthModalHref({
@@ -614,9 +659,13 @@ export default function CountryPredictionsClient({
   }, [customElo, customAttack, customDefense, customPlayerRatingDelta, playersIn, playersOut]);
 
   const togglePlayerSelection = (bucket: "in" | "out", playerId: string) => {
-    if (!canEditPlayerAvailability) {
-      setUpgradeModalReason("pro");
-      setUpgradeModalOpen(true);
+    const canUseFeature = promptFeatureAccess({
+      feature: bucket === "in" ? "Players In" : "Players Out",
+      targetModel: "pro",
+      requiredPlan: "pro",
+    });
+
+    if (!canUseFeature) {
       return;
     }
 
@@ -1444,7 +1493,22 @@ export default function CountryPredictionsClient({
                         max={2200}
                         value={customElo}
                         disabled={!canEditTeamCore}
-                        onChange={(e) => setCustomElo(clampRating(Number(e.target.value || 1200), 1200, 2200))}
+                        onClick={() => {
+                          if (!promptFeatureAccess({ feature: "Elo Rating", targetModel: "base" })) {
+                            return;
+                          }
+                        }}
+                        onFocus={() => {
+                          if (!promptFeatureAccess({ feature: "Elo Rating", targetModel: "base" })) {
+                            return;
+                          }
+                        }}
+                        onChange={(e) => {
+                          if (!promptFeatureAccess({ feature: "Elo Rating", targetModel: "base" })) {
+                            return;
+                          }
+                          setCustomElo(clampRating(Number(e.target.value || 1200), 1200, 2200));
+                        }}
                         className="w-24 h-9 rounded-lg border border-slate-200 bg-white text-center text-sm font-mono font-bold text-slate-950 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
                       />
                     </div>
@@ -1459,7 +1523,22 @@ export default function CountryPredictionsClient({
                         max={99}
                         value={customAttack}
                         disabled={!canEditTeamCore}
-                        onChange={(e) => setCustomAttack(clampRating(Number(e.target.value || 15), 15, 99))}
+                        onClick={() => {
+                          if (!promptFeatureAccess({ feature: "Attack Power", targetModel: "base" })) {
+                            return;
+                          }
+                        }}
+                        onFocus={() => {
+                          if (!promptFeatureAccess({ feature: "Attack Power", targetModel: "base" })) {
+                            return;
+                          }
+                        }}
+                        onChange={(e) => {
+                          if (!promptFeatureAccess({ feature: "Attack Power", targetModel: "base" })) {
+                            return;
+                          }
+                          setCustomAttack(clampRating(Number(e.target.value || 15), 15, 99));
+                        }}
                         className="w-24 h-9 rounded-lg border border-slate-200 bg-white text-center text-sm font-mono font-bold text-slate-950 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
                       />
                     </div>
@@ -1474,13 +1553,36 @@ export default function CountryPredictionsClient({
                         max={99}
                         value={customDefense}
                         disabled={!canEditTeamCore}
-                        onChange={(e) => setCustomDefense(clampRating(Number(e.target.value || 15), 15, 99))}
+                        onClick={() => {
+                          if (!promptFeatureAccess({ feature: "Defense Strength", targetModel: "base" })) {
+                            return;
+                          }
+                        }}
+                        onFocus={() => {
+                          if (!promptFeatureAccess({ feature: "Defense Strength", targetModel: "base" })) {
+                            return;
+                          }
+                        }}
+                        onChange={(e) => {
+                          if (!promptFeatureAccess({ feature: "Defense Strength", targetModel: "base" })) {
+                            return;
+                          }
+                          setCustomDefense(clampRating(Number(e.target.value || 15), 15, 99));
+                        }}
                         className="w-24 h-9 rounded-lg border border-slate-200 bg-white text-center text-sm font-mono font-bold text-slate-950 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
                       />
                     </div>
                   </div>
 
-                  <div className="py-2.5 border-b border-slate-100 dark:border-white/5">
+                  <div
+                    className="py-2.5 border-b border-slate-100 dark:border-white/5"
+                    onClick={() => {
+                      if (!canEditPlayerRatings) {
+                        setUpgradeModalReason("plus");
+                        setUpgradeModalOpen(true);
+                      }
+                    }}
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-slate-700 dark:text-white/70 flex items-center gap-1.5">
                         <span>Player Rating Boost</span>
@@ -1503,13 +1605,24 @@ export default function CountryPredictionsClient({
                         max={10}
                         value={customPlayerRatingDelta}
                         disabled={!canEditPlayerRatings}
-                        onChange={(e) => setCustomPlayerRatingDelta(Number(e.target.value))}
-                        className="w-full accent-cyan-600 disabled:opacity-45"
-                        onClick={() => {
-                          if (!canEditPlayerRatings) {
-                            setUpgradeModalReason("plus");
-                            setUpgradeModalOpen(true);
+                        onChange={(e) => {
+                          if (!promptFeatureAccess({
+                            feature: "Player Rating Boost",
+                            targetModel: "advanced",
+                            requiredPlan: "plus",
+                          })) {
+                            return;
                           }
+                          setCustomPlayerRatingDelta(Number(e.target.value));
+                        }}
+                        className="w-full accent-cyan-600 disabled:opacity-45"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          promptFeatureAccess({
+                            feature: "Player Rating Boost",
+                            targetModel: "advanced",
+                            requiredPlan: "plus",
+                          });
                         }}
                       />
                     </div>
@@ -1538,11 +1651,14 @@ export default function CountryPredictionsClient({
                         <PlayerBucketCompact
                           players={getTeamPlayers(selectedTeam.code).slice(0, 12)}
                           activeIds={playersIn}
-                          disabled={!canEditPlayerAvailability}
+                          disabled={!canEditPlayerAvailability || selectedModel !== "pro"}
                           onToggle={(playerId) => togglePlayerSelection("in", playerId)}
                           onLockedClick={() => {
-                            setUpgradeModalReason("pro");
-                            setUpgradeModalOpen(true);
+                            promptFeatureAccess({
+                              feature: "Players In",
+                              targetModel: "pro",
+                              requiredPlan: "pro",
+                            });
                           }}
                         />
                       </AccordionContent>
@@ -1570,11 +1686,14 @@ export default function CountryPredictionsClient({
                         <PlayerBucketCompact
                           players={getTeamPlayers(selectedTeam.code).slice(0, 12)}
                           activeIds={playersOut}
-                          disabled={!canEditPlayerAvailability}
+                          disabled={!canEditPlayerAvailability || selectedModel !== "pro"}
                           onToggle={(playerId) => togglePlayerSelection("out", playerId)}
                           onLockedClick={() => {
-                            setUpgradeModalReason("pro");
-                            setUpgradeModalOpen(true);
+                            promptFeatureAccess({
+                              feature: "Players Out",
+                              targetModel: "pro",
+                              requiredPlan: "pro",
+                            });
                           }}
                         />
                       </AccordionContent>
@@ -2423,6 +2542,33 @@ export default function CountryPredictionsClient({
         onClose={() => setUpgradeModalOpen(false)}
         reason={upgradeModalReason}
       />
+      <AlertDialog open={!!pendingModelSwitch} onOpenChange={(open) => !open && setPendingModelSwitch(null)}>
+        <AlertDialogContent className="rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl dark:border-white/10 dark:bg-slate-950 dark:text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl font-bold text-slate-950 dark:text-white">
+              Switch to {pendingModelSwitch?.targetModel === "base" ? "Base" : pendingModelSwitch?.targetModel === "advanced" ? "Advance" : "Pro"} Model?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              {pendingModelSwitch?.feature} works with the {pendingModelSwitch?.targetModel === "base" ? "Base" : pendingModelSwitch?.targetModel === "advanced" ? "Advance" : "Pro"} model. Switch now to continue using this feature.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 flex gap-2">
+            <AlertDialogCancel className="cursor-pointer rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:text-white dark:hover:bg-white/5">
+              Keep Current
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingModelSwitch) return;
+                setSelectedModel(pendingModelSwitch.targetModel);
+                setPendingModelSwitch(null);
+              }}
+              className="cursor-pointer rounded-xl bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] px-4 py-2 text-xs font-black text-white hover:opacity-95"
+            >
+              Switch Model
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -2589,15 +2735,19 @@ function PlayerBucketCompact({
           <button
             key={playerId}
             type="button"
-            disabled={disabled}
             onClick={(e) => {
               e.stopPropagation();
+              if (disabled) {
+                onLockedClick();
+                return;
+              }
               onToggle(playerId);
             }}
             className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition cursor-pointer select-none ${active
               ? "border-cyan-400 bg-cyan-500/10 text-cyan-700 dark:text-neon"
               : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/70 dark:hover:border-white/20"
               } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+            aria-disabled={disabled}
           >
             {name}
           </button>
