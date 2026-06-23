@@ -6,7 +6,7 @@ import { ProbabilityExplorer } from "@/components/site/ProbabilityExplorer";
 import { WildcardCountrySection } from "@/components/site/WildcardCountrySection";
 import { FixturesExplorer } from "@/components/site/FixturesExplorer";
 
-const DEFAULT_OPEN_SECTION = "probability";
+const DEFAULT_OPEN_SECTIONS = ["probability", "fixtures"];
 
 const SECTIONS = [
   {
@@ -30,18 +30,17 @@ const SECTIONS = [
 ] as const;
 
 export function HomeSectionsAccordion() {
-  const [openItem, setOpenItem] = useState<string>(DEFAULT_OPEN_SECTION);
+  const [openItems, setOpenItems] = useState<string[]>(DEFAULT_OPEN_SECTIONS);
 
   return (
     <Accordion
-      type="single"
-      collapsible
-      value={openItem}
-      onValueChange={setOpenItem}
+      type="multiple"
+      value={openItems}
+      onValueChange={setOpenItems}
       className="container mx-auto space-y-4 px-4 py-12"
     >
       {SECTIONS.map((section) => {
-        const isOpen = openItem === section.value;
+        const isOpen = openItems.includes(section.value);
 
         return (
           <AccordionItem

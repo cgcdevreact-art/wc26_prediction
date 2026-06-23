@@ -11,6 +11,8 @@ import { useTeams } from "@/components/TeamsProvider";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { CountryFlag } from "@/components/ui/CountryFlag";
+import { UpgradeModal } from "@/components/site/UpgradeModal";
 
 export default function TeamDetailsClient({ 
   teamCode, 
@@ -30,6 +32,8 @@ export default function TeamDetailsClient({
   // State for the Player Edit Modal
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [showAllStats, setShowAllStats] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<"plus" | "pro">("plus");
 
   // States for Editable Team Ratings
   const [elo, setElo] = useState<number>(0);
@@ -40,6 +44,8 @@ export default function TeamDetailsClient({
   const { data: session } = useSession();
   const subTier = session?.user?.subscriptionTier || "free";
   const router = useRouter();
+
+  const canEditTeam = subTier === "free" || subTier === "plus" || subTier === "pro";
 
   const appTeam = appTeams.find((t) => t.code === teamCode);
 
@@ -84,6 +90,8 @@ export default function TeamDetailsClient({
       });
   }, [players, teamCode]);
 
+  const topPlayer = teamPlayers[0];
+
   const hasChanges = appTeam ? (
     elo !== Math.round(appTeam.elo) ||
     attack !== (appTeam.attack >= 10 ? Math.round(appTeam.attack) : Number(formatRating(appTeam.attack))) ||
@@ -127,6 +135,8 @@ export default function TeamDetailsClient({
   };
 
   const selectedPlayer = selectedPlayerId ? players[selectedPlayerId] : null;
+  const isTopPlayer = selectedPlayer && topPlayer && (selectedPlayer["Player Name"] === topPlayer["Player Name"] && selectedPlayer["Team Code"] === topPlayer["Team Code"]);
+  const canEditPlayer = subTier === "pro" || (subTier === "plus" && isTopPlayer);
 
   const handleSavePlayer = async () => {
     if (!selectedPlayer) return;
@@ -166,6 +176,8 @@ export default function TeamDetailsClient({
       }
 
       toast.success(`${selectedPlayer["Player Name"]} stats saved successfully!`);
+      setSelectedPlayerId(null);
+      setShowAllStats(false);
       router.refresh();
     } catch (error: any) {
       console.error(error);
@@ -192,15 +204,13 @@ export default function TeamDetailsClient({
   if (!team) {
     return (
       <div className="text-center py-20">
-        <h2 className="text-2xl font-bold text-gray-300">Team not found</h2>
-        <Link href="/teams" className="text-blue-400 hover:text-blue-300 mt-4 inline-block">
+        <h2 className="text-2xl font-bold text-foreground">Team not found</h2>
+        <Link href="/teams" className="mt-4 inline-block text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
           &larr; Back to Teams
         </Link>
       </div>
     );
   }
-
-  const topPlayer = teamPlayers[0];
   const topPlayerName = topPlayer ? (topPlayer["Name on Shirt"] || topPlayer["Player Name"]) : "";
   const topPlayerRating = topPlayer ? (topPlayer["Overall Rating"] || "") : "";
   const topPlayerDisp = topPlayerName ? `${topPlayerName} (${topPlayerRating})` : "N/A";
@@ -216,18 +226,24 @@ export default function TeamDetailsClient({
       <div className="glass-strong rounded-2xl p-8 mb-12">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
           <div className="flex items-center space-x-6">
-            <div className="text-6xl drop-shadow-lg">{flagMap[teamCode] || "🏳️"}</div>
+            <CountryFlag
+              code={teamCode}
+              flag={flagMap[teamCode]}
+              name={team.Team}
+              className="h-12 w-18 rounded-md shadow-md object-cover flex-shrink-0"
+              emojiClassName="text-6xl leading-none drop-shadow-lg"
+            />
             <div>
               <h1 className="text-4xl font-extrabold text-foreground tracking-tight">{team.Team}</h1>
-              <p className="text-gray-400 text-lg">{team["Team Code"]} &bull; {team.Players} Players</p>
+              <p className="text-lg text-muted-foreground">{team["Team Code"]} &bull; {team.Players} Players</p>
             </div>
           </div>
           <div>
             <button
               onClick={handleSaveTeam}
-              disabled={isSavingTeam || subTier !== "pro"}
+              disabled={isSavingTeam || !canEditTeam}
               className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 ${
-                hasChanges && subTier === "pro"
+                hasChanges && canEditTeam
                   ? "bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:shadow-[0_0_25px_rgba(239,68,68,0.6)]" 
                   : "bg-gradient-to-r from-neon via-cyan-500 to-blue-600 text-white shadow-[0_0_15px_rgba(0,255,255,0.4)] hover:shadow-[0_0_25px_rgba(0,255,255,0.6)]"
               }`}
@@ -255,7 +271,7 @@ export default function TeamDetailsClient({
               type="number"
               value={elo || ""}
               onChange={(e) => setElo(Number(e.target.value))}
-              disabled={subTier !== "pro"}
+              disabled={!canEditTeam}
               className="bg-background/50 border-white/10 text-2xl font-bold text-foreground font-mono h-12 focus-visible:ring-neon"
             />
           </div>
@@ -266,7 +282,7 @@ export default function TeamDetailsClient({
               type="number"
               value={attack || ""}
               onChange={(e) => setAttack(Number(e.target.value))}
-              disabled={subTier !== "pro"}
+              disabled={!canEditTeam}
               className="bg-background/50 border-white/10 text-2xl font-bold text-foreground font-mono h-12 focus-visible:ring-neon"
             />
           </div>
@@ -277,29 +293,47 @@ export default function TeamDetailsClient({
               type="number"
               value={defense || ""}
               onChange={(e) => setDefense(Number(e.target.value))}
-              disabled={subTier !== "pro"}
+              disabled={!canEditTeam}
               className="bg-background/50 border-white/10 text-2xl font-bold text-foreground font-mono h-12 focus-visible:ring-neon"
             />
           </div>
           <div className="bg-background/30 p-4 rounded-xl border border-white/5 space-y-2">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Top Rated Player</div>
-            <div className="text-lg font-bold text-neon truncate pt-2" title={topPlayerDisp}>
-              {topPlayerName || "N/A"}{" "}
-              {topPlayerRating && (
-                <span className="text-xs text-muted-foreground font-sans">({topPlayerRating})</span>
-              )}
+            <div className="flex items-center gap-3 pt-2">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-background/80 dark:border-white/10">
+                {topPlayer?.ImageUrl ? (
+                  <img
+                    src={topPlayer.ImageUrl}
+                    alt={topPlayer["Player Name"]}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <User className="h-5 w-5 text-muted-foreground" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-lg font-bold text-neon" title={topPlayerDisp}>
+                  {topPlayerName || "N/A"}{" "}
+                  {topPlayerRating && (
+                    <span className="text-xs text-muted-foreground font-sans">({topPlayerRating})</span>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {topPlayer?.Club || "Top squad rating"}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {(!session?.user?.id || subTier !== "pro") && (
+        {(!session?.user?.id || !canEditTeam) && (
           <div className="mt-6 p-3 rounded-lg bg-[#a855f7]/10 border border-[#a855f7]/20 text-[#c084fc] text-xs flex items-center justify-between">
             <span className="flex items-center">
               {!session?.user?.id 
                 ? "⚠️ You are not signed in. Any rating overrides will not be saved to the database. Sign in to customize."
-                : "⚠️ Rating customization and overrides are restricted to Pro subscribers."}
+                : "⚠️ Team rating customization is restricted on the Advanced plan. Upgrade to Pro/Expert for full editing."}
             </span>
-            {session?.user?.id && subTier !== "pro" && (
+            {session?.user?.id && !canEditTeam && (
               <Link href="/subscription" className="bg-[#a855f7]/20 hover:bg-[#a855f7]/30 border border-[#a855f7]/40 px-3 py-1 rounded-full text-[10px] font-bold text-white transition-all uppercase tracking-wide">
                 Upgrade to Pro
               </Link>
@@ -309,10 +343,10 @@ export default function TeamDetailsClient({
       </div>
 
       {/* Glossary & Legend Card */}
-      <div className="glass-strong rounded-2xl p-6 mb-8 border border-white/10 grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+      <div className="glass-strong rounded-2xl border border-slate-200/80 p-6 text-sm text-foreground dark:border-white/10 dark:text-white/90 mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Acronyms Glossary */}
         <div>
-          <h3 className="font-display font-extrabold text-white text-base mb-4 tracking-tight flex items-center">
+          <h3 className="mb-4 flex items-center font-display text-base font-extrabold tracking-tight text-foreground dark:text-white">
             📖 Acronyms Glossary
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -333,7 +367,7 @@ export default function TeamDetailsClient({
 
         {/* Color Legend */}
         <div>
-          <h3 className="font-display font-extrabold text-white text-base mb-4 tracking-tight flex items-center">
+          <h3 className="mb-4 flex items-center font-display text-base font-extrabold tracking-tight text-foreground dark:text-white">
             🎨 Color Key Legend
           </h3>
           <div className="space-y-3.5 text-xs">
@@ -348,10 +382,10 @@ export default function TeamDetailsClient({
             {/* Positions Color scale */}
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-muted-foreground font-semibold">Positions:</span>
-              <span className="bg-purple-700 text-purple-50 border border-purple-500 px-2 py-0.5 rounded font-bold text-[10px]">GK</span>
-              <span className="bg-red-700 text-red-50 border border-red-500 px-2 py-0.5 rounded font-bold text-[10px]">DEF</span>
-              <span className="bg-blue-700 text-blue-50 border border-blue-500 px-2 py-0.5 rounded font-bold text-[10px]">MID</span>
-              <span className="bg-emerald-700 text-emerald-50 border border-emerald-500 px-2 py-0.5 rounded font-bold text-[10px]">FWD</span>
+              <span className="bg-purple-700 text-purple-50 border border-purple-500 px-2.5 py-0.5 rounded font-bold text-[10px]">Goalkeeper</span>
+              <span className="bg-red-700 text-red-50 border border-red-500 px-2.5 py-0.5 rounded font-bold text-[10px]">Defender</span>
+              <span className="bg-blue-700 text-blue-50 border border-blue-500 px-2.5 py-0.5 rounded font-bold text-[10px]">Midfielder</span>
+              <span className="bg-emerald-700 text-emerald-50 border border-emerald-500 px-2.5 py-0.5 rounded font-bold text-[10px]">Forward</span>
             </div>
           </div>
         </div>
@@ -363,9 +397,9 @@ export default function TeamDetailsClient({
         Squad Roster
       </h2>
       
-      <div className="glass overflow-x-auto rounded-xl border-white/10">
+      <div className="glass overflow-x-auto rounded-xl border border-slate-200/80 dark:border-white/10">
         <table className="w-full text-sm text-left whitespace-nowrap">
-          <thead className="text-[10px] uppercase tracking-wider bg-black/40 text-muted-foreground border-b border-white/10">
+          <thead className="border-b border-slate-200/80 bg-slate-100/80 text-[10px] uppercase tracking-wider text-slate-600 dark:border-white/10 dark:bg-black/40 dark:text-muted-foreground">
             <tr>
               <th className="px-4 py-3 rounded-tl-xl font-medium">Player</th>
               <th className="px-2 py-3 text-center font-medium">Pos</th>
@@ -399,11 +433,13 @@ export default function TeamDetailsClient({
               return (
                 <tr 
                   key={pId} 
-                  onClick={() => setSelectedPlayerId(pId)}
-                  className="border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                  className="border-b border-slate-200/70 transition-colors dark:border-white/5"
                 >
-                  <td className="px-4 py-2 flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-full bg-background/80 overflow-hidden flex items-center justify-center border border-white/10 flex-shrink-0">
+                  <td 
+                    onClick={() => setSelectedPlayerId(pId)}
+                    className="px-4 py-2 flex items-center space-x-3 cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"
+                  >
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-background/80 dark:border-white/10">
                       {player.ImageUrl ? (
                         <img src={player.ImageUrl} alt={player["Player Name"]} className="w-full h-full object-cover" />
                       ) : (
@@ -415,38 +451,59 @@ export default function TeamDetailsClient({
                       <div className="text-[10px] text-muted-foreground">{player.Club}</div>
                     </div>
                   </td>
-                  <td className="px-2 py-2 text-center">
-                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getPositionColor(player["Position Code"])}`}>
+                  <td 
+                    onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
+                    className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
+                  >
+                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getPositionColor(player["Position Code"])} ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                       {player["Position Code"]}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-center">
-                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["Overall Rating"])}`}>
+                  <td 
+                    onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
+                    className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
+                  >
+                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["Overall Rating"])} ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                       {player["Overall Rating"]}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-center">
-                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["Base Quality"])}`}>
+                  <td 
+                    onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
+                    className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
+                  >
+                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["Base Quality"])} ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                       {player["Base Quality"]}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-center">
-                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["Recent Form"])}`}>
+                  <td 
+                    onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
+                    className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
+                  >
+                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["Recent Form"])} ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                       {player["Recent Form"]}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-center">
-                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["International Experience"])}`}>
+                  <td 
+                    onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
+                    className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
+                  >
+                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["International Experience"])} ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                       {player["International Experience"]}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-center">
-                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["Attacking Impact"])}`}>
+                  <td 
+                    onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
+                    className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
+                  >
+                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["Attacking Impact"])} ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                       {player["Attacking Impact"]}
                     </span>
                   </td>
-                  <td className="px-2 py-2 text-center">
-                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["Defensive Impact"])}`}>
+                  <td 
+                    onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
+                    className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
+                  >
+                    <span className={`inline-block w-12 py-1 text-[10px] font-bold rounded shadow-sm border ${getStatColor(player["Defensive Impact"])} ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                       {player["Defensive Impact"]}
                     </span>
                   </td>
@@ -469,7 +526,7 @@ export default function TeamDetailsClient({
           setShowAllStats(false);
         }
       }}>
-        <DialogContent className="glass-strong border-white/10 text-foreground max-w-2xl">
+        <DialogContent className="glass-strong max-w-2xl border border-slate-200/80 text-foreground dark:border-white/10">
           {selectedPlayer && (
             <>
               <DialogHeader>
@@ -490,160 +547,173 @@ export default function TeamDetailsClient({
                 </DialogTitle>
               </DialogHeader>
               
-              <div className="mt-6 space-y-6">
-                <div className="bg-background/30 p-4 rounded-xl border border-white/5">
-                  <Label className="text-muted-foreground flex items-center mb-2">
-                    <ImageIcon className="w-4 h-4 mr-2" />
-                    Player Image URL
-                  </Label>
-                  <Input 
-                    placeholder="https://example.com/image.jpg"
-                    value={selectedPlayer.ImageUrl || ""} 
-                    onChange={(e) => handlePlayerEdit("ImageUrl", e.target.value)}
-                    disabled={subTier !== "pro"}
-                    className="bg-background/60 border-white/10 text-foreground font-mono text-sm focus-visible:ring-neon"
+              <div className="mt-6 relative">
+                {subTier === "free" && (
+                  <div 
+                    className="absolute inset-0 z-10 cursor-pointer bg-transparent" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setUpgradeReason("plus");
+                      setUpgradeOpen(true);
+                    }}
                   />
-                  <p className="text-xs text-muted-foreground mt-2 opacity-70">Paste a direct link to an image to replace the placeholder.</p>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Overall Rating</Label>
+                )}
+                <div className={`space-y-6 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
+                  <div className="bg-background/30 p-4 rounded-xl border border-white/5">
+                    <Label className="text-muted-foreground flex items-center mb-2">
+                      <ImageIcon className="w-4 h-4 mr-2" />
+                      Player Image URL
+                    </Label>
                     <Input 
-                      value={selectedPlayer["Overall Rating"] || ""} 
-                      onChange={(e) => handlePlayerEdit("Overall Rating", e.target.value)}
-                      disabled={subTier !== "pro"}
-                      className="bg-background/50 border-white/10 text-foreground font-bold focus-visible:ring-neon"
+                      placeholder="https://example.com/image.jpg"
+                      value={selectedPlayer.ImageUrl || ""} 
+                      onChange={(e) => handlePlayerEdit("ImageUrl", e.target.value)}
+                      disabled={!canEditPlayer}
+                      className="bg-background/60 border-white/10 text-foreground font-mono text-sm focus-visible:ring-neon"
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Base Quality</Label>
-                    <Input 
-                      value={selectedPlayer["Base Quality"] || ""} 
-                      onChange={(e) => handlePlayerEdit("Base Quality", e.target.value)}
-                      disabled={subTier !== "pro"}
-                      className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Recent Form</Label>
-                    <Input 
-                      value={selectedPlayer["Recent Form"] || ""} 
-                      onChange={(e) => handlePlayerEdit("Recent Form", e.target.value)}
-                      disabled={subTier !== "pro"}
-                      className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Intl Experience</Label>
-                    <Input 
-                      value={selectedPlayer["International Experience"] || ""} 
-                      onChange={(e) => handlePlayerEdit("International Experience", e.target.value)}
-                      disabled={subTier !== "pro"}
-                      className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Attacking Impact</Label>
-                    <Input 
-                      value={selectedPlayer["Attacking Impact"] || ""} 
-                      onChange={(e) => handlePlayerEdit("Attacking Impact", e.target.value)}
-                      disabled={subTier !== "pro"}
-                      className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Defensive Impact</Label>
-                    <Input 
-                      value={selectedPlayer["Defensive Impact"] || ""} 
-                      onChange={(e) => handlePlayerEdit("Defensive Impact", e.target.value)}
-                      disabled={subTier !== "pro"}
-                      className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                    />
+                    <p className="text-xs text-muted-foreground mt-2 opacity-70">Paste a direct link to an image to replace the placeholder.</p>
                   </div>
 
-                  {showAllStats && (
-                    <>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Passing / Creativity</Label>
-                        <Input 
-                          value={selectedPlayer["Passing / Creativity"] || ""} 
-                          onChange={(e) => handlePlayerEdit("Passing / Creativity", e.target.value)}
-                          disabled={subTier !== "pro"}
-                          className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Fitness / Availability</Label>
-                        <Input 
-                          value={selectedPlayer["Fitness / Availability"] || ""} 
-                          onChange={(e) => handlePlayerEdit("Fitness / Availability", e.target.value)}
-                          disabled={subTier !== "pro"}
-                          className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Discipline Risk</Label>
-                        <Input 
-                          value={selectedPlayer["Discipline Risk"] || ""} 
-                          onChange={(e) => handlePlayerEdit("Discipline Risk", e.target.value)}
-                          disabled={subTier !== "pro"}
-                          className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Match Importance</Label>
-                        <Input 
-                          value={selectedPlayer["Match Importance"] || ""} 
-                          onChange={(e) => handlePlayerEdit("Match Importance", e.target.value)}
-                          disabled={subTier !== "pro"}
-                          className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Rating Tier</Label>
-                        <Input 
-                          value={selectedPlayer["Rating Tier"] || ""} 
-                          onChange={(e) => handlePlayerEdit("Rating Tier", e.target.value)}
-                          disabled={subTier !== "pro"}
-                          className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Overall Rating</Label>
+                      <Input 
+                        value={selectedPlayer["Overall Rating"] || ""} 
+                        onChange={(e) => handlePlayerEdit("Overall Rating", e.target.value)}
+                        disabled={!canEditPlayer}
+                        className="bg-background/50 border-white/10 text-foreground font-bold focus-visible:ring-neon"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Base Quality</Label>
+                      <Input 
+                        value={selectedPlayer["Base Quality"] || ""} 
+                        onChange={(e) => handlePlayerEdit("Base Quality", e.target.value)}
+                        disabled={!canEditPlayer}
+                        className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Recent Form</Label>
+                      <Input 
+                        value={selectedPlayer["Recent Form"] || ""} 
+                        onChange={(e) => handlePlayerEdit("Recent Form", e.target.value)}
+                        disabled={!canEditPlayer}
+                        className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Intl Experience</Label>
+                      <Input 
+                        value={selectedPlayer["International Experience"] || ""} 
+                        onChange={(e) => handlePlayerEdit("International Experience", e.target.value)}
+                        disabled={!canEditPlayer}
+                        className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Attacking Impact</Label>
+                      <Input 
+                        value={selectedPlayer["Attacking Impact"] || ""} 
+                        onChange={(e) => handlePlayerEdit("Attacking Impact", e.target.value)}
+                        disabled={!canEditPlayer}
+                        className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Defensive Impact</Label>
+                      <Input 
+                        value={selectedPlayer["Defensive Impact"] || ""} 
+                        onChange={(e) => handlePlayerEdit("Defensive Impact", e.target.value)}
+                        disabled={!canEditPlayer}
+                        className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
+                      />
+                    </div>
 
-                <div className="flex items-center justify-between pt-6 border-t border-white/10">
-                  <button
-                    onClick={() => setShowAllStats(!showAllStats)}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full border border-white/10"
-                  >
-                    <span>{showAllStats ? "Show Less" : "Show All Stats"}</span>
-                  </button>
-
-                  <button
-                    onClick={handleSavePlayer}
-                    disabled={isSavingPlayer || subTier !== "pro"}
-                    className="px-5 py-2 rounded-full font-bold text-sm bg-gradient-to-r from-neon via-cyan-500 to-blue-600 text-white shadow-[0_0_12px_rgba(0,255,255,0.3)] hover:shadow-[0_0_20px_rgba(0,255,255,0.5)] transition-all duration-300 disabled:opacity-50 flex items-center space-x-2"
-                  >
-                    {isSavingPlayer ? (
+                    {showAllStats && (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        <span>Save Player Progress</span>
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Passing / Creativity</Label>
+                          <Input 
+                            value={selectedPlayer["Passing / Creativity"] || ""} 
+                            onChange={(e) => handlePlayerEdit("Passing / Creativity", e.target.value)}
+                            disabled={!canEditPlayer}
+                            className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Fitness / Availability</Label>
+                          <Input 
+                            value={selectedPlayer["Fitness / Availability"] || ""} 
+                            onChange={(e) => handlePlayerEdit("Fitness / Availability", e.target.value)}
+                            disabled={!canEditPlayer}
+                            className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Discipline Risk</Label>
+                          <Input 
+                            value={selectedPlayer["Discipline Risk"] || ""} 
+                            onChange={(e) => handlePlayerEdit("Discipline Risk", e.target.value)}
+                            disabled={!canEditPlayer}
+                            className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Match Importance</Label>
+                          <Input 
+                            value={selectedPlayer["Match Importance"] || ""} 
+                            onChange={(e) => handlePlayerEdit("Match Importance", e.target.value)}
+                            disabled={!canEditPlayer}
+                            className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Rating Tier</Label>
+                          <Input 
+                            value={selectedPlayer["Rating Tier"] || ""} 
+                            onChange={(e) => handlePlayerEdit("Rating Tier", e.target.value)}
+                            disabled={!canEditPlayer}
+                            className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
+                          />
+                        </div>
                       </>
                     )}
-                  </button>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-6 border-t border-white/10">
+                    <button
+                      onClick={() => setShowAllStats(!showAllStats)}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full border border-white/10"
+                    >
+                      <span>{showAllStats ? "Show Less" : "Show All Stats"}</span>
+                    </button>
+
+                    <button
+                      onClick={handleSavePlayer}
+                      disabled={isSavingPlayer || !canEditPlayer}
+                      className="px-5 py-2 rounded-full font-bold text-sm bg-gradient-to-r from-neon via-cyan-500 to-blue-600 text-white shadow-[0_0_12px_rgba(0,255,255,0.3)] hover:shadow-[0_0_20px_rgba(0,255,255,0.5)] transition-all duration-300 disabled:opacity-50 flex items-center space-x-2"
+                    >
+                      {isSavingPlayer ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          <span>Save Player Progress</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </>
           )}
         </DialogContent>
       </Dialog>
+      <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} reason={upgradeReason} />
     </div>
   );
 }

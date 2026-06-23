@@ -198,10 +198,6 @@ export default function CountryPredictionsClient({
 
     setHasProcessedLoadUrl(true);
     handleLoadPrediction(pred);
-
-    if (autorun) {
-      setPendingAutorun(true);
-    }
   }, [mounted, isInitialized, savedPredictions, isLoadingSaved, searchParams, pathname, hasProcessedLoadUrl]);
 
   useEffect(() => {
@@ -259,6 +255,7 @@ export default function CountryPredictionsClient({
         });
       }
 
+      setSaveSuccess(true);
       toast.success(`Loaded saved simulation for ${data.name}!`);
 
       // Delay resetting the ref to allow React to flush state updates
@@ -1609,9 +1606,51 @@ export default function CountryPredictionsClient({
           >
             <AccordionItem value="team-overview" className="border-none">
               <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
-                <div>
-                  <div className="font-display text-xl font-extrabold text-foreground">Team Overview</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Profile, champion odds, and stage progression</div>
+                <div className="flex flex-row items-center justify-between w-full pr-4">
+                  <div className="text-left">
+                    <div className="font-display text-xl font-extrabold text-foreground">Team Overview</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Profile, champion odds, and stage progression</div>
+                  </div>
+                  {/* Save Projections Action Button */}
+                  {simResults && (
+                    <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {session ? (
+                        <button
+                          onClick={handleSavePrediction}
+                          disabled={isSaving || isSimulating || saveSuccess}
+                          className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all ${saveSuccess
+                            ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 cursor-not-allowed opacity-80"
+                            : "border border-transparent bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] text-white shadow-[0_10px_25px_rgba(44,124,135,0.2)] hover:opacity-95 active:scale-95 disabled:opacity-50"
+                            }`}
+                        >
+                          {isSaving ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              <span>Saving...</span>
+                            </>
+                          ) : saveSuccess ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400 animate-in zoom-in duration-300" />
+                              <span>Saved!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4 text-white" />
+                              <span>Save to Predictions</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => openAuthModal("signin")}
+                          className="flex items-center gap-2 bg-gradient-to-r from-cyan-50 to-fuchsia-50 border border-cyan-300 hover:from-cyan-100 hover:to-fuchsia-100 text-slate-900 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 dark:from-neon/20 dark:to-neon-2/20 dark:border-neon/30 dark:hover:from-neon/30 dark:hover:to-neon-2/30 dark:text-white"
+                        >
+                          <User className="w-3.5 h-3.5 text-neon-2" />
+                          <span>Sign In to Save</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-6 pb-6">
@@ -1653,47 +1692,6 @@ export default function CountryPredictionsClient({
                             </div>
                           </div>
                         </div>
-
-                        {/* Save Projections Action Button */}
-                        {simResults && (
-                          <div className="flex items-center self-start sm:self-auto gap-2 shrink-0">
-                            {session ? (
-                              <button
-                                onClick={handleSavePrediction}
-                                disabled={isSaving || isSimulating}
-                                className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all ${saveSuccess
-                                  ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
-                                  : "border border-transparent bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] text-white shadow-[0_10px_25px_rgba(44,124,135,0.2)] hover:opacity-95 active:scale-95 disabled:opacity-50"
-                                  }`}
-                              >
-                                {isSaving ? (
-                                  <>
-                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    <span>Saving...</span>
-                                  </>
-                                ) : saveSuccess ? (
-                                  <>
-                                    <Check className="w-3.5 h-3.5 text-emerald-400 animate-in zoom-in duration-300" />
-                                    <span>Saved!</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Sparkles className="h-4 w-4 text-white" />
-                                    <span>Save to Predictions</span>
-                                  </>
-                                )}
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => openAuthModal("signin")}
-                                className="flex items-center gap-2 bg-gradient-to-r from-cyan-50 to-fuchsia-50 border border-cyan-300 hover:from-cyan-100 hover:to-fuchsia-100 text-slate-900 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 dark:from-neon/20 dark:to-neon-2/20 dark:border-neon/30 dark:hover:from-neon/30 dark:hover:to-neon-2/30 dark:text-white"
-                              >
-                                <User className="w-3.5 h-3.5 text-neon-2" />
-                                <span>Sign In to Save</span>
-                              </button>
-                            )}
-                          </div>
-                        )}
                       </div>
 
                       {/* Core Attributes Mini Grid */}

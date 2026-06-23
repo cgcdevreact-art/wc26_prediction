@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Input } from "@/components/ui/input";
@@ -215,20 +215,21 @@ export default function TeamsClient({
   const rankingColumns: {
     key: RankingSortKey;
     label: string;
+    tooltip: string;
     align?: "left" | "center" | "right";
     render: (team: RankingTeam) => string;
   }[] = [
-    { key: "playersCount", label: "Players", render: (team) => String(team.playersCount) },
-    { key: "eliteCount", label: "Elite", render: (team) => String(team.eliteCount) },
-    { key: "strongCount", label: "Strong", render: (team) => String(team.strongCount) },
-    { key: "winProbability", label: "Win Probability", render: (team) => `${team.winProbability.toFixed(1)}%` },
-    { key: "rank", label: "FIFA Ranking", render: (team) => `#${team.rank}` },
-    { key: "elo", label: "Elo Rating", render: (team) => team.elo.toFixed(2) },
-    { key: "attack", label: "Attack Rating", render: (team) => String(team.attack) },
-    { key: "defense", label: "Defense Rating", render: (team) => String(team.defense) },
-    { key: "squadValueM", label: "Squad Value", render: (team) => `€${Math.round(team.squadValueM)}M` },
-    { key: "avgAge", label: "Average Age", render: (team) => team.avgAge.toFixed(1) },
-    { key: "goalsPerMatch", label: "Goals / Match", render: (team) => team.goalsPerMatch.toFixed(2) },
+    { key: "playersCount", label: "Players", tooltip: "Total Players", render: (team) => String(team.playersCount) },
+    { key: "eliteCount", label: "Elite", tooltip: "Elite Players (90+)", render: (team) => String(team.eliteCount) },
+    { key: "strongCount", label: "Strong", tooltip: "Strong Players (85-89)", render: (team) => String(team.strongCount) },
+    { key: "winProbability", label: "Win %", tooltip: "Championship Win Probability", render: (team) => `${team.winProbability.toFixed(1)}%` },
+    { key: "rank", label: "FIFA", tooltip: "FIFA Ranking", render: (team) => `#${team.rank}` },
+    { key: "elo", label: "Elo", tooltip: "Elo Rating", render: (team) => team.elo.toFixed(2) },
+    { key: "attack", label: "Att", tooltip: "Attack Rating", render: (team) => String(team.attack) },
+    { key: "defense", label: "Def", tooltip: "Defense Rating", render: (team) => String(team.defense) },
+    { key: "squadValueM", label: "Value", tooltip: "Squad Value", render: (team) => `€${Math.round(team.squadValueM)}M` },
+    { key: "avgAge", label: "Age", tooltip: "Average Age", render: (team) => team.avgAge.toFixed(1) },
+    { key: "goalsPerMatch", label: "Goals/M", tooltip: "Goals / Match", render: (team) => team.goalsPerMatch.toFixed(2) },
   ];
 
   const toggleRankingSort = (key: RankingSortKey) => {
@@ -251,11 +252,6 @@ export default function TeamsClient({
   };
 
   const openTeam = (teamCode: string) => {
-    if (subTier === "free") {
-      setModalReason("plus");
-      setModalOpen(true);
-      return;
-    }
     router.push(`/teams/${teamCode}`);
   };
 
@@ -312,16 +308,13 @@ export default function TeamsClient({
                   <th className="w-16 rounded-tl-[1.75rem] px-5 py-4 text-left font-semibold whitespace-nowrap">Rk</th>
                   <th className="px-5 py-4 font-semibold whitespace-nowrap">Team</th>
                   <th className="px-4 py-4 text-center font-semibold whitespace-nowrap">Players</th>
-                  {subTier !== "free" && (
-                    <>
-                      <th className="px-4 py-4 text-center font-semibold whitespace-nowrap">Elite</th>
-                      <th className="px-4 py-4 text-center font-semibold whitespace-nowrap">Strong</th>
-                    </>
-                  )}
+                  <th className="px-4 py-4 text-center font-semibold whitespace-nowrap cursor-help" title="Players with an overall rating of 90+">Elite (90+)</th>
+                  <th className="px-4 py-4 text-center font-semibold whitespace-nowrap cursor-help" title="Players with an overall rating of 85-89">Strong (85-89)</th>
                   <th className="w-20 px-4 py-4 text-center font-semibold whitespace-nowrap">Elo</th>
                   <th className="w-16 px-4 py-4 text-center font-semibold whitespace-nowrap">Att</th>
                   <th className="w-16 px-4 py-4 text-center font-semibold whitespace-nowrap">Def</th>
-                  <th className="w-56 rounded-tr-[1.75rem] px-5 py-4 text-right font-semibold whitespace-nowrap">Top Player</th>
+                  <th className="w-56 px-5 py-4 text-right font-semibold whitespace-nowrap">Top Player</th>
+                  <th className="w-32 rounded-tr-[1.75rem] px-5 py-4 text-right font-semibold whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -356,7 +349,7 @@ export default function TeamsClient({
                             <span className="truncate font-bold text-slate-950 transition-colors group-hover:text-cyan-700 dark:text-white dark:group-hover:text-neon">
                               {team.Team}
                             </span>
-                            <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">{team["Team Code"]}</span>
+                            <span className="text-[11px] uppercase tracking-wider text-slate-550 dark:text-slate-400">{team["Team Code"]}</span>
                           </div>
                         </div>
                       </td>
@@ -365,20 +358,30 @@ export default function TeamsClient({
                           {team.Players}
                         </span>
                       </td>
-                      {subTier !== "free" && (
-                        <>
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
-                              {team.Elite || "0"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
-                              {team["Very Strong"] || "0"}
-                            </span>
-                          </td>
-                        </>
-                      )}
+                      <td 
+                        className={`px-4 py-3 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : ""}`}
+                        onClick={subTier === "free" ? (e) => {
+                          e.stopPropagation();
+                          setModalReason("plus");
+                          setModalOpen(true);
+                        } : undefined}
+                      >
+                        <span className={`inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
+                          {team.Elite || "0"}
+                        </span>
+                      </td>
+                      <td 
+                        className={`px-4 py-3 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : ""}`}
+                        onClick={subTier === "free" ? (e) => {
+                          e.stopPropagation();
+                          setModalReason("plus");
+                          setModalOpen(true);
+                        } : undefined}
+                      >
+                        <span className={`inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
+                          {team["Very Strong"] || "0"}
+                        </span>
+                      </td>
                       <td className="px-3 py-3 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
                         <span className="font-semibold text-slate-800 dark:text-slate-100">
                           {appTeam?.elo ? Math.round(appTeam.elo) : "-"}
@@ -400,11 +403,23 @@ export default function TeamsClient({
                             {topPlayerName || "N/A"}
                           </span>
                           {topPlayerRating && (
-                            <span className="shrink-0 text-[11px] text-slate-500 dark:text-slate-300">
+                            <span className="shrink-0 text-[11px] text-slate-550 dark:text-slate-300">
                               ({topPlayerRating})
                             </span>
                           )}
                         </div>
+                      </td>
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openTeam(team["Team Code"]);
+                          }}
+                          className="p-2 rounded-full border border-slate-200 dark:border-white/10 text-slate-650 dark:text-slate-350 transition hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white inline-flex items-center justify-center"
+                          title="View Team Details"
+                        >
+                          <Eye className="w-4.5 h-4.5" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -457,25 +472,39 @@ export default function TeamsClient({
                 ))}
               </select>
             </div>
-
             <div className="overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
-              <table className="w-full min-w-[1450px] text-left text-sm">
-                <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[11px] uppercase tracking-[0.16em] text-slate-600 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-300">
+              <table className="w-full text-left text-[11px] table-auto">
+                <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[9px] uppercase tracking-[0.12em] text-slate-600 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-300">
                   <tr>
-                    <th className="w-16 px-5 py-4 font-semibold whitespace-nowrap">#</th>
-                    <th className="min-w-[220px] px-5 py-4 font-semibold whitespace-nowrap">Team</th>
-                    {rankingColumns.map((column) => (
-                      <th key={column.key} className="px-4 py-4 font-semibold whitespace-nowrap">
-                        <button
-                          onClick={() => toggleRankingSort(column.key)}
-                          className="flex items-center gap-2 whitespace-nowrap text-left transition hover:text-slate-950 dark:hover:text-white"
-                        >
-                          <span>{column.label}</span>
-                          {renderSortIcon(column.key)}
-                        </button>
-                      </th>
-                    ))}
-                    <th className="min-w-[220px] px-5 py-4 text-right font-semibold whitespace-nowrap">Top Player</th>
+                    <th className="w-8 px-1 py-3 font-semibold whitespace-nowrap">#</th>
+                    <th className="min-w-[90px] px-1 py-3 font-semibold whitespace-nowrap">Team</th>
+                    {rankingColumns.map((column) => {
+                      const isRestricted = (
+                        column.key === "eliteCount" ||
+                        column.key === "strongCount" ||
+                        column.key === "winProbability" ||
+                        column.key === "squadValueM" ||
+                        column.key === "avgAge" ||
+                        column.key === "goalsPerMatch"
+                      ) && subTier === "free";
+                      return (
+                        <th key={column.key} className="px-1 py-3 font-semibold whitespace-nowrap">
+                          <button
+                            onClick={isRestricted ? (e) => {
+                              e.stopPropagation();
+                              setModalReason("plus");
+                              setModalOpen(true);
+                            } : () => toggleRankingSort(column.key)}
+                            className="flex items-center gap-1 whitespace-nowrap text-left transition hover:text-slate-950 dark:hover:text-white"
+                            title={column.tooltip}
+                          >
+                            <span>{column.label}</span>
+                            {renderSortIcon(column.key)}
+                          </button>
+                        </th>
+                      );
+                    })}
+                    <th className="min-w-[90px] px-1 py-3 text-right font-semibold whitespace-nowrap">Top Player</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -485,61 +514,78 @@ export default function TeamsClient({
                       onClick={() => openTeam(team.code)}
                       className="group cursor-pointer border-b border-slate-100 transition-colors hover:bg-gradient-to-r hover:from-cyan-50/50 hover:to-fuchsia-50/40 dark:border-white/5 dark:hover:bg-[linear-gradient(90deg,rgba(6,182,212,0.08),rgba(217,70,239,0.05))]"
                     >
-                      <td className="px-5 py-4">
-                        <span className="inline-flex min-w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
+                      <td className="px-1 py-2">
+                        <span className="inline-flex min-w-6 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-1 py-0.5 font-mono text-[10px] text-slate-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300">
                           {index + 1}
                         </span>
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
+                      <td className="px-1 py-2">
+                        <div className="flex items-center gap-1.5 min-w-0 max-w-[80px] sm:max-w-[120px] truncate" title={team.name}>
                           <CountryFlag
                             code={team.code}
                             flag={team.flag}
                             name={team.name}
-                            className="h-7 w-9 shrink-0 rounded object-cover"
-                            emojiClassName="text-2xl leading-none"
+                            className="h-4.5 w-6 shrink-0 rounded object-cover"
+                            emojiClassName="text-base leading-none"
                           />
-                          <div className="min-w-0">
+                          <div className="min-w-0 truncate">
                             <div className="truncate font-semibold text-slate-950 group-hover:text-cyan-700 dark:text-white dark:group-hover:text-neon">
                               {team.name}
                             </div>
-                            <div className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">{team.code}</div>
+                            <div className="text-[9px] uppercase tracking-wider text-slate-550 dark:text-slate-400">{team.code}</div>
                           </div>
                         </div>
                       </td>
-                      {rankingColumns.map((column) => (
-                        <td
-                          key={column.key}
-                          className="px-4 py-4 font-mono tabular-nums text-slate-800 dark:text-slate-100"
-                        >
-                          {column.key === "winProbability" ? (
-                            <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
-                              {column.render(team)}
+                      {rankingColumns.map((column) => {
+                        const isRestricted = (
+                          column.key === "eliteCount" ||
+                          column.key === "strongCount" ||
+                          column.key === "winProbability" ||
+                          column.key === "squadValueM" ||
+                          column.key === "avgAge" ||
+                          column.key === "goalsPerMatch"
+                        ) && subTier === "free";
+                        return (
+                          <td
+                            key={column.key}
+                            className={`px-1 py-2 font-mono tabular-nums text-slate-800 dark:text-slate-100 ${isRestricted ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : ""}`}
+                            onClick={isRestricted ? (e) => {
+                              e.stopPropagation();
+                              setModalReason("plus");
+                              setModalOpen(true);
+                            } : undefined}
+                          >
+                            <span className={isRestricted ? "blur-[5px] select-none pointer-events-none" : ""}>
+                              {column.key === "winProbability" ? (
+                                <span className="inline-flex rounded-full bg-emerald-50 px-1 py-0.5 font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
+                                  {column.render(team)}
+                                </span>
+                              ) : column.key === "rank" ? (
+                                <span className="inline-flex rounded-full bg-sky-50 px-1 py-0.5 font-semibold text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20">
+                                  {column.render(team)}
+                                </span>
+                              ) : column.key === "attack" || column.key === "defense" ? (
+                                <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-fuchsia-50 px-1 py-0.5 font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:ring-fuchsia-500/20">
+                                  {column.render(team)}
+                                </span>
+                              ) : column.key === "playersCount" || column.key === "eliteCount" || column.key === "strongCount" ? (
+                                <span className="inline-flex min-w-8 items-center justify-center rounded-full bg-slate-100 px-1 py-0.5 text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
+                                  {column.render(team)}
+                                </span>
+                              ) : (
+                                <span className="font-semibold">{column.render(team)}</span>
+                              )}
                             </span>
-                          ) : column.key === "rank" ? (
-                            <span className="inline-flex rounded-full bg-sky-50 px-3 py-1 font-semibold text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20">
-                              {column.render(team)}
-                            </span>
-                          ) : column.key === "attack" || column.key === "defense" ? (
-                            <span className="inline-flex min-w-14 items-center justify-center rounded-full bg-fuchsia-50 px-3 py-1 font-semibold text-fuchsia-700 ring-1 ring-fuchsia-200 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:ring-fuchsia-500/20">
-                              {column.render(team)}
-                            </span>
-                          ) : column.key === "playersCount" || column.key === "eliteCount" || column.key === "strongCount" ? (
-                            <span className="inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10">
-                              {column.render(team)}
-                            </span>
-                          ) : (
-                            <span className="font-semibold">{column.render(team)}</span>
-                          )}
-                        </td>
-                      ))}
-                      <td className="px-5 py-4 text-right">
-                        <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-50 to-cyan-50 px-3 py-1.5 ring-1 ring-emerald-200 dark:from-emerald-500/10 dark:to-cyan-500/10 dark:ring-emerald-500/20">
-                          <span className="font-semibold text-emerald-700 dark:text-neon">
+                          </td>
+                        );
+                      })}
+                      <td className="px-1 py-2 text-right">
+                        <div className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-emerald-50 to-cyan-50 px-1.5 py-0.5 ring-1 ring-emerald-200 dark:from-emerald-500/10 dark:to-cyan-500/10 dark:ring-emerald-500/20">
+                          <span className="font-semibold text-emerald-700 dark:text-neon truncate max-w-[60px] sm:max-w-[90px]" title={team.topPlayerName}>
                             {team.topPlayerName}
                           </span>
                           {team.topPlayerRating && (
-                            <span className="text-[11px] text-slate-500 dark:text-slate-300">
+                            <span className="text-[9px] text-slate-500 dark:text-slate-300 shrink-0">
                               ({team.topPlayerRating})
                             </span>
                           )}
