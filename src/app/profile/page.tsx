@@ -29,9 +29,9 @@ const PLAN_STYLES: Record<string, string> = {
 };
 
 const PLAN_LABELS: Record<string, string> = {
-  free: "Free",
-  plus: "Plus",
-  pro : "Pro",
+  free: "Free Predictor",
+  plus: "Advanced Predictor",
+  pro : "Expert Predictor",
 };
 
 function formatPredictionType(type: string) {

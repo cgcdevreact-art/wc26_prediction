@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
+import Script from "next/script";
+
 const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
@@ -23,6 +25,10 @@ import { GlobalAuthModal } from "@/components/site/GlobalAuthModal";
 export const metadata: Metadata = {
   title: "WC26 Predict",
   description: "Who will win the World Cup 2026?",
+  icons: {
+    icon: "/wc26-logo.png",
+    apple: "/wc26-logo.png",
+  },
 };
 
 export default async function RootLayout({
@@ -42,7 +48,9 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script
+        <Script
+          id="theme-initializer"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
