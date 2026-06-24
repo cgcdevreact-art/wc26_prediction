@@ -174,17 +174,27 @@ export default function CountryPredictionsClient({
 
     const loadId = searchParams.get("load");
     const autorun = searchParams.get("autorun") === "true";
+    const forcedModel = searchParams.get("model");
 
     if (!loadId) {
+      if (forcedModel === "base" && selectedModel !== "base") {
+        setSelectedModel("base");
+        return;
+      }
       if (autorun) {
         const params = new URLSearchParams(searchParams.toString());
         params.delete("autorun");
         window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
 
         const executeAutoSim = async () => {
+          setShowConfirmPopup(true);
+          setIsSimulating(true);
           const allowed = await consumeCredit();
           if (allowed) {
             runSimulations();
+          } else {
+            setIsSimulating(false);
+            setShowConfirmPopup(false);
           }
         };
         executeAutoSim();
@@ -210,15 +220,20 @@ export default function CountryPredictionsClient({
 
     setHasProcessedLoadUrl(true);
     handleLoadPrediction(pred);
-  }, [mounted, isInitialized, savedPredictions, isLoadingSaved, searchParams, pathname, hasProcessedLoadUrl]);
+  }, [mounted, isInitialized, savedPredictions, isLoadingSaved, searchParams, pathname, hasProcessedLoadUrl, selectedModel, setSelectedModel]);
 
   useEffect(() => {
     if (pendingAutorun && mounted && isInitialized) {
       setPendingAutorun(false);
       const executeAutoSim = async () => {
+        setShowConfirmPopup(true);
+        setIsSimulating(true);
         const allowed = await consumeCredit();
         if (allowed) {
           runSimulations();
+        } else {
+          setIsSimulating(false);
+          setShowConfirmPopup(false);
         }
       };
       executeAutoSim();
@@ -576,6 +591,10 @@ export default function CountryPredictionsClient({
     return customCountries.find((cc) => cc.code === selectedCode);
   }, [selectedCode, customCountries]);
 
+  const isWildcardScenario = useMemo(() => {
+    return searchParams.get("wildcard") === "true" || !!activeCustomCountry;
+  }, [searchParams, activeCustomCountry]);
+
   const effectiveCode = useMemo(() => {
     return activeCustomCountry ? activeCustomCountry.replacedCode : selectedCode;
   }, [activeCustomCountry, selectedCode]);
@@ -597,6 +616,14 @@ export default function CountryPredictionsClient({
     }
     return appTeams.find((t) => t.code === selectedCode) || appTeams[0];
   }, [selectedCode, activeCustomCountry, appTeams]);
+
+  const isKnownTeamCode = (code: string | null | undefined) => {
+    if (!code) return false;
+    if (activeCustomCountry && (activeCustomCountry.replacedCode === code || activeCustomCountry.code === code)) {
+      return true;
+    }
+    return appTeams.some((team) => team.code === code);
+  };
 
   const getTeam = (code: string): SimTeam => {
     const custom = activeCustomCountry &&
@@ -629,12 +656,12 @@ export default function CountryPredictionsClient({
       };
     }
     return {
-      code: "ARG",
-      name: "Argentina",
-      flag: "🇦🇷",
-      elo: 1875,
-      attack: 1.09,
-      defense: 1.09,
+      code: code || "TBD",
+      name: code ? `Unknown Team (${code})` : "TBD",
+      flag: "🏳️",
+      elo: 1500,
+      attack: 1,
+      defense: 1,
     };
   };
 
@@ -796,17 +823,6 @@ export default function CountryPredictionsClient({
       final: {}
     };
 
-    const trackMatch = (stage: string, team: string, opponent: string, gf: number, ga: number, won: boolean) => {
-      if (team !== effectiveCode) return;
-      if (!stageOpponents[stage][opponent]) {
-        stageOpponents[stage][opponent] = { count: 0, gfSum: 0, gaSum: 0, wins: 0 };
-      }
-      stageOpponents[stage][opponent].count += 1;
-      stageOpponents[stage][opponent].gfSum += gf;
-      stageOpponents[stage][opponent].gaSum += ga;
-      if (won) stageOpponents[stage][opponent].wins += 1;
-    };
-
     const simulateKo = (home: string, away: string) => {
       const homeTeam = getTeam(home);
       const awayTeam = getTeam(away);
@@ -820,6 +836,34 @@ export default function CountryPredictionsClient({
       return { hs, as, winner: hs > as ? home : away };
     };
 
+    const hasDistinctKnownTeams = (teams: (string | null | undefined)[], expectedSize?: number) => {
+      const normalized = teams.filter((team): team is string => typeof team === "string" && team.length > 0);
+      if (expectedSize !== undefined && normalized.length !== expectedSize) {
+        return false;
+      }
+      if (!normalized.every((team) => isKnownTeamCode(team))) {
+        return false;
+      }
+      return new Set(normalized).size === normalized.length;
+    };
+
+    const mergeStageOpponentStats = (
+      target: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>>,
+      source: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>>,
+    ) => {
+      Object.entries(source).forEach(([stage, opponents]) => {
+        Object.entries(opponents).forEach(([opponent, values]) => {
+          if (!target[stage][opponent]) {
+            target[stage][opponent] = { count: 0, gfSum: 0, gaSum: 0, wins: 0 };
+          }
+          target[stage][opponent].count += values.count;
+          target[stage][opponent].gfSum += values.gfSum;
+          target[stage][opponent].gaSum += values.gaSum;
+          target[stage][opponent].wins += values.wins;
+        });
+      });
+    };
+
     let bestScore = -1;
     let bestMockTournament: any = null;
 
@@ -827,8 +871,35 @@ export default function CountryPredictionsClient({
       await new Promise<void>((resolve) => {
         setTimeout(() => {
           const end = Math.min(start + CHUNK_SIZE, iterations);
-          for (let iteration = start; iteration < end; iteration++) {
+          iterationLoop: for (let iteration = start; iteration < end; iteration++) {
             let currentScore = 0;
+            const iterationStageCounts: Record<string, number> = {
+              group: 0,
+              r32: 0,
+              r16: 0,
+              qf: 0,
+              sf: 0,
+              final: 0,
+              champion: 0
+            };
+            const iterationStageOpponents: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>> = {
+              group: {},
+              r32: {},
+              r16: {},
+              qf: {},
+              sf: {},
+              final: {}
+            };
+            const trackIterationMatch = (stage: string, team: string, opponent: string, gf: number, ga: number, won: boolean) => {
+              if (team !== effectiveCode) return;
+              if (!iterationStageOpponents[stage][opponent]) {
+                iterationStageOpponents[stage][opponent] = { count: 0, gfSum: 0, gaSum: 0, wins: 0 };
+              }
+              iterationStageOpponents[stage][opponent].count += 1;
+              iterationStageOpponents[stage][opponent].gfSum += gf;
+              iterationStageOpponents[stage][opponent].gaSum += ga;
+              if (won) iterationStageOpponents[stage][opponent].wins += 1;
+            };
 
             // Mock Tournament tracking for this iteration
             const currentMock: any = {
@@ -866,17 +937,17 @@ export default function CountryPredictionsClient({
 
                 if (hs > as) {
                   standings[t1Idx].pts += 3;
-                  trackMatch("group", t1.code, t2.code, hs, as, true);
-                  trackMatch("group", t2.code, t1.code, as, hs, false);
+                  trackIterationMatch("group", t1.code, t2.code, hs, as, true);
+                  trackIterationMatch("group", t2.code, t1.code, as, hs, false);
                 } else if (hs < as) {
                   standings[t2Idx].pts += 3;
-                  trackMatch("group", t1.code, t2.code, hs, as, false);
-                  trackMatch("group", t2.code, t1.code, as, hs, true);
+                  trackIterationMatch("group", t1.code, t2.code, hs, as, false);
+                  trackIterationMatch("group", t2.code, t1.code, as, hs, true);
                 } else {
                   standings[t1Idx].pts += 1;
                   standings[t2Idx].pts += 1;
-                  trackMatch("group", t1.code, t2.code, hs, as, false);
-                  trackMatch("group", t2.code, t1.code, as, hs, false);
+                  trackIterationMatch("group", t1.code, t2.code, hs, as, false);
+                  trackIterationMatch("group", t2.code, t1.code, as, hs, false);
                 }
               };
 
@@ -899,7 +970,7 @@ export default function CountryPredictionsClient({
               currentMock.groups[groupName] = standings;
             });
 
-            stageCounts.group += 1;
+            iterationStageCounts.group += 1;
 
             // Rank thirds
             const thirds = Object.entries(groupStandings).map(([_, stand]) => stand[2]);
@@ -971,10 +1042,15 @@ export default function CountryPredictionsClient({
               return { home, away };
             }).filter((pair) => pair.home && pair.away && pair.home !== pair.away);
 
+            const r32Participants = r32Pairings.flatMap((pair) => [pair.home, pair.away]);
+            if (r32Pairings.length !== 16 || !hasDistinctKnownTeams(r32Participants, 32)) {
+              continue iterationLoop;
+            }
+
             // Check if selected country is in R32
             const inR32 = r32Pairings.some(p => p.home === effectiveCode || p.away === effectiveCode);
             if (inR32) currentScore = 1;
-            if (inR32) stageCounts.r32 += 1;
+            if (inR32) iterationStageCounts.r32 += 1;
 
             // Simulate R32
             const r16Teams: string[] = [];
@@ -983,87 +1059,116 @@ export default function CountryPredictionsClient({
               r16Teams.push(winner);
               currentMock.r32.push({ home: pair.home, away: pair.away, hs, as, winner });
               if (inR32) {
-                trackMatch("r32", pair.home, pair.away, hs, as, winner === pair.home);
-                trackMatch("r32", pair.away, pair.home, as, hs, winner === pair.away);
+                trackIterationMatch("r32", pair.home, pair.away, hs, as, winner === pair.home);
+                trackIterationMatch("r32", pair.away, pair.home, as, hs, winner === pair.away);
               }
             });
+            if (!hasDistinctKnownTeams(r16Teams, 16)) {
+              continue iterationLoop;
+            }
 
             // Check if selected country is in R16
             const inR16 = r16Teams.includes(effectiveCode);
             if (inR16) currentScore = 2;
-            if (inR16) stageCounts.r16 += 1;
+            if (inR16) iterationStageCounts.r16 += 1;
 
             // Simulate R16
             const qfTeams: string[] = [];
             for (let i = 0; i < 8; i++) {
               const home = r16Teams[2 * i];
               const away = r16Teams[2 * i + 1];
+              if (!home || !away || home === away || !isKnownTeamCode(home) || !isKnownTeamCode(away)) {
+                continue iterationLoop;
+              }
               const { hs, as, winner } = simulateKo(home, away);
               qfTeams.push(winner);
               currentMock.r16.push({ home, away, hs, as, winner });
               if (inR16) {
-                trackMatch("r16", home, away, hs, as, winner === home);
-                trackMatch("r16", away, home, as, hs, winner === away);
+                trackIterationMatch("r16", home, away, hs, as, winner === home);
+                trackIterationMatch("r16", away, home, as, hs, winner === away);
               }
+            }
+            if (!hasDistinctKnownTeams(qfTeams, 8)) {
+              continue iterationLoop;
             }
 
             // Check QF
             const inQF = qfTeams.includes(effectiveCode);
             if (inQF) currentScore = 3;
-            if (inQF) stageCounts.qf += 1;
+            if (inQF) iterationStageCounts.qf += 1;
 
             // Simulate QF
             const sfTeams: string[] = [];
             for (let i = 0; i < 4; i++) {
               const home = qfTeams[2 * i];
               const away = qfTeams[2 * i + 1];
+              if (!home || !away || home === away || !isKnownTeamCode(home) || !isKnownTeamCode(away)) {
+                continue iterationLoop;
+              }
               const { hs, as, winner } = simulateKo(home, away);
               sfTeams.push(winner);
               currentMock.qf.push({ home, away, hs, as, winner });
               if (inQF) {
-                trackMatch("qf", home, away, hs, as, winner === home);
-                trackMatch("qf", away, home, as, hs, winner === away);
+                trackIterationMatch("qf", home, away, hs, as, winner === home);
+                trackIterationMatch("qf", away, home, as, hs, winner === away);
               }
+            }
+            if (!hasDistinctKnownTeams(sfTeams, 4)) {
+              continue iterationLoop;
             }
 
             // Check SF
             const inSF = sfTeams.includes(effectiveCode);
             if (inSF) currentScore = 4;
-            if (inSF) stageCounts.sf += 1;
+            if (inSF) iterationStageCounts.sf += 1;
 
             // Simulate SF
             const finalTeams: string[] = [];
             for (let i = 0; i < 2; i++) {
               const home = sfTeams[2 * i];
               const away = sfTeams[2 * i + 1];
+              if (!home || !away || home === away || !isKnownTeamCode(home) || !isKnownTeamCode(away)) {
+                continue iterationLoop;
+              }
               const { hs, as, winner } = simulateKo(home, away);
               finalTeams.push(winner);
               currentMock.sf.push({ home, away, hs, as, winner });
               if (inSF) {
-                trackMatch("sf", home, away, hs, as, winner === home);
-                trackMatch("sf", away, home, as, hs, winner === away);
+                trackIterationMatch("sf", home, away, hs, as, winner === home);
+                trackIterationMatch("sf", away, home, as, hs, winner === away);
               }
+            }
+            if (!hasDistinctKnownTeams(finalTeams, 2)) {
+              continue iterationLoop;
             }
 
             // Check Final
             const inFinal = finalTeams.includes(effectiveCode);
             if (inFinal) currentScore = 5;
-            if (inFinal) stageCounts.final += 1;
+            if (inFinal) iterationStageCounts.final += 1;
 
             // Simulate Final
             const homeTeam = finalTeams[0];
             const awayTeam = finalTeams[1];
+            if (!homeTeam || !awayTeam || homeTeam === awayTeam || !isKnownTeamCode(homeTeam) || !isKnownTeamCode(awayTeam)) {
+              continue iterationLoop;
+            }
             const { hs, as, winner } = simulateKo(homeTeam, awayTeam);
             currentMock.final = { home: homeTeam, away: awayTeam, hs, as, winner };
             if (inFinal) {
-              trackMatch("final", homeTeam, awayTeam, hs, as, winner === homeTeam);
-              trackMatch("final", awayTeam, homeTeam, as, hs, winner === awayTeam);
+              trackIterationMatch("final", homeTeam, awayTeam, hs, as, winner === homeTeam);
+              trackIterationMatch("final", awayTeam, homeTeam, as, hs, winner === awayTeam);
             }
 
             if (winner === effectiveCode) {
-              stageCounts.champion += 1;
+              iterationStageCounts.champion += 1;
               currentScore = 6;
             }
+
+            Object.entries(iterationStageCounts).forEach(([stage, count]) => {
+              stageCounts[stage] += count;
+            });
+            mergeStageOpponentStats(stageOpponents, iterationStageOpponents);
 
             // Keep best mock tournament
             if (currentScore > bestScore) {
@@ -1313,6 +1418,12 @@ export default function CountryPredictionsClient({
   }, [effectiveCode, simResults]);
 
   const selectedGroup = Object.entries(GROUPS_CONFIG).find(([_, list]) => list.includes(effectiveCode))?.[0] || "-";
+  const wildcardBaselineName = activeCustomCountry
+    ? appTeams.find((team) => team.code === activeCustomCountry.baselineCode)?.name || activeCustomCountry.baselineCode
+    : null;
+  const wildcardReplacedName = activeCustomCountry
+    ? appTeams.find((team) => team.code === activeCustomCountry.replacedCode)?.name || activeCustomCountry.replacedCode
+    : null;
   const championProbability = simResults ? (simResults.stages.champion / 1000) * 100 : 0;
   const stageCards = [
     { key: "group", label: "Group Stage", icon: "G" },
@@ -1366,6 +1477,22 @@ export default function CountryPredictionsClient({
               {selectedModel === "advanced" && " Factors in average player Overall Ratings for squad quality."}
               {selectedModel === "pro" && " Incorporates detailed individual player attributes (impact, passing, form, fitness, and discipline risk)."}
             </p>
+            {isWildcardScenario && activeCustomCountry && (
+              <div className="mt-4 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/70 bg-cyan-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-700 dark:border-neon/25 dark:bg-neon/10 dark:text-neon">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Hypothetical Path
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                    Base Model Run
+                  </span>
+                </div>
+                <p className="max-w-2xl rounded-2xl border border-cyan-200 bg-cyan-50/70 px-4 py-3 text-sm font-medium leading-relaxed text-cyan-800 dark:border-neon/15 dark:bg-white/[0.04] dark:text-white/80">
+                  {activeCustomCountry.name} did not make the World Cup. This is a hypothetical path to glory with them replacing {wildcardReplacedName}, and this wildcard simulation is being run on the Base model using the cloned {wildcardBaselineName} squad profile.
+                </p>
+              </div>
+            )}
           </div>
           <div className="flex gap-3 shrink-0">
             <div className="flex flex-col items-end rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 shadow-sm dark:border-white/10 dark:bg-slate-950/60">
@@ -1424,7 +1551,7 @@ export default function CountryPredictionsClient({
                         <div
                           key={t.code}
                           onClick={() => setSelectedCode(t.code)}
-                          className={`w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition-all duration-300 border relative overflow-hidden group cursor-pointer ${active
+                          className={`w-full flex min-h-[78px] items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition-all duration-300 border relative overflow-hidden group cursor-pointer ${active
                             ? "bg-gradient-to-r from-cyan-50 to-fuchsia-50 border-cyan-300 text-slate-950 shadow-[0_12px_30px_rgba(14,165,233,0.12)] font-bold dark:from-neon/10 dark:to-neon-2/10 dark:border-neon/30 dark:text-white dark:shadow-[0_0_15px_rgba(6,182,212,0.1)]"
                             : "border-slate-200 bg-slate-50 text-muted-foreground hover:bg-slate-100 hover:text-slate-950 dark:border-white/5 dark:bg-white/[0.01] dark:hover:bg-white/5 dark:hover:text-white"
                             }`}
@@ -1447,13 +1574,17 @@ export default function CountryPredictionsClient({
                                   <PencilLine className="w-3.5 h-3.5 text-cyan-600 dark:text-neon shrink-0 animate-pulse" />
                                 )}
                               </div>
-                              {"isCustom" in t && t.isCustom && (
-                                <div className="mt-1">
+                              <div className="mt-1 h-5">
+                                {"isCustom" in t && t.isCustom ? (
                                   <span className="inline-flex max-w-full truncate rounded-full border border-fuchsia-200 bg-fuchsia-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-fuchsia-700 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10 dark:text-fuchsia-300">
                                     Replaced with {t.replacedName}
                                   </span>
-                                </div>
-                              )}
+                                ) : (
+                                  <span className="inline-flex text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+                                    {t.code}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2.5 z-10">

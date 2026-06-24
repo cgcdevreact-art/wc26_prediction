@@ -20,7 +20,7 @@ export function Footer() {
             </span>
             <div className="font-semibold">WC26 <span className="text-gradient">PREDICT</span></div>
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">The most engaging way to predict World Cup 2026. Probabilities. Picks. Glory.</p>
+          <p className="mt-3 text-xs text-muted-foreground">The most intelligent way to predict World Cup 2026. Probabilities. Picks. Glory.</p>
         </div>
         <FooterCol
           title="Predict"

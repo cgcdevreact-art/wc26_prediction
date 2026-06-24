@@ -4,12 +4,13 @@ import { useTeams } from "@/components/TeamsProvider";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { Countdown } from "./Countdown";
 import { HOME_SECTION_OPEN_EVENT } from "./HomeSectionsAccordion";
-import { Trophy, Sparkles, ArrowRight } from "lucide-react";
+import { Trophy, Sparkles, ArrowRight, MapPin, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { BarChart, Bar, ResponsiveContainer, XAxis, Cell, Tooltip } from "recharts";
-import { useState, type MouseEvent } from "react";
+import { useState, useEffect, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AuthModal } from "./AuthModal";
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
 
 export function Hero() {
   const teams = useTeams();
@@ -17,6 +18,54 @@ export function Hero() {
   const { data: session } = useSession();
   const router = useRouter();
   const [authModalOpen, setAuthModalOpen] = useState(false);
+
+  const [fixtures, setFixtures] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
+
+  useEffect(() => {
+    if (!carouselApi) return;
+    const onSelect = () => {
+      setCanScrollPrev(carouselApi.canScrollPrev());
+      setCanScrollNext(carouselApi.canScrollNext());
+    };
+    carouselApi.on("select", onSelect);
+    carouselApi.on("reInit", onSelect);
+    onSelect();
+    return () => {
+      carouselApi.off("select", onSelect);
+      carouselApi.off("reInit", onSelect);
+    };
+  }, [carouselApi]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchFixtures = async () => {
+      try {
+        const res = await fetch("/api/fixtures");
+        if (res.ok) {
+          const data = await res.json();
+          if (active && data.success && Array.isArray(data.fixtures)) {
+            setFixtures(data.fixtures);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch fixtures for hero", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchFixtures();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayMatches = fixtures.filter((f) => f.date === todayStr);
 
   const handleSimulationClick = () => {
     if (session) {
@@ -42,6 +91,20 @@ export function Hero() {
     });
   };
 
+  const handleMatchCardClick = () => {
+    window.dispatchEvent(new CustomEvent(HOME_SECTION_OPEN_EVENT, {
+      detail: { section: "fixtures" },
+    }));
+    window.history.replaceState(null, "", "#fixtures");
+
+    requestAnimationFrame(() => {
+      document.getElementById("fixtures")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
+
   return (
     <section className="relative overflow-hidden bg-hero">
       <div className="pointer-events-none absolute inset-0">
@@ -49,7 +112,7 @@ export function Hero() {
         <div className="absolute right-0 top-0 h-96 w-96 rounded-full bg-neon-2/20 blur-3xl" />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-neon/60 to-transparent" />
       </div>
-      <div className="relative mx-auto grid container mx-auto px-4 gap-10  py-16 md:px-6 md:py-24 lg:grid-cols-2 lg:items-center">
+      <div className="relative mx-auto grid container mx-auto px-4 gap-8 pt-12 pb-8 md:px-6 md:pt-20 md:pb-12 lg:grid-cols-2 lg:items-center">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-xs uppercase tracking-[0.25em] text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-neon" /> FIFA World Cup 2026 · USA · Canada · Mexico
@@ -130,6 +193,148 @@ export function Hero() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Today's Matches Slider */}
+          <div className="mt-10 relative z-10">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-red-500" /> Today's <span className="text-red-500">Matches</span>
+              </h3>
+
+              {/* Navigation buttons and Swipe indicator */}
+              {todayMatches.length > 1 && (
+                <div className="flex items-center gap-3">
+                  <span className="hidden sm:inline text-[10px] font-medium text-muted-foreground bg-muted dark:bg-white/5 border border-border dark:border-white/5 rounded-full px-2 py-0.5 animate-pulse">
+                    Swipe to view ({todayMatches.length})
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => carouselApi?.scrollPrev()}
+                      disabled={!canScrollPrev}
+                      className="h-6 w-6 rounded-full border border-border dark:border-white/10 flex items-center justify-center bg-white/70 dark:bg-white/5 text-foreground/80 hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+                      aria-label="Previous match"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => carouselApi?.scrollNext()}
+                      disabled={!canScrollNext}
+                      className="h-6 w-6 rounded-full border border-border dark:border-white/10 flex items-center justify-center bg-white/70 dark:bg-white/5 text-foreground/80 hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+                      aria-label="Next match"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="glass rounded-2xl p-6 flex flex-col items-center justify-center min-h-[120px] gap-2 border border-border dark:border-white/5">
+                <div className="h-6 w-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Loading matches...</span>
+              </div>
+            ) : todayMatches.length > 0 ? (
+              <Carousel setApi={setCarouselApi} className="w-full" opts={{ align: "start", loop: false }}>
+                <CarouselContent className="-ml-3">
+                  {todayMatches.map((match) => (
+                    <CarouselItem key={match.match_no} className="pl-3 basis-[85%] sm:basis-[48%]">
+                      <div
+                        onClick={handleMatchCardClick}
+                        className="glass hover:bg-white/10 hover:border-red-500/40 hover:scale-[1.01] transition-all duration-300 rounded-2xl p-3 cursor-pointer relative overflow-hidden group select-none border border-white/5"
+                      >
+                        {/* Shimmer effect on hover */}
+                        <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+
+                        <div className="flex items-center justify-between text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-2">
+                          <span className="text-red-500 font-extrabold">Match #{match.match_no}</span>
+                          <span className="text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full font-extrabold">
+                            {match.group ? `Group ${match.group}` : match.stageName}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2.5 my-1.5">
+                          {/* Home Team */}
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <div className="shrink-0 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 rounded-md border border-white/5">
+                              <CountryFlag
+                                code={match.homeTeamObj.code}
+                                flag={match.homeTeamObj.flag}
+                                name={match.homeTeamObj.name}
+                                className="h-4.5 w-6 shrink-0"
+                                emojiClassName="text-base leading-none"
+                              />
+                            </div>
+                            <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
+                              {match.homeTeamObj.code || match.homeTeamObj.name.slice(0, 3)}
+                            </span>
+                          </div>
+
+                          {/* Score / VS display */}
+                          <div className="shrink-0 px-2 py-0.5 rounded-lg bg-black/10 dark:bg-black/40 border border-white/5 text-center min-w-[60px] flex flex-col justify-center items-center">
+                            {match.status === "LIVE" ? (
+                              <>
+                                <span className="font-mono text-xs font-black text-red-500 flex items-center gap-0.5">
+                                  <span className="h-1 w-1 rounded-full bg-red-500 animate-ping inline-block" />
+                                  {match.homeScore} - {match.awayScore}
+                                </span>
+                                <span className="text-[7px] text-red-500 uppercase tracking-widest font-extrabold mt-0.5">
+                                  {match.time_elapsed && !isNaN(Number(match.time_elapsed)) ? `${match.time_elapsed}'` : "LIVE"}
+                                </span>
+                              </>
+                            ) : match.status === "COMPLETED" ? (
+                              <>
+                                <span className="font-mono text-xs font-bold text-muted-foreground">{match.homeScore} - {match.awayScore}</span>
+                                <span className="text-[7px] text-muted-foreground/80 uppercase font-extrabold mt-0.5">FT</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-mono text-[10px] font-black text-red-500">{match.kickoffTime || "VS"}</span>
+                                <span className="text-[7px] text-muted-foreground uppercase font-extrabold mt-0.5">UPCOMING</span>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Away Team */}
+                          <div className="flex items-center gap-1.5 justify-end min-w-0 flex-1 text-right">
+                            <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
+                              {match.awayTeamObj.code || match.awayTeamObj.name.slice(0, 3)}
+                            </span>
+                            <div className="shrink-0 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 rounded-md border border-white/5">
+                              <CountryFlag
+                                code={match.awayTeamObj.code}
+                                flag={match.awayTeamObj.flag}
+                                name={match.awayTeamObj.name}
+                                className="h-4.5 w-6 shrink-0"
+                                emojiClassName="text-base leading-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-[9px] text-center text-muted-foreground/80 mt-2.5 pt-1.5 border-t border-white/5 flex items-center justify-center gap-1 font-medium truncate">
+                          <MapPin className="h-2.5 w-2.5 text-red-500 shrink-0" />
+                          <span className="truncate">{match.stageName} · {match.city}</span>
+                        </div>
+                      </div>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+              </Carousel>
+            ) : (
+              <div
+                onClick={handleMatchCardClick}
+                className="glass hover:bg-white/10 hover:border-red-500/40 hover:scale-[1.01] transition-all duration-300 rounded-2xl p-6 cursor-pointer text-center relative overflow-hidden group select-none border border-white/5"
+              >
+                <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-500/15 text-red-500 mb-2 border border-red-500/20">
+                  <Calendar className="h-4.5 w-4.5" />
+                </div>
+                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">No matches scheduled today</h4>
+                <p className="text-[11px] text-muted-foreground mt-1 max-w-xs mx-auto">Click to browse full schedules, venues, and stage filters.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
