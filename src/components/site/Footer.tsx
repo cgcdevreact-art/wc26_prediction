@@ -11,14 +11,14 @@ export function Footer() {
           <div className="flex items-center gap-2">
             <span className="flex h-8 items-center">
               <Image
-                src="/wc26-logo.png"
+                src="/26wc-logo.png"
                 alt="WC26 Predict"
                 width={58}
                 height={32}
                 className="h-8 w-auto"
               />
             </span>
-            <div className="font-semibold">WC26 <span className="text-gradient">PREDICT</span></div>
+            <div className="font-semibold">26WC <span className="text-gradient">PREDICTION</span></div>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">The most intelligent way to predict World Cup 2026. Probabilities. Picks. Glory.</p>
         </div>

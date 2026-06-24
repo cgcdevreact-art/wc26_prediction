@@ -26,8 +26,9 @@ export const metadata: Metadata = {
   title: "WC26 Predict",
   description: "Who will win the World Cup 2026?",
   icons: {
-    icon: "/wc26-logo.png",
-    apple: "/wc26-logo.png",
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/apple-icon.png",
   },
 };
 

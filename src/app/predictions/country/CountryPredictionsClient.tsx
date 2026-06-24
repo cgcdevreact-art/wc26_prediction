@@ -144,6 +144,7 @@ export default function CountryPredictionsClient({
   const [compareChartTab, setCompareChartTab] = useState<"progression" | "attributes">("progression");
   const [pendingAutorun, setPendingAutorun] = useState(false);
   const [hasProcessedLoadUrl, setHasProcessedLoadUrl] = useState(false);
+  const [isLoadingCustomCountries, setIsLoadingCustomCountries] = useState(true);
 
   const fetchSavedPredictions = async () => {
     if (!session?.user?.id) return;
@@ -170,7 +171,7 @@ export default function CountryPredictionsClient({
 
   // Handle auto-loading and auto-running from URL params
   useEffect(() => {
-    if (!mounted || !isInitialized || hasProcessedLoadUrl) return;
+    if (!mounted || !isInitialized || hasProcessedLoadUrl || isLoadingCustomCountries) return;
 
     const loadId = searchParams.get("load");
     const autorun = searchParams.get("autorun") === "true";
@@ -220,10 +221,10 @@ export default function CountryPredictionsClient({
 
     setHasProcessedLoadUrl(true);
     handleLoadPrediction(pred);
-  }, [mounted, isInitialized, savedPredictions, isLoadingSaved, searchParams, pathname, hasProcessedLoadUrl, selectedModel, setSelectedModel]);
+  }, [mounted, isInitialized, savedPredictions, isLoadingSaved, searchParams, pathname, hasProcessedLoadUrl, selectedModel, setSelectedModel, isLoadingCustomCountries]);
 
   useEffect(() => {
-    if (pendingAutorun && mounted && isInitialized) {
+    if (pendingAutorun && mounted && isInitialized && !isLoadingCustomCountries) {
       setPendingAutorun(false);
       const executeAutoSim = async () => {
         setShowConfirmPopup(true);
@@ -238,7 +239,7 @@ export default function CountryPredictionsClient({
       };
       executeAutoSim();
     }
-  }, [pendingAutorun, mounted, isInitialized]);
+  }, [pendingAutorun, mounted, isInitialized, isLoadingCustomCountries]);
 
   const handleLoadPrediction = (prediction: any) => {
     try {
@@ -504,6 +505,7 @@ export default function CountryPredictionsClient({
     }
 
     if (session?.user?.id) {
+      setIsLoadingCustomCountries(true);
       fetch("/api/user/custom-countries")
         .then((res) => res.json())
         .then(async (data) => {
@@ -539,7 +541,12 @@ export default function CountryPredictionsClient({
             localStorage.setItem("wc26_custom_countries", JSON.stringify(merged));
           }
         })
-        .catch((err) => console.error("Error fetching custom countries from DB:", err));
+        .catch((err) => console.error("Error fetching custom countries from DB:", err))
+        .finally(() => {
+          setIsLoadingCustomCountries(false);
+        });
+    } else {
+      setIsLoadingCustomCountries(false);
     }
   }, [initializeData, initialTeams, initialPlayers, session]);
 
@@ -1468,7 +1475,7 @@ export default function CountryPredictionsClient({
               <Sparkles className="w-4 h-4 text-cyan-600 dark:text-neon animate-pulse" />
               Predictive Intelligence Platform
             </div>
-            <h1 className="font-display text-4xl font-black sm:text-5xl text-slate-950 dark:text-gradient tracking-tight">
+            <h1 className="font-display text-3xl font-black sm:text-4xl text-slate-950 dark:text-gradient tracking-tight">
               Path to Glory Explorer
             </h1>
             <p className="mt-2 text-muted-foreground text-sm max-w-2xl leading-relaxed">
@@ -1497,7 +1504,7 @@ export default function CountryPredictionsClient({
           <div className="flex gap-3 shrink-0">
             <div className="flex flex-col items-end rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 shadow-sm dark:border-white/10 dark:bg-slate-950/60">
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Simulation Engine</span>
-              <span className="text-lg font-bold font-display text-cyan-700 dark:text-neon mt-0.5">{formattedModelName}</span>
+              <span className="text-base font-bold font-display text-cyan-700 dark:text-neon mt-0.5">{formattedModelName}</span>
             </div>
             <button
               onClick={handleRunSimulationClick}
@@ -1524,7 +1531,7 @@ export default function CountryPredictionsClient({
               <AccordionTrigger className="shrink-0 px-5 pt-5 pb-3 hover:no-underline">
                 <div className="flex w-full items-start justify-between gap-3 pr-4">
                   <div>
-                    <div className="font-display text-lg font-bold text-foreground">Country Rankings</div>
+                    <div className="font-display text-base font-bold text-foreground">Country Rankings</div>
                     <div className="text-xs text-muted-foreground mt-0.5">Browse and simulate every national team</div>
                   </div>
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
@@ -1532,7 +1539,7 @@ export default function CountryPredictionsClient({
                   </span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="min-h-0 px-5 pb-5 data-[state=open]:flex data-[state=open]:flex-1 [&>div]:flex [&>div]:h-full [&>div]:min-h-0 [&>div]:flex-1 [&>div]:flex-col [&>div]:pb-0">
+              <AccordionContent className="min-h-0 pb-0 data-[state=open]:flex data-[state=open]:flex-col data-[state=open]:flex-1 [&>div]:flex [&>div]:h-full [&>div]:min-h-0 [&>div]:flex-1 [&>div]:flex-col [&>div]:pb-5 [&>div]:px-5">
                 <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
                   <div className="relative mb-5 group">
                     <Search className="absolute inset-y-0 left-3.5 h-4 w-4 my-auto text-muted-foreground group-focus-within:text-neon transition-colors" />
@@ -1574,9 +1581,9 @@ export default function CountryPredictionsClient({
                                   <PencilLine className="w-3.5 h-3.5 text-cyan-600 dark:text-neon shrink-0 animate-pulse" />
                                 )}
                               </div>
-                              <div className="mt-1 h-5">
+                              <div className="mt-1 min-h-[1.25rem]">
                                 {"isCustom" in t && t.isCustom ? (
-                                  <span className="inline-flex max-w-full truncate rounded-full border border-fuchsia-200 bg-fuchsia-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-fuchsia-700 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10 dark:text-fuchsia-300">
+                                  <span className="inline-flex max-w-full rounded-full border border-fuchsia-200 bg-fuchsia-50 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-fuchsia-700 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 sm:text-[9px]">
                                     Replaced with {t.replacedName}
                                   </span>
                                 ) : (
@@ -1633,7 +1640,7 @@ export default function CountryPredictionsClient({
               <AccordionTrigger className="px-5 pt-5 pb-3 hover:no-underline">
                 <div className="flex items-center justify-between w-full pr-4">
                   <div>
-                    <div className="font-display font-bold text-lg text-foreground">Simulation Lab</div>
+                    <div className="font-display font-bold text-base text-foreground">Simulation Lab</div>
                     <div className="text-xs text-muted-foreground mt-0.5">Tune strength, rating, and availability.</div>
                   </div>
                   <span className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full border ${activePlan === "pro"
@@ -1894,7 +1901,7 @@ export default function CountryPredictionsClient({
               <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
                 <div className="flex flex-row items-center justify-between w-full pr-4">
                   <div className="text-left">
-                    <div className="font-display text-xl font-extrabold text-foreground">Team Overview</div>
+                    <div className="font-display text-lg font-extrabold text-foreground">Team Overview</div>
                     <div className="text-xs text-muted-foreground mt-0.5">Profile, champion odds, and stage progression</div>
                   </div>
                   {/* Save Projections Action Button */}
@@ -1964,7 +1971,7 @@ export default function CountryPredictionsClient({
                               <span className="text-fuchsia-600 dark:text-neon-2">Group {selectedGroup}</span>
                             </div>
                             <div className="mt-1 flex items-center gap-2">
-                              <h2 className="text-4xl font-extrabold font-display text-slate-950 dark:text-foreground tracking-tight truncate">
+                              <h2 className="text-3xl font-extrabold font-display text-slate-950 dark:text-foreground tracking-tight truncate">
                                 {selectedTeam.name}
                               </h2>
                               <button
@@ -1981,28 +1988,28 @@ export default function CountryPredictionsClient({
                       </div>
 
                       {/* Core Attributes Mini Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mt-2">
-                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Elo Rating</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">{Math.round(customElo)}</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-5 gap-3 mt-2">
+                        <div className="min-w-0 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground block font-bold leading-tight">Elo Rating</span>
+                          <span className="text-base sm:text-lg font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{Math.round(customElo)}</span>
                         </div>
-                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Power Index</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">{selectedTeam.power || 70}</span>
+                        <div className="min-w-0 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground block font-bold leading-tight">Power Index</span>
+                          <span className="text-base sm:text-lg font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{selectedTeam.power || 70}</span>
                         </div>
-                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Squad Value</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">
+                        <div className="min-w-0 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground block font-bold leading-tight">Squad Value</span>
+                          <span className="text-base sm:text-lg font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">
                             {selectedTeam.squadValueM ? `€${selectedTeam.squadValueM}M` : "N/A"}
                           </span>
                         </div>
-                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Attack / Defense</span>
-                          <span className="text-xl font-bold font-mono text-slate-950 dark:text-foreground mt-1 block truncate">{customAttack} / {customDefense}</span>
+                        <div className="min-w-0 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground block font-bold leading-tight">Attack / Defense</span>
+                          <span className="text-base sm:text-lg font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{customAttack} / {customDefense}</span>
                         </div>
-                        <div className="min-w-0 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 sm:p-4 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-medium truncate">Top Player</span>
-                          <span className="text-xs font-bold text-emerald-700 mt-1.5 block truncate dark:text-neon" title={getTopPlayer(selectedTeam.code)}>
+                        <div className="min-w-0 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
+                          <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground block font-bold leading-tight">Top Player</span>
+                          <span className="text-[11px] sm:text-xs font-bold text-emerald-700 mt-1.5 block truncate dark:text-neon" title={getTopPlayer(selectedTeam.code)}>
                             {getTopPlayer(selectedTeam.code)}
                           </span>
                         </div>
@@ -2046,7 +2053,7 @@ export default function CountryPredictionsClient({
                           </defs>
                         </svg>
                         <div className="absolute text-center">
-                          <div className="text-2xl font-black font-mono text-slate-950 dark:text-foreground leading-none">
+                          <div className="text-xl font-black font-mono text-slate-950 dark:text-foreground leading-none">
                             {championProbability.toFixed(1)}%
                           </div>
                         </div>
@@ -2062,7 +2069,7 @@ export default function CountryPredictionsClient({
                   </div>
 
                   {/* Stages Progression Matrix */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-7 gap-3">
                     {stageCards.map((s) => {
                       const count = simResults?.stages[s.key] || 0;
                       const pct = (count / 1000) * 100;
@@ -2070,7 +2077,7 @@ export default function CountryPredictionsClient({
                       return (
                         <div
                           key={s.key}
-                          className={`relative flex min-h-[144px] flex-col rounded-[1.75rem] border p-4 transition-all duration-300 overflow-hidden group ${active
+                          className={`relative flex min-h-[144px] flex-col rounded-[1.75rem] border p-3.5 transition-all duration-300 overflow-hidden group ${active
                             ? "border-cyan-500/50 bg-gradient-to-br from-cyan-500/10 via-emerald-500/10 to-fuchsia-500/10 shadow-[0_0_30px_rgba(6,182,212,0.15)] dark:from-cyan-500/20 dark:via-emerald-500/10 dark:to-fuchsia-500/20"
                             : "border-slate-200 bg-white hover:border-cyan-500/30 hover:bg-slate-50 dark:border-white/5 dark:bg-slate-900/50 dark:hover:bg-slate-800/80"
                             }`}
@@ -2081,14 +2088,14 @@ export default function CountryPredictionsClient({
                             <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-600 dark:text-muted-foreground leading-tight">
                               {s.label}
                             </span>
-                            {s.icon === "🏆" ? (
-                              <Trophy className={`h-4 w-4 shrink-0 ${active ? "text-yellow-500" : "text-muted-foreground"}`} />
+                            {s.key === "champion" ? (
+                              <Trophy className={`h-4 w-4 shrink-0 ${active ? "text-yellow-500 animate-bounce" : "text-muted-foreground"}`} />
                             ) : (
                               <span className="shrink-0 text-[11px] font-mono font-bold text-slate-400 dark:text-foreground/25">{s.icon}</span>
                             )}
                           </div>
 
-                          <div className={`mt-5 text-[2rem] font-black font-mono tabular-nums leading-none ${active ? "text-slate-900 dark:text-foreground" : "text-slate-400 dark:text-muted-foreground"}`}>
+                          <div className={`mt-5 text-[1.75rem] font-black font-mono tabular-nums leading-none ${active ? "text-slate-900 dark:text-foreground" : "text-slate-400 dark:text-muted-foreground"}`}>
                             {pct.toFixed(1)}%
                           </div>
 
@@ -2135,7 +2142,7 @@ export default function CountryPredictionsClient({
             <div className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
               <div className="px-6 pt-6 pb-3">
                 <div>
-                  <div className="font-display font-bold text-lg text-foreground">Performance Attributes</div>
+                  <div className="font-display font-bold text-base text-foreground">Performance Attributes</div>
                   <div className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</div>
                 </div>
               </div>
@@ -2161,7 +2168,7 @@ export default function CountryPredictionsClient({
             <div className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
               <div className="px-6 pt-6 pb-3">
                 <div>
-                  <div className="font-display font-bold text-lg text-foreground">Squad Quality Tiers</div>
+                  <div className="font-display font-bold text-base text-foreground">Squad Quality Tiers</div>
                   <div className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</div>
                 </div>
               </div>
@@ -2209,7 +2216,7 @@ export default function CountryPredictionsClient({
           <div className="rounded-[2rem] bg-white border border-slate-200 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
             <div className="px-6 pt-6 pb-3">
               <div>
-                <div className="font-display font-bold text-xl text-foreground">Expected Path to Glory</div>
+                <div className="font-display font-bold text-lg text-foreground">Expected Path to Glory</div>
                 <div className="text-xs text-muted-foreground mt-0.5">Calculated dynamically from the most common matchups and scores across all simulations.</div>
               </div>
             </div>
@@ -2309,7 +2316,7 @@ export default function CountryPredictionsClient({
         <AccordionItem value="path-to-glory" className="border-none">
           <AccordionTrigger className="px-6 md:px-8 pt-6 md:pt-8 pb-3 hover:no-underline">
             <div>
-              <div className="font-display font-extrabold text-2xl text-foreground dark:text-white tracking-tight">Path to Glory</div>
+              <div className="font-display font-extrabold text-xl text-foreground dark:text-white tracking-tight">Path to Glory</div>
               <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">Most likely path to lifting the trophy for {selectedTeam.name}</div>
             </div>
           </AccordionTrigger>
@@ -2568,7 +2575,7 @@ export default function CountryPredictionsClient({
                             className="h-10 w-14 drop-shadow-md"
                             emojiClassName="text-4xl drop-shadow-md select-none"
                           />
-                          <span className="text-2xl font-black text-foreground dark:text-white tracking-tight">{getTeam(simResults.mockTournament.final.winner).name}</span>
+                          <span className="text-xl font-black text-foreground dark:text-white tracking-tight">{getTeam(simResults.mockTournament.final.winner).name}</span>
                         </div>
                       </div>
 

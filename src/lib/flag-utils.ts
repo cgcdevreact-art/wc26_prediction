@@ -55,9 +55,46 @@ const CODE_TO_FLAG_ASSET: Record<string, string> = {
   IND: "in", // India
 };
 
-export function getFlagImageSrc(teamCode?: string | null) {
-  if (!teamCode) return null;
-  const asset = CODE_TO_FLAG_ASSET[teamCode.toUpperCase()];
+const NAME_TO_FLAG_ASSET: Record<string, string> = {
+  "ascension island": "ac",
+  "ascencension island": "ac",
+  "canary islands": "ic",
+  "canary island": "ic",
+  "clipperton island": "cp",
+  "tristan da cunha": "ta",
+  "ceuta and melilla": "ea",
+  "ceuta & melilla": "ea",
+  "ceuta melilla": "ea",
+};
+
+function normalizeFlagKey(value?: string | null) {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/gi, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function getFlagAsset(teamCode?: string | null, teamName?: string | null) {
+  const normalizedCode = teamCode?.trim().toUpperCase();
+  if (normalizedCode) {
+    if (CODE_TO_FLAG_ASSET[normalizedCode]) {
+      return CODE_TO_FLAG_ASSET[normalizedCode];
+    }
+  }
+
+  const normalizedName = normalizeFlagKey(teamName);
+  if (normalizedName && NAME_TO_FLAG_ASSET[normalizedName]) {
+    return NAME_TO_FLAG_ASSET[normalizedName];
+  }
+
+  return null;
+}
+
+export function getFlagImageSrc(teamCode?: string | null, teamName?: string | null) {
+  const asset = getFlagAsset(teamCode, teamName);
   if (!asset) return null;
   return `https://flagcdn.com/w80/${asset}.png`;
 }
@@ -104,4 +141,3 @@ export function emojiToCountryCode(emoji: string): string | null {
 
   return null;
 }
-

@@ -171,10 +171,11 @@ export default function SubscriptionPage() {
           ]
         },
         {
-          title: "Squad Availability",
+          title: "Full Parameter Control",
           items: [
-            "Control active roster selections (in/out)",
-            "Track player fitness levels"
+            "Edit overall rating, base quality, form, and intl experience",
+            "Customize attacking/defending impact, passing, and discipline risk",
+            "Modify match importance, rating tier, and active roster selections (in/out)"
           ]
         },
         {

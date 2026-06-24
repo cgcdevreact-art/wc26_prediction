@@ -117,7 +117,7 @@ export function HomeSectionsAccordion() {
 
             {/* Banner element between Team Probability Explorer and Dream Route */}
             {section.value === "probability" && (
-              <div className="my-6 overflow-hidden rounded-2xl border border-black/8 dark:border-white/10 shadow-lg hover:opacity-95 transition-opacity duration-300">
+              <div className="my-20 overflow-hidden rounded-2xl border border-black/8 dark:border-white/10 shadow-lg hover:opacity-95 transition-opacity duration-300">
                 <img
                   src="/banner.png"
                   alt="FIFA World Cup 2026 Banner"

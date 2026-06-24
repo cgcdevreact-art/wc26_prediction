@@ -348,7 +348,7 @@ export default async function PredictionsPage(props: {
             <div>
               <h2 className="text-xl font-bold font-display text-slate-900 dark:text-white flex items-center gap-2">
                 <SlidersHorizontal className="h-5 w-5 text-neon" />
-                <span>Saved Team & Player Customizations</span>
+                <span>My Team & Player Customizations</span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Your saved team rating overrides and player edits from the teams section.

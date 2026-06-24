@@ -397,9 +397,9 @@ export default function TeamsClient({
 
                 <div className="relative z-10">
                   <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                        Tier 1 — Free
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-450">
+                        Free
                       </span>
                       {subTier === "free" && (
                         <span className="text-[9px] font-black uppercase bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
@@ -498,9 +498,12 @@ export default function TeamsClient({
 
                 <div className="relative z-10">
                   <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                        Tier 2 — Advanced
+                        Advanced
+                      </span>
+                      <span className="text-[9px] font-bold uppercase bg-blue-150/40 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/10">
+                        Free features included
                       </span>
                       {subTier === "plus" && (
                         <span className="text-[9px] font-black uppercase bg-blue-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
@@ -603,9 +606,12 @@ export default function TeamsClient({
 
                 <div className="relative z-10">
                   <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[10px] font-black uppercase tracking-wider text-fuchsia-600 dark:text-fuchsia-400">
-                        Tier 3 — Expert
+                        Expert
+                      </span>
+                      <span className="text-[9px] font-bold uppercase bg-fuchsia-150/40 text-fuchsia-700 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 px-2 py-0.5 rounded-full border border-fuchsia-500/10">
+                        Free + Advanced features
                       </span>
                       {subTier === "pro" && (
                         <span className="text-[9px] font-black uppercase bg-fuchsia-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
@@ -652,16 +658,20 @@ export default function TeamsClient({
                         <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-fuchsia-500/10 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-400">
                           <Check className="h-3 w-3" />
                         </span>
-                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Squad Availability</strong>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Full Parameter Control</strong>
                       </div>
                       <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
                         <li className="flex items-start gap-1.5">
                           <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
-                          <span>Control active roster selections (in/out)</span>
+                          <span>Edit overall rating, base quality, form, and intl experience</span>
                         </li>
                         <li className="flex items-start gap-1.5">
                           <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
-                          <span>Track player fitness levels</span>
+                          <span>Customize attacking/defending impact, passing, and discipline risk</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Modify match importance, rating tier, and active roster selections (in/out)</span>
                         </li>
                       </ul>
                     </div>

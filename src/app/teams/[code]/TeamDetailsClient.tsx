@@ -391,9 +391,9 @@ export default function TeamDetailsClient({
 
                 <div className="relative z-10">
                   <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-450">
-                        Tier 1 — Free
+                        Free
                       </span>
                       {subTier === "free" && (
                         <span className="text-[9px] font-black uppercase bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
@@ -492,9 +492,12 @@ export default function TeamDetailsClient({
 
                 <div className="relative z-10">
                   <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                        Tier 2 — Advanced
+                        Advanced
+                      </span>
+                      <span className="text-[9px] font-bold uppercase bg-blue-150/40 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/10">
+                        Free features included
                       </span>
                       {subTier === "plus" && (
                         <span className="text-[9px] font-black uppercase bg-blue-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
@@ -597,9 +600,12 @@ export default function TeamDetailsClient({
 
                 <div className="relative z-10">
                   <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="text-[10px] font-black uppercase tracking-wider text-fuchsia-600 dark:text-fuchsia-400">
-                        Tier 3 — Expert
+                        Expert
+                      </span>
+                      <span className="text-[9px] font-bold uppercase bg-fuchsia-150/40 text-fuchsia-700 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 px-2 py-0.5 rounded-full border border-fuchsia-500/10">
+                        Free + Advanced features
                       </span>
                       {subTier === "pro" && (
                         <span className="text-[9px] font-black uppercase bg-fuchsia-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
@@ -646,16 +652,20 @@ export default function TeamDetailsClient({
                         <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-fuchsia-500/10 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-400">
                           <Check className="h-3 w-3" />
                         </span>
-                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Squad Availability</strong>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Full Parameter Control</strong>
                       </div>
                       <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
                         <li className="flex items-start gap-1.5">
                           <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
-                          <span>Control active roster selections (in/out)</span>
+                          <span>Edit overall rating, base quality, form, and intl experience</span>
                         </li>
                         <li className="flex items-start gap-1.5">
                           <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
-                          <span>Track player fitness levels</span>
+                          <span>Customize attacking/defending impact, passing, and discipline risk</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Modify match importance, rating tier, and active roster selections (in/out)</span>
                         </li>
                       </ul>
                     </div>
@@ -913,19 +923,27 @@ export default function TeamDetailsClient({
                 )}
                 {subTier === "plus" && (
                   isTopPlayer ? (
-                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-650 dark:text-emerald-450 text-xs flex items-center gap-2">
-                      <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                      <span><strong>Top Player unlocked:</strong> You have edit access to this player under the Advanced Predictor plan.</span>
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                        <span><strong>Top Player unlocked:</strong> You have edit access to this player under the Advanced Predictor plan.</span>
+                      </span>
+                      <button
+                        onClick={() => { setUpgradeReason("pro"); setUpgradeOpen(true); }}
+                        className="bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-full text-[10px] font-black text-white transition-all uppercase tracking-wide shrink-0"
+                      >
+                        Upgrade to Edit More
+                      </button>
                     </div>
                   ) : (
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center justify-between">
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between">
                       <span className="flex items-center gap-2">
                         <Lock className="h-3.5 w-3.5 shrink-0" />
                         <span><strong>Roster locked:</strong> Customizing other players requires Expert Predictor. Only the Top Player is unlocked on Advanced Predictor.</span>
                       </span>
                       <button
                         onClick={() => { setUpgradeReason("pro"); setUpgradeOpen(true); }}
-                        className="bg-amber-550 hover:bg-amber-600 px-3 py-1 rounded-full text-[10px] font-black text-white transition-all uppercase tracking-wide shrink-0"
+                        className="bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-full text-[10px] font-black text-white transition-all uppercase tracking-wide shrink-0"
                       >
                         Upgrade to Expert
                       </button>
@@ -1063,12 +1081,20 @@ export default function TeamDetailsClient({
                         </div>
                         <div className="space-y-2">
                           <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Rating Tier</Label>
-                          <Input
+                          <select
                             value={selectedPlayer["Rating Tier"] || ""}
                             onChange={(e) => handlePlayerEdit("Rating Tier", e.target.value)}
                             disabled={!canEditPlayer}
-                            className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                          />
+                            className="flex h-10 w-full rounded-md border border-white/10 bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-neon dark:focus:ring-neon"
+                          >
+                            <option value="">Select tier</option>
+                            <option value="Elite">Elite</option>
+                            <option value="Very Strong">Very Strong</option>
+                            <option value="Strong">Strong</option>
+                            <option value="Good/Average">Good/Average</option>
+                            <option value="Developing">Developing</option>
+                            <option value="Unknown">Unknown</option>
+                          </select>
                         </div>
                       </>
                     )}
