@@ -139,8 +139,8 @@ export function Header() {
             />
           </span>
           <div className="leading-tight">
-            <div className="text-sm font-semibold tracking-wide">WC26 <span className="text-gradient">PREDICT</span></div>
-            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Predict like a Expert</div>
+            <div className="text-sm font-semibold tracking-wide">WC26 <span className="text-gradient">PREDICTION</span></div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Predict like an Expert</div>
           </div>
         </Link>
 

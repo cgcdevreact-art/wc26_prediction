@@ -3,9 +3,10 @@
 import { useTeams } from "@/components/TeamsProvider";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { Countdown } from "./Countdown";
+import { HOME_SECTION_OPEN_EVENT } from "./HomeSectionsAccordion";
 import { Trophy, Sparkles, ArrowRight } from "lucide-react";
 import { BarChart, Bar, ResponsiveContainer, XAxis, Cell, Tooltip } from "recharts";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AuthModal } from "./AuthModal";
@@ -23,6 +24,22 @@ export function Hero() {
     } else {
       setAuthModalOpen(true);
     }
+  };
+
+  const handleStartPredictingClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+
+    window.dispatchEvent(new CustomEvent(HOME_SECTION_OPEN_EVENT, {
+      detail: { section: "probability" },
+    }));
+    window.history.replaceState(null, "", "#predict");
+
+    requestAnimationFrame(() => {
+      document.getElementById("predict")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
   };
 
   return (
@@ -50,7 +67,11 @@ export function Hero() {
             >
               Run Simulation <ArrowRight className="h-4 w-4" />
             </button>
-            <a href="#predict" className="rounded-md glass px-5 py-3 text-sm font-semibold hover:bg-white/10">
+            <a
+              href="#predict"
+              onClick={handleStartPredictingClick}
+              className="rounded-md glass px-5 py-3 text-sm font-semibold hover:bg-white/10"
+            >
               Start Predicting
             </a>
           </div>

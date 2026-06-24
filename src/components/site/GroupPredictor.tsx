@@ -275,8 +275,8 @@ const MODEL_META = {
   base: {
     label: "Base",
     title: "Base Model",
-    description: "",
-    summary: "",
+    description: "Uses team-level Elo, Attack, and Defense metrics to calculate expected goals.",
+    summary: "Predicts using country-level Elo and attack/defense ratings.",
     accent: "text-emerald-600 dark:text-neon",
     border: "border-emerald-200/80 dark:border-emerald-400/20",
     glow: "from-emerald-500/12 via-transparent to-transparent dark:from-emerald-400/10",
@@ -286,8 +286,8 @@ const MODEL_META = {
   advanced: {
     label: "Advanced",
     title: "Advanced Model",
-    description: "",
-    summary: "",
+    description: "Factors in average player Overall Ratings to adjust base expected goals for squad quality.",
+    summary: "Scales expected goals using the ratio of overall average player ratings.",
     accent: "text-sky-700 dark:text-sky-300",
     border: "border-sky-200/80 dark:border-sky-400/20",
     glow: "from-sky-500/12 via-transparent to-transparent dark:from-sky-400/10",
@@ -297,8 +297,8 @@ const MODEL_META = {
   pro: {
     label: "Pro",
     title: "Pro Model",
-    description: "",
-    summary: "",
+    description: "Incorporates deep player attributes including Attacking Impact, Passing/Creativity, Recent Form, Defensive Impact, International Experience, Fitness/Availability, and Discipline Risk.",
+    summary: "Integrates specific player-level attributes (Form, Passing, Impact, Fitness, Discipline Risk).",
     accent: "text-cyan-700 dark:text-cyan-300",
     border: "border-cyan-200/80 dark:border-cyan-400/20",
     glow: "from-cyan-500/12 via-transparent to-transparent dark:from-cyan-400/10",
@@ -3880,13 +3880,18 @@ function SimulationEngineBadge({ model }: { model: keyof typeof MODEL_META }) {
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
           <Icon className="h-4.5 w-4.5" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-550 dark:text-slate-400">
             Simulation Engine
           </div>
           <div className="text-base font-bold text-slate-900 dark:text-white">
             {meta.title}
           </div>
+          {meta.description && (
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-normal">
+              {meta.description}
+            </div>
+          )}
         </div>
       </div>
     </div>

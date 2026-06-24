@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, Eye, Save, Brain, Cpu, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, Eye, Save, Brain, Cpu, Sparkles, ChevronDown, ChevronUp, Info, Check, X, Lock, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +15,7 @@ import { useSimulationStore, TeamStats, PlayerStats } from "@/lib/store/simulati
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { PlayersRankingsTable } from "@/components/site/PlayersRankingsTable";
 import { toast } from "sonner";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 type RankingTeam = {
   code: string;
@@ -83,6 +84,7 @@ export default function TeamsClient({
   const { data: session } = useSession();
 
   const [mounted, setMounted] = useState(false);
+  const [capabilitiesExpanded, setCapabilitiesExpanded] = useState(false);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalReason, setModalReason] = useState<"plus" | "pro" | "credits" | "guest">("plus");
@@ -340,6 +342,360 @@ export default function TeamsClient({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Plan Capabilities Accordion */}
+      <div className="rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-[0_20px_50px_rgba(15,23,42,0.06)] backdrop-blur-md dark:border-white/5 dark:bg-slate-900/60 overflow-hidden mb-8 animate-in fade-in duration-500">
+        <button
+          onClick={() => setCapabilitiesExpanded(!capabilitiesExpanded)}
+          className="w-full flex items-center justify-between p-6 text-left transition-colors hover:bg-slate-500/[0.01]"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/15 text-cyan-650 dark:text-neon border border-cyan-500/20">
+              <Info className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-display text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                Plan Customization & Simulation Capabilities
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Compare what you can edit, view, and simulate across Free, Advanced, and Expert Predictor tiers
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase block tracking-wider">Current Plan</span>
+              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${subTier === "pro"
+                ? "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-400 border border-fuchsia-500/20 shadow-[0_0_12px_rgba(217,70,239,0.15)]"
+                : subTier === "plus"
+                  ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.15)]"
+                  : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+                }`}>
+                {subTier === "pro" ? "Expert Predictor" : subTier === "plus" ? "Advanced Predictor" : "Free Predictor"}
+              </span>
+            </div>
+            {capabilitiesExpanded ? (
+              <ChevronUp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+            )}
+          </div>
+        </button>
+
+        {capabilitiesExpanded && (
+          <div className="border-t border-slate-200/60 dark:border-white/5 p-6 bg-slate-500/[0.01] animate-in slide-in-from-top duration-300">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Free Predictor Column */}
+              <div className={`group relative overflow-hidden rounded-[2rem] border p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-lg ${subTier === "free"
+                ? "border-emerald-500/40 bg-emerald-50/25 dark:border-emerald-500/30 dark:bg-emerald-500/[0.04] shadow-[0_0_30px_rgba(16,185,129,0.12)] hover:border-emerald-500/55"
+                : "border-emerald-200/60 bg-emerald-50/[0.08] dark:border-emerald-500/10 dark:bg-emerald-500/[0.01] hover:border-emerald-500/30 hover:bg-emerald-50/15 dark:hover:bg-emerald-500/[0.02] hover:shadow-lg hover:shadow-emerald-500/[0.02]"
+                }`}>
+                {/* Background Watermark */}
+                <span className="absolute -right-4 -bottom-6 font-display text-9xl font-black text-emerald-500/[0.04] dark:text-emerald-500/[0.02] select-none pointer-events-none">
+                  01
+                </span>
+
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                        Tier 1 — Free
+                      </span>
+                      {subTier === "free" && (
+                        <span className="text-[9px] font-black uppercase bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
+                      )}
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <Cpu className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <h3 className="mt-3 font-display text-xl font-bold text-slate-900 dark:text-white">
+                    Free Predictor
+                  </h3>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Basic team-level ratings edits and base match predictions.
+                  </p>
+
+                  <div className="mt-6 space-y-3">
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-450">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-250">Team Rating Edits</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Edit Elo ratings</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Edit Attack ratings (Att)</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Edit Defense ratings (Def)</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-455">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-250">Standard Visibility</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Access team rankings</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Access player rankings</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Detailed player profiles are blurred</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-455">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-250">Base Simulation Engine</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Base simulation model access</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Capped at 5 free runs total</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Predictor Column */}
+              <div className={`group relative overflow-hidden rounded-[2rem] border p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-lg ${subTier === "plus"
+                ? "border-blue-500/40 bg-blue-50/25 dark:border-blue-500/30 dark:bg-blue-500/[0.04] shadow-[0_0_30px_rgba(59,130,246,0.12)] hover:border-blue-500/55"
+                : "border-blue-200/60 bg-blue-50/[0.08] dark:border-blue-500/10 dark:bg-blue-500/[0.01] hover:border-blue-500/30 hover:bg-blue-50/15 dark:hover:bg-blue-500/[0.02] hover:shadow-lg hover:shadow-blue-500/[0.02]"
+                }`}>
+                {/* Background Watermark */}
+                <span className="absolute -right-4 -bottom-6 font-display text-9xl font-black text-blue-500/[0.04] dark:text-blue-500/[0.02] select-none pointer-events-none">
+                  02
+                </span>
+
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        Tier 2 — Advanced
+                      </span>
+                      {subTier === "plus" && (
+                        <span className="text-[9px] font-black uppercase bg-blue-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
+                      )}
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      <Brain className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <h3 className="mt-3 font-display text-xl font-bold text-slate-900 dark:text-white">
+                    Advanced Predictor
+                  </h3>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Squad averages adjustments and Top Player override controls.
+                  </p>
+
+                  <div className="mt-6 space-y-3">
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-250">Top Player Overrides</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Edit overall rating</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Edit form shifts</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Edit player stats</span>
+                        </li>
+                        {/* <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Edit profile image URL</span>
+                        </li> */}
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-655 dark:bg-blue-500/20 dark:text-blue-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Full Data Visibility</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Unblurred player profile stats</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Detailed player rating summaries</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Unrestricted team/player lists</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-655 dark:bg-blue-500/20 dark:text-blue-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Advanced Engine</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Squad analytics integration</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Unlimited bracket simulations</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expert Predictor Column */}
+              <div className={`group relative overflow-hidden rounded-[2rem] border p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-lg ${subTier === "pro"
+                ? "border-fuchsia-500/40 bg-fuchsia-50/25 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/[0.04] shadow-[0_0_30px_rgba(217,70,239,0.12)] hover:border-fuchsia-500/55"
+                : "border-fuchsia-200/60 bg-fuchsia-50/[0.08] dark:border-fuchsia-500/10 dark:bg-fuchsia-500/[0.01] hover:border-fuchsia-500/30 hover:bg-fuchsia-50/15 dark:hover:bg-fuchsia-500/[0.02] hover:shadow-lg hover:shadow-fuchsia-500/[0.02]"
+                }`}>
+                {/* Background Watermark */}
+                <span className="absolute -right-4 -bottom-6 font-display text-9xl font-black text-fuchsia-500/[0.04] dark:text-fuchsia-500/[0.02] select-none pointer-events-none">
+                  03
+                </span>
+
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-fuchsia-600 dark:text-fuchsia-400">
+                        Tier 3 — Expert
+                      </span>
+                      {subTier === "pro" && (
+                        <span className="text-[9px] font-black uppercase bg-fuchsia-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
+                      )}
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-500/10 dark:bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400 border border-fuchsia-500/20">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <h3 className="mt-3 font-display text-xl font-bold text-slate-900 dark:text-white">
+                    Expert Predictor
+                  </h3>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Complete squad control, active line-up edits, and Pro model simulations.
+                  </p>
+
+                  <div className="mt-6 space-y-3">
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-fuchsia-500/10 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Full Roster Control</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Edit ratings for all roster players</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Edit form shifts for all players</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Edit profile images for all players</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-fuchsia-500/10 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Squad Availability</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Control active roster selections (in/out)</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Track player fitness levels</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-fuchsia-500/10 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Pro Simulation Engine</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Pro simulation model access</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Factor in tactical changes & fitness</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Unlimited bracket simulations</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <Tabs defaultValue="list" className="space-y-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <TabsList className="h-auto rounded-full border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
