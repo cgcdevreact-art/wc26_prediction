@@ -780,8 +780,15 @@ export default function SavedPredictionsClient() {
                                                         {stageShort}
                                                       </span>
                                                       <div className="flex items-center gap-1.5">
-                                                        <span className="font-bold text-foreground truncate max-w-[120px]" title={step.opponentName}>
-                                                          {step.opponentFlag} {step.opponentName}
+                                                        <span className="flex items-center gap-1.5 font-bold text-foreground truncate max-w-[120px]" title={step.opponentName}>
+                                                          <CountryFlag
+                                                            code={step.opponentCode}
+                                                            flag={step.opponentFlag}
+                                                            name={step.opponentName}
+                                                            className="h-3.5 w-5 shrink-0 rounded-[2px] object-cover"
+                                                            emojiClassName="hidden"
+                                                          />
+                                                          <span className="truncate">{step.opponentName}</span>
                                                         </span>
                                                         <span className="font-mono font-bold text-cyan-600 dark:text-neon text-[10px] bg-cyan-500/10 px-1 py-0.2 rounded shrink-0">
                                                           {step.winPct}%

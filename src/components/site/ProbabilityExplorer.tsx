@@ -129,7 +129,7 @@ export function ProbabilityExplorer() {
   };
 
   return (
-    <div id="predict" className="py-2">
+    <div className="py-2">
       <div className="grid gap-5 lg:grid-cols-[280px_1fr] min-w-0">
         {/* Team list */}
         <div className="glass self-start h-fit rounded-2xl border border-border/70 dark:border-white/10 overflow-hidden">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ProbabilityExplorer } from "@/components/site/ProbabilityExplorer";
 import { WildcardCountrySection } from "@/components/site/WildcardCountrySection";
@@ -8,6 +8,8 @@ import { FixturesExplorer } from "@/components/site/FixturesExplorer";
 import { ChevronDown } from "lucide-react";
 
 const DEFAULT_OPEN_SECTIONS = [ "fixtures"];
+export const HOME_SECTION_OPEN_EVENT = "wc26:open-home-section";
+const PROBABILITY_SECTION_VALUE = "probability";
 
 const SECTIONS = [
   {
@@ -22,7 +24,7 @@ const SECTIONS = [
     value: "wildcard",
     eyebrow: "Dream Route",
     title: "Your team didn't make the World Cup?",
-    sub: "Drop them in anyway. Build your custom country profile, swap them into the tournament brackets, and run their path to glory.",
+    sub: "Drop them in anyway. Build your custom country profile, swap them into the tournament brackets, and run their path hypothetical to glory.",
     contentClassName: "pt-6",
     content: <WildcardCountrySection />,
   },
@@ -39,6 +41,34 @@ const SECTIONS = [
 export function HomeSectionsAccordion() {
   const [openItems, setOpenItems] = useState<string[]>(DEFAULT_OPEN_SECTIONS);
 
+  useEffect(() => {
+    const openProbabilitySection = () => {
+      setOpenItems((current) => (
+        current.includes(PROBABILITY_SECTION_VALUE)
+          ? current
+          : [...current, PROBABILITY_SECTION_VALUE]
+      ));
+    };
+
+    const handleOpenRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{ section?: string }>).detail;
+
+      if (detail?.section === PROBABILITY_SECTION_VALUE) {
+        openProbabilitySection();
+      }
+    };
+
+    window.addEventListener(HOME_SECTION_OPEN_EVENT, handleOpenRequest);
+
+    if (window.location.hash === "#predict") {
+      openProbabilitySection();
+    }
+
+    return () => {
+      window.removeEventListener(HOME_SECTION_OPEN_EVENT, handleOpenRequest);
+    };
+  }, []);
+
   return (
     <Accordion
       type="multiple"
@@ -53,6 +83,7 @@ export function HomeSectionsAccordion() {
           <AccordionItem
             key={section.value}
             value={section.value}
+            id={section.value === PROBABILITY_SECTION_VALUE ? "predict" : undefined}
             className="overflow-visible border-none bg-transparent shadow-none"
           >
             <AccordionTrigger className="w-full flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-slate-200 dark:border-white/10 pb-6 hover:no-underline text-left cursor-pointer group [&>svg]:hidden">

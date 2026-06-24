@@ -1362,9 +1362,9 @@ export default function CountryPredictionsClient({
             </h1>
             <p className="mt-2 text-muted-foreground text-sm max-w-2xl leading-relaxed">
               Simulate the entire tournament 1,000 times dynamically based on the active model.
-              {selectedModel === "base" && " Uses Elo / Att / Def stats."}
-              {selectedModel === "advanced" && " Includes Squad value & stats."}
-              {selectedModel === "pro" && " Incorporates Player aspects & form."}
+              {selectedModel === "base" && " Uses team-level Elo, Attack, and Defense ratings."}
+              {selectedModel === "advanced" && " Factors in average player Overall Ratings for squad quality."}
+              {selectedModel === "pro" && " Incorporates detailed individual player attributes (impact, passing, form, fitness, and discipline risk)."}
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
