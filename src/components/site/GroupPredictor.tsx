@@ -2271,8 +2271,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
       {/* Tab Selectors */}
       {!onlyKnockout && (
-        <div className="mb-8 flex flex-col gap-4 border-b border-border pb-6 dark:border-white/10 md:flex-row md:items-start md:justify-between">
-          <div className="flex">
+        <div className="mb-8 flex flex-col gap-4 border-b border-border dark:border-white/10 md:flex-row md:items-end md:justify-between">
+          <div className="flex -mb-[1px]">
             <button
               onClick={() => setActiveTab("group")}
               className={`px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "group"
@@ -2295,7 +2295,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             )}
           </div>
 
-          <div className="md:max-w-md">
+          <div className="md:max-w-md pb-4 md:pb-3 w-full md:w-auto">
             <SimulationEngineBadge model={selectedModel} />
           </div>
         </div>

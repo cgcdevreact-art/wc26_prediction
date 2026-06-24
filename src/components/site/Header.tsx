@@ -126,11 +126,11 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 glass">
-      <div className="container mx-auto flex px-4 items-center justify-between py-3">
+      <div className="container mx-auto flex px-4 items-center justify-between py-2">
         <Link href="/" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
           <span className="flex h-9 items-center">
             <Image
-              src="/wc26-logo.png"
+              src="/26wc-logo.png"
               alt="WC26 Predict"
               width={66}
               height={36}
@@ -139,7 +139,7 @@ export function Header() {
             />
           </span>
           <div className="leading-tight">
-            <div className="text-sm font-semibold tracking-wide">WC26 <span className="text-gradient">PREDICTION</span></div>
+            <div className="text-sm font-semibold tracking-wide">26WC <span className="text-gradient">PREDICTION</span></div>
             <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Predict like an Expert</div>
           </div>
         </Link>

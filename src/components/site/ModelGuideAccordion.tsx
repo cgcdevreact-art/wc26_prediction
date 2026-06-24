@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { ArrowRight, Check, Cpu, Brain, Sparkles, ChevronRight } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export function ModelGuideAccordion() {
+  const { data: session } = useSession();
+  const subTier = session?.user?.subscriptionTier || "free";
+
   return (
     <div className="rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-[0_20px_50px_rgba(15,23,42,0.06)] backdrop-blur-md dark:border-white/5 dark:bg-slate-900/60 overflow-hidden">
       <Accordion type="single" collapsible className="w-full">
@@ -45,9 +49,14 @@ export function ModelGuideAccordion() {
                 
                 <div className="relative z-10">
                   <div className="flex justify-between items-start">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                      Step 1 — Core Rating
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                        Free
+                      </span>
+                      {subTier === "free" && (
+                        <span className="text-[9px] font-black uppercase bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
+                      )}
+                    </div>
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                       <Cpu className="h-5 w-5" />
                     </div>
@@ -134,9 +143,17 @@ export function ModelGuideAccordion() {
                 <div className="relative z-10 flex flex-col h-full justify-between">
                   <div>
                     <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                        Step 2 — Squad Analytics
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                          Advanced
+                        </span>
+                        <span className="text-[9px] font-bold uppercase bg-blue-150/40 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/10">
+                          Free features included
+                        </span>
+                        {subTier === "plus" && (
+                          <span className="text-[9px] font-black uppercase bg-blue-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
+                        )}
+                      </div>
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                         <Brain className="h-5 w-5" />
                       </div>
@@ -228,9 +245,17 @@ export function ModelGuideAccordion() {
                 <div className="relative z-10 flex flex-col h-full justify-between">
                   <div>
                     <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-fuchsia-600 dark:text-fuchsia-400">
-                        Step 3 — Premium Pro
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-fuchsia-600 dark:text-fuchsia-400">
+                          Expert
+                        </span>
+                        <span className="text-[9px] font-bold uppercase bg-fuchsia-150/40 text-fuchsia-700 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 px-2 py-0.5 rounded-full border border-fuchsia-500/10">
+                          Free + Advanced features
+                        </span>
+                        {subTier === "pro" && (
+                          <span className="text-[9px] font-black uppercase bg-fuchsia-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
+                        )}
+                      </div>
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-500/10 dark:bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400 border border-fuchsia-500/20">
                         <Sparkles className="h-5 w-5" />
                       </div>
@@ -268,16 +293,20 @@ export function ModelGuideAccordion() {
                           <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-fuchsia-500/10 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-400">
                             <Check className="h-3 w-3" />
                           </span>
-                          <strong className="text-xs font-bold text-slate-900 dark:text-slate-250">Squad Availability</strong>
+                          <strong className="text-xs font-bold text-slate-900 dark:text-slate-250">Full Parameter Control</strong>
                         </div>
                         <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
                           <li className="flex items-start gap-1.5">
                             <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
-                            <span>Highly sensitive to player edits and squad changes</span>
+                            <span>Edit overall rating, base quality, form, and intl experience</span>
                           </li>
                           <li className="flex items-start gap-1.5">
                             <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
-                            <span>Tracks active player selection and availability status</span>
+                            <span>Customize attacking/defending impact, passing, and discipline risk</span>
+                          </li>
+                          <li className="flex items-start gap-1.5">
+                            <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                            <span>Modify match importance, rating tier, and active roster selections (in/out)</span>
                           </li>
                         </ul>
                       </div>

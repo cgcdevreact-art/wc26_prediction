@@ -109,49 +109,29 @@ export function WildcardCountrySection() {
 
   const [flagSearch, setFlagSearch] = useState("");
   const [isFlagDropdownOpen, setIsFlagDropdownOpen] = useState(false);
-  const [countriesList, setCountriesList] = useState<any[]>(ALL_COUNTRIES);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [confirmRunOpen, setConfirmRunOpen] = useState(false);
   const [customCountryDeleteTarget, setCustomCountryDeleteTarget] = useState<CustomCountry | null>(null);
-
-  useEffect(() => {
-    fetch("https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/index.json")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          const cleaned = data.map((c: any) => ({
-            name: c.name,
-            code: c.code,
-            emoji: c.emoji,
-          }));
-          setCountriesList(cleaned);
-        }
-      })
-      .catch((err) => console.warn("Failed to fetch country flag JSON from CDN, using static fallback:", err));
-  }, []);
-
-  const filteredCountries = useMemo(() => {
-    const search = flagSearch.trim().toLowerCase();
-    const list = [...countriesList].sort((a, b) => a.name.localeCompare(b.name));
-    if (!search) return list;
-    return list.filter((c) =>
-      c.name.toLowerCase().includes(search)
-    );
-  }, [flagSearch, countriesList]);
 
   const worldCupCodes = useMemo(() => {
     return Object.values(groupsConfig).flat();
   }, [groupsConfig]);
 
-  const failedToQualifyCountries = useMemo<FailedCountryOption[]>(() => {
-    const qualifiedNames = new Set(
-      teams
-        .filter((team) => worldCupCodes.includes(team.code))
-        .map((team) => normalizeCountryName(team.name))
-    );
+  const qualifiedNamesAndFlags = useMemo(() => {
+    const names = new Set<string>();
+    const flags = new Set<string>();
+    teams
+      .filter((team) => worldCupCodes.includes(team.code))
+      .forEach((team) => {
+        if (team.name) names.add(normalizeCountryName(team.name));
+        if (team.flag) flags.add(team.flag);
+      });
+    return { names, flags };
+  }, [teams, worldCupCodes]);
 
+  const failedToQualifyCountries = useMemo<FailedCountryOption[]>(() => {
     return ALL_COUNTRIES
-      .filter((country) => !qualifiedNames.has(normalizeCountryName(country.name)))
+      .filter((country) => !qualifiedNamesAndFlags.names.has(normalizeCountryName(country.name)))
       .map((country) => ({
         code: country.code,
         name: country.name,
@@ -159,7 +139,7 @@ export function WildcardCountrySection() {
         selectionCode: `NQ-${country.code}`,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [teams, worldCupCodes]);
+  }, [qualifiedNamesAndFlags]);
 
   const visibleFailedToQualifyCountries = useMemo(() => {
     const customCountryNames = new Set(
@@ -170,6 +150,14 @@ export function WildcardCountrySection() {
       (country) => !customCountryNames.has(normalizeCountryName(country.name)),
     );
   }, [customCountries, failedToQualifyCountries]);
+
+  const filteredCountries = useMemo(() => {
+    const search = normalizeCountryName(flagSearch);
+    const list = [...visibleFailedToQualifyCountries].sort((a, b) => a.name.localeCompare(b.name));
+
+    if (!search) return list;
+    return list.filter((country) => normalizeCountryName(country.name).includes(search));
+  }, [flagSearch, visibleFailedToQualifyCountries]);
 
   useEffect(() => {
     let localList: CustomCountry[] = [];
@@ -311,7 +299,8 @@ export function WildcardCountrySection() {
   const selectedTeamDetails = useMemo(() => {
     const custom = customCountries.find((cc) => cc.code === selectedCode);
     if (custom) {
-      const orig = teams.find((t) => t.code === custom.replacedCode);
+      const baselineTeam = teams.find((t) => t.code === custom.baselineCode);
+      const replacedTeam = teams.find((t) => t.code === custom.replacedCode);
       return {
         code: custom.code,
         name: custom.name,
@@ -320,11 +309,11 @@ export function WildcardCountrySection() {
         elo: custom.elo,
         attack: custom.attack,
         defense: custom.defense,
-        power: orig?.power || 75,
-        squadValueM: orig?.squadValueM || 100,
-        confederation: orig?.confederation || "UEFA",
+        power: baselineTeam?.power || 75,
+        squadValueM: baselineTeam?.squadValueM || 100,
+        confederation: replacedTeam?.confederation || baselineTeam?.confederation || "UEFA",
         isCustom: true,
-        replacedName: orig?.name || "",
+        replacedName: replacedTeam?.name || "",
       };
     }
     if (selectedFailedCountry) {
@@ -580,6 +569,8 @@ export function WildcardCountrySection() {
         elo: customElo,
         attack: customAttack,
         defense: customDefense,
+        power: teams.find((team) => team.code === baselineCode)?.power || selectedTeamDetails.power,
+        squadValueM: teams.find((team) => team.code === baselineCode)?.squadValueM || selectedTeamDetails.squadValueM,
         confederation:
           teams.find((team) => team.code === replacedCode)?.confederation || selectedTeamDetails.confederation,
         isCustom: true,
@@ -588,6 +579,8 @@ export function WildcardCountrySection() {
     : selectedTeamDetails;
 
   const previewEloBarWidth = Math.max(0, Math.min(100, ((previewDetails.elo - 1200) / 1000) * 100));
+  const hasSavedSelectedCountry = customCountries.some((country) => country.code === selectedCode);
+  const canRunPathToGlory = hasSavedSelectedCountry && !isBuilding;
 
   return (
     <div className="py-2">
@@ -816,12 +809,18 @@ export function WildcardCountrySection() {
           <div className="relative z-10 pt-8 border-t border-slate-200/50 dark:border-white/5 mt-6">
             <button
               onClick={() => setConfirmRunOpen(true)}
-              className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-6 text-sm font-black text-background transition hover:opacity-95 active:scale-[0.98] shadow-lg shadow-neon/20 hover:shadow-neon/30 cursor-pointer"
+              disabled={!canRunPathToGlory}
+              className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-6 text-sm font-black text-background transition hover:opacity-95 active:scale-[0.98] shadow-lg shadow-neon/20 hover:shadow-neon/30 cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
             >
               <Sparkles className="h-4.5 w-4.5 fill-current" />
               <span>Run Path To Glory</span>
               <ArrowRight className="h-4.5 w-4.5" />
             </button>
+            {!canRunPathToGlory && (
+              <p className="mt-2 text-center text-[11px] font-semibold text-muted-foreground">
+                Save the country profile first to enable this run.
+              </p>
+            )}
           </div>
         </div>
 
@@ -937,8 +936,8 @@ export function WildcardCountrySection() {
                                 key={c.code}
                                 type="button"
                                 onClick={() => {
-                                  setCustomFlag(c.emoji);
-                                  if (!customName.trim() || countriesList.some(ac => ac.name.toLowerCase() === customName.trim().toLowerCase())) {
+                                  setCustomFlag(c.flag);
+                                  if (!customName.trim() || visibleFailedToQualifyCountries.some(ac => ac.name.toLowerCase() === customName.trim().toLowerCase())) {
                                     setCustomName(c.name);
                                   }
                                   setFlagSearch("");
@@ -946,7 +945,7 @@ export function WildcardCountrySection() {
                                 }}
                                 className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer text-slate-900 dark:text-white"
                               >
-                                <CountryFlag flag={c.emoji} className="h-4.5 w-6 rounded object-cover shrink-0" />
+                                <CountryFlag code={c.code} flag={c.flag} name={c.name} className="h-4.5 w-6 rounded object-cover shrink-0" />
                                 <span className="font-semibold">{c.name}</span>
                                 <span className="text-[10px] text-muted-foreground ml-auto uppercase font-mono">{c.code}</span>
                               </button>
@@ -970,7 +969,7 @@ export function WildcardCountrySection() {
                         type="button"
                         onClick={() => {
                           setCustomFlag(country.flag);
-                          if (!customName.trim() || countriesList.some(ac => ac.name.toLowerCase() === customName.trim().toLowerCase())) {
+                          if (!customName.trim() || visibleFailedToQualifyCountries.some(ac => ac.name.toLowerCase() === customName.trim().toLowerCase())) {
                             setCustomName(country.name);
                           }
                         }}
