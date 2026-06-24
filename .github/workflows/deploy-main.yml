@@ -146,114 +146,114 @@ jobs:
             --exclude='./prisma/dev.db-shm' \
             -czf - . | ssh wc26-main-server "tar -xzf - -C '$SERVER_DIR'"
 
-      # - name: Deploy application
-      #   run: |
-      #     set -e
+      - name: Deploy application
+        run: |
+          set -e
 
-      #     ssh wc26-main-server "
-      #       set -e
+          ssh wc26-main-server "
+            set -e
 
-      #       cd '$SERVER_DIR'
+            cd '$SERVER_DIR'
 
-      #       echo '================================='
-      #       echo 'Current directory:'
-      #       pwd
-      #       echo '================================='
+            echo '================================='
+            echo 'Current directory:'
+            pwd
+            echo '================================='
 
-      #       echo ''
-      #       echo 'Verifying Prisma datasource provider...'
-      #       if ! grep -q 'provider = \"sqlite\"' prisma/schema.prisma; then
-      #         echo 'ERROR: Expected Prisma datasource provider sqlite, but server schema is different:'
-      #         sed -n '1,12p' prisma/schema.prisma
-      #         exit 1
-      #       fi
+            echo ''
+            echo 'Verifying Prisma datasource provider...'
+            if ! grep -q 'provider = \"sqlite\"' prisma/schema.prisma; then
+              echo 'ERROR: Expected Prisma datasource provider sqlite, but server schema is different:'
+              sed -n '1,12p' prisma/schema.prisma
+              exit 1
+            fi
 
-      #       if [ ! -f .env ]; then
-      #         echo 'ERROR: .env file is missing at $SERVER_DIR/.env'
-      #         echo 'Create it on the server before deploying.'
-      #         exit 1
-      #       fi
+            if [ ! -f .env ]; then
+              echo 'ERROR: .env file is missing at $SERVER_DIR/.env'
+              echo 'Create it on the server before deploying.'
+              exit 1
+            fi
 
-      #       echo ''
-      #       echo 'Server resources before deploy:'
-      #       free -h || true
-      #       df -h / || true
-      #       docker version || true
+            echo ''
+            echo 'Server resources before deploy:'
+            free -h || true
+            df -h / || true
+            docker version || true
 
-      #       echo ''
-      #       echo 'Docker compose configuration:'
-      #       docker compose -p '$COMPOSE_PROJECT' config
+            echo ''
+            echo 'Docker compose configuration:'
+            docker compose -p '$COMPOSE_PROJECT' config
 
-      #       echo ''
-      #       echo 'Removing old manually-created main container if it exists...'
-      #       docker rm -f wc26_prediction_app || true
+            echo ''
+            echo 'Removing old manually-created main container if it exists...'
+            docker rm -f wc26_prediction_app || true
 
-      #       echo ''
-      #       echo 'Preparing main SQLite DB...'
-      #       mkdir -p prisma
+            echo ''
+            echo 'Preparing main SQLite DB...'
+            mkdir -p prisma
 
-      #       echo ''
-      #       echo 'Stopping only wc26 main containers...'
-      #       docker compose -p '$COMPOSE_PROJECT' stop app || true
+            echo ''
+            echo 'Stopping only wc26 main containers...'
+            docker compose -p '$COMPOSE_PROJECT' stop app || true
 
-      #       echo ''
-      #       echo 'Backing up SQLite DB after app stop...'
-      #       mkdir -p '$BACKUP_DIR'
-      #       if [ -f prisma/dev.db ]; then
-      #         backup='$BACKUP_DIR/dev-after-stop-'\"\$(date +%Y%m%d-%H%M%S)\"'.db'
-      #         cp prisma/dev.db \"\$backup\"
-      #         echo \"SQLite DB backup created after app stop: \$backup\"
-      #       else
-      #         echo 'No existing prisma/dev.db found after app stop. Fresh DB will be created on startup.'
-      #       fi
+            echo ''
+            echo 'Backing up SQLite DB after app stop...'
+            mkdir -p '$BACKUP_DIR'
+            if [ -f prisma/dev.db ]; then
+              backup='$BACKUP_DIR/dev-after-stop-'\"\$(date +%Y%m%d-%H%M%S)\"'.db'
+              cp prisma/dev.db \"\$backup\"
+              echo \"SQLite DB backup created after app stop: \$backup\"
+            else
+              echo 'No existing prisma/dev.db found after app stop. Fresh DB will be created on startup.'
+            fi
 
-      #       if [ '$RESET_DATABASE' = 'true' ]; then
-      #         echo ''
-      #         echo 'RESET_DATABASE=true; removing main SQLite DB so Prisma creates a fresh one.'
-      #         rm -f prisma/dev.db prisma/dev.db-journal prisma/dev.db-wal prisma/dev.db-shm
-      #       else
-      #         echo ''
-      #         echo 'RESET_DATABASE=false; preserving existing main SQLite DB.'
-      #       fi
+            if [ '$RESET_DATABASE' = 'true' ]; then
+              echo ''
+              echo 'RESET_DATABASE=true; removing main SQLite DB so Prisma creates a fresh one.'
+              rm -f prisma/dev.db prisma/dev.db-journal prisma/dev.db-wal prisma/dev.db-shm
+            else
+              echo ''
+              echo 'RESET_DATABASE=false; preserving existing main SQLite DB.'
+            fi
 
-      #       echo ''
-      #       echo 'Removing only wc26 main containers...'
-      #       docker compose -p '$COMPOSE_PROJECT' down --remove-orphans || true
+            echo ''
+            echo 'Removing only wc26 main containers...'
+            docker compose -p '$COMPOSE_PROJECT' down --remove-orphans || true
 
-      #       echo ''
-      #       echo 'Removing stopped wc26 main containers...'
-      #       docker compose -p '$COMPOSE_PROJECT' rm -f || true
+            echo ''
+            echo 'Removing stopped wc26 main containers...'
+            docker compose -p '$COMPOSE_PROJECT' rm -f || true
 
-      #       echo ''
-      #       echo 'Cleaning unused Docker resources and build cache...'
-      #       docker system prune -af || true
+            echo ''
+            echo 'Cleaning unused Docker resources and build cache...'
+            docker system prune -af || true
 
-      #       echo ''
-      #       echo 'Building Docker image...'
-      #       DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain docker compose -p '$COMPOSE_PROJECT' build --pull --no-cache --progress=plain
+            echo ''
+            echo 'Building Docker image...'
+            DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain docker compose -p '$COMPOSE_PROJECT' build --pull --no-cache --progress=plain
 
-      #       echo ''
-      #       echo 'Starting fresh wc26 main containers...'
-      #       docker compose -p '$COMPOSE_PROJECT' up -d --force-recreate --remove-orphans
+            echo ''
+            echo 'Starting fresh wc26 main containers...'
+            docker compose -p '$COMPOSE_PROJECT' up -d --force-recreate --remove-orphans
 
-      #       echo ''
-      #       echo 'Waiting for startup...'
-      #       sleep 20
+            echo ''
+            echo 'Waiting for startup...'
+            sleep 20
 
-      #       echo ''
-      #       echo 'Compose status:'
-      #       docker compose -p '$COMPOSE_PROJECT' ps
+            echo ''
+            echo 'Compose status:'
+            docker compose -p '$COMPOSE_PROJECT' ps
 
-      #       echo ''
-      #       echo 'Recent container logs:'
-      #       docker compose -p '$COMPOSE_PROJECT' logs --tail=80
+            echo ''
+            echo 'Recent container logs:'
+            docker compose -p '$COMPOSE_PROJECT' logs --tail=80
 
-      #       echo ''
-      #       echo 'Running containers:'
-      #       docker ps
+            echo ''
+            echo 'Running containers:'
+            docker ps
 
-      #       echo ''
-      #       echo 'Deployment successful.'
-      #     "
+            echo ''
+            echo 'Deployment successful.'
+          "
 
 
