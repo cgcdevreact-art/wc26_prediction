@@ -1,0 +1,239 @@
+﻿name: Deploy Main WC26 Prediction
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+    inputs:
+      reset_database:
+        description: "Reset main SQLite DB before deploy"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  main_deploy:
+    runs-on: ubuntu-latest
+    environment: main
+
+    env:
+      SERVER_HOST: ${{ secrets.SERVER_HOST_prod }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY_prod }}
+      SERVER_DIR: /home/ubuntu/wc26_prediction/main
+      BACKUP_DIR: /home/ubuntu/wc26_prediction/backups
+      COMPOSE_PROJECT: wc26-main
+      RESET_DATABASE: ${{ github.event.inputs.reset_database || 'false' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH key
+        run: |
+          set -e
+
+          if [ -z "$SERVER_HOST" ]; then
+            echo "::error::SERVER_HOST_prod secret is missing."
+            exit 1
+          fi
+
+          if [ -z "$SERVER_USER" ]; then
+            echo "::error::SERVER_USER secret is missing."
+            exit 1
+          fi
+
+          if [ -z "$SERVER_SSH_KEY" ]; then
+            echo "::error::SERVER_SSH_KEY_prod secret is missing."
+            exit 1
+          fi
+
+          mkdir -p ~/.ssh
+          printf '%s' "$SERVER_SSH_KEY" | sed 's/\\n/\n/g; s/\r$//' > ~/.ssh/wc26_main_key
+          chmod 600 ~/.ssh/wc26_main_key
+
+          if ! grep -q "BEGIN .*PRIVATE KEY" ~/.ssh/wc26_main_key; then
+            echo "::error::SERVER_SSH_KEY_prod does not look like a private key. Paste the full private key, including BEGIN/END lines."
+            exit 1
+          fi
+
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+          cat > ~/.ssh/config <<EOF
+          Host wc26-main-server
+            HostName $SERVER_HOST
+            User $SERVER_USER
+            IdentityFile ~/.ssh/wc26_main_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+          EOF
+
+          ssh -o BatchMode=yes wc26-main-server "echo SSH authentication OK"
+
+      - name: Remove local-only files from deploy payload
+        run: |
+          rm -rf .git
+          rm -f .env
+          rm -f prisma/dev.db
+          rm -f prisma/dev.db-journal
+          rm -f prisma/dev.db-wal
+          rm -f prisma/dev.db-shm
+
+      - name: Ensure server directory exists
+        run: |
+          set -e
+
+          ssh wc26-main-server "
+            set -e
+            mkdir -p '$SERVER_DIR'
+            mkdir -p '$SERVER_DIR/prisma'
+            mkdir -p '$BACKUP_DIR'
+          "
+
+      - name: Backup server database before file sync
+        run: |
+          set -e
+
+          ssh wc26-main-server "
+            set -e
+            cd '$SERVER_DIR'
+
+            if [ -f prisma/dev.db ]; then
+              backup='$BACKUP_DIR/dev-before-sync-'\"\$(date +%Y%m%d-%H%M%S)\"'.db'
+              cp prisma/dev.db \"\$backup\"
+              echo \"SQLite DB backup created before sync: \$backup\"
+            else
+              echo 'No existing main prisma/dev.db found before sync.'
+            fi
+          "
+
+      - name: Copy repository to server
+        run: |
+          set -e
+
+          tar \
+            --exclude='./.env' \
+            --exclude='./.git' \
+            --exclude='./prisma/dev.db' \
+            --exclude='./prisma/dev.db-journal' \
+            --exclude='./prisma/dev.db-wal' \
+            --exclude='./prisma/dev.db-shm' \
+            -czf - . | ssh wc26-main-server "tar -xzf - -C '$SERVER_DIR'"
+
+      - name: Deploy application
+        run: |
+          set -e
+
+          ssh wc26-main-server "
+            set -e
+
+            cd '$SERVER_DIR'
+
+            echo '================================='
+            echo 'Current directory:'
+            pwd
+            echo '================================='
+
+            echo ''
+            echo 'Verifying Prisma datasource provider...'
+            if ! grep -q 'provider = \"sqlite\"' prisma/schema.prisma; then
+              echo 'ERROR: Expected Prisma datasource provider sqlite, but server schema is different:'
+              sed -n '1,12p' prisma/schema.prisma
+              exit 1
+            fi
+
+            if [ ! -f .env ]; then
+              echo 'ERROR: .env file is missing at $SERVER_DIR/.env'
+              echo 'Create it on the server before deploying.'
+              exit 1
+            fi
+
+            echo ''
+            echo 'Server resources before deploy:'
+            free -h || true
+            df -h / || true
+            docker version || true
+
+            echo ''
+            echo 'Docker compose configuration:'
+            docker compose -p '$COMPOSE_PROJECT' config
+
+            echo ''
+            echo 'Removing old manually-created main container if it exists...'
+            docker rm -f wc26_prediction_app || true
+
+            echo ''
+            echo 'Preparing main SQLite DB...'
+            mkdir -p prisma
+
+            echo ''
+            echo 'Stopping only wc26 main containers...'
+            docker compose -p '$COMPOSE_PROJECT' stop app || true
+
+            echo ''
+            echo 'Backing up SQLite DB after app stop...'
+            mkdir -p '$BACKUP_DIR'
+            if [ -f prisma/dev.db ]; then
+              backup='$BACKUP_DIR/dev-after-stop-'\"\$(date +%Y%m%d-%H%M%S)\"'.db'
+              cp prisma/dev.db \"\$backup\"
+              echo \"SQLite DB backup created after app stop: \$backup\"
+            else
+              echo 'No existing prisma/dev.db found after app stop. Fresh DB will be created on startup.'
+            fi
+
+            if [ '$RESET_DATABASE' = 'true' ]; then
+              echo ''
+              echo 'RESET_DATABASE=true; removing main SQLite DB so Prisma creates a fresh one.'
+              rm -f prisma/dev.db prisma/dev.db-journal prisma/dev.db-wal prisma/dev.db-shm
+            else
+              echo ''
+              echo 'RESET_DATABASE=false; preserving existing main SQLite DB.'
+            fi
+
+            echo ''
+            echo 'Removing only wc26 main containers...'
+            docker compose -p '$COMPOSE_PROJECT' down --remove-orphans || true
+
+            echo ''
+            echo 'Removing stopped wc26 main containers...'
+            docker compose -p '$COMPOSE_PROJECT' rm -f || true
+
+            echo ''
+            echo 'Cleaning unused Docker resources and build cache...'
+            docker system prune -af || true
+
+            echo ''
+            echo 'Building Docker image...'
+            DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain docker compose -p '$COMPOSE_PROJECT' build --pull --no-cache --progress=plain
+
+            echo ''
+            echo 'Starting fresh wc26 main containers...'
+            docker compose -p '$COMPOSE_PROJECT' up -d --force-recreate --remove-orphans
+
+            echo ''
+            echo 'Waiting for startup...'
+            sleep 20
+
+            echo ''
+            echo 'Compose status:'
+            docker compose -p '$COMPOSE_PROJECT' ps
+
+            echo ''
+            echo 'Recent container logs:'
+            docker compose -p '$COMPOSE_PROJECT' logs --tail=80
+
+            echo ''
+            echo 'Running containers:'
+            docker ps
+
+            echo ''
+            echo 'Deployment successful.'
+          "
+
+
