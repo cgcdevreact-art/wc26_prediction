@@ -45,6 +45,20 @@ function InfoTooltip({ content }: { content: string }) {
 
 const FEATURED_CODES = ["NOR", "ITA", "CHL", "NGA", "IND", "RSA"];
 const DEFAULT_FAILED_COUNTRY_CODE = "NQ-NO";
+const FLAG_QUICK_SELECT_CODES = ["NG", "NO", "IT", "CL", "IN", "ZA", "EG", "SE"];
+
+function formatTeamScaleRating(value: number | undefined | null) {
+  if (value === undefined || value === null) return 75;
+  if (value < 10) {
+    const minM = 0.75;
+    const maxM = 1.1;
+    const minR = 50;
+    const maxR = 95;
+    const rating = ((value - minM) / (maxM - minM)) * (maxR - minR) + minR;
+    return Math.max(15, Math.min(99, Math.round(rating)));
+  }
+  return Math.max(15, Math.min(99, Math.round(value)));
+}
 
 function normalizeCountryName(value: string) {
   return value
@@ -95,49 +109,29 @@ export function WildcardCountrySection() {
 
   const [flagSearch, setFlagSearch] = useState("");
   const [isFlagDropdownOpen, setIsFlagDropdownOpen] = useState(false);
-  const [countriesList, setCountriesList] = useState<any[]>(ALL_COUNTRIES);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [confirmRunOpen, setConfirmRunOpen] = useState(false);
   const [customCountryDeleteTarget, setCustomCountryDeleteTarget] = useState<CustomCountry | null>(null);
-
-  useEffect(() => {
-    fetch("https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/index.json")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          const cleaned = data.map((c: any) => ({
-            name: c.name,
-            code: c.code,
-            emoji: c.emoji,
-          }));
-          setCountriesList(cleaned);
-        }
-      })
-      .catch((err) => console.warn("Failed to fetch country flag JSON from CDN, using static fallback:", err));
-  }, []);
-
-  const filteredCountries = useMemo(() => {
-    const search = flagSearch.trim().toLowerCase();
-    const list = [...countriesList].sort((a, b) => a.name.localeCompare(b.name));
-    if (!search) return list;
-    return list.filter((c) =>
-      c.name.toLowerCase().includes(search)
-    );
-  }, [flagSearch, countriesList]);
 
   const worldCupCodes = useMemo(() => {
     return Object.values(groupsConfig).flat();
   }, [groupsConfig]);
 
-  const failedToQualifyCountries = useMemo<FailedCountryOption[]>(() => {
-    const qualifiedNames = new Set(
-      teams
-        .filter((team) => worldCupCodes.includes(team.code))
-        .map((team) => normalizeCountryName(team.name))
-    );
+  const qualifiedNamesAndFlags = useMemo(() => {
+    const names = new Set<string>();
+    const flags = new Set<string>();
+    teams
+      .filter((team) => worldCupCodes.includes(team.code))
+      .forEach((team) => {
+        if (team.name) names.add(normalizeCountryName(team.name));
+        if (team.flag) flags.add(team.flag);
+      });
+    return { names, flags };
+  }, [teams, worldCupCodes]);
 
+  const failedToQualifyCountries = useMemo<FailedCountryOption[]>(() => {
     return ALL_COUNTRIES
-      .filter((country) => !qualifiedNames.has(normalizeCountryName(country.name)))
+      .filter((country) => !qualifiedNamesAndFlags.names.has(normalizeCountryName(country.name)))
       .map((country) => ({
         code: country.code,
         name: country.name,
@@ -145,7 +139,25 @@ export function WildcardCountrySection() {
         selectionCode: `NQ-${country.code}`,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [teams, worldCupCodes]);
+  }, [qualifiedNamesAndFlags]);
+
+  const visibleFailedToQualifyCountries = useMemo(() => {
+    const customCountryNames = new Set(
+      customCountries.map((country) => normalizeCountryName(country.name)),
+    );
+
+    return failedToQualifyCountries.filter(
+      (country) => !customCountryNames.has(normalizeCountryName(country.name)),
+    );
+  }, [customCountries, failedToQualifyCountries]);
+
+  const filteredCountries = useMemo(() => {
+    const search = normalizeCountryName(flagSearch);
+    const list = [...visibleFailedToQualifyCountries].sort((a, b) => a.name.localeCompare(b.name));
+
+    if (!search) return list;
+    return list.filter((country) => normalizeCountryName(country.name).includes(search));
+  }, [flagSearch, visibleFailedToQualifyCountries]);
 
   useEffect(() => {
     let localList: CustomCountry[] = [];
@@ -213,9 +225,11 @@ export function WildcardCountrySection() {
     }
   };
 
-  const sortedTeams = useMemo(() => {
-    return [...teams].sort((a, b) => a.name.localeCompare(b.name));
-  }, [teams]);
+  const worldCupTeams = useMemo(() => {
+    return teams
+      .filter((team) => worldCupCodes.includes(team.code))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [teams, worldCupCodes]);
 
   const featuredTeams = useMemo(() => {
     const featuredNameMap: Record<string, string> = {
@@ -228,11 +242,35 @@ export function WildcardCountrySection() {
     };
 
     const featured = FEATURED_CODES
-      .map((code) => failedToQualifyCountries.find((country) => country.name === featuredNameMap[code]))
+      .map((code) => visibleFailedToQualifyCountries.find((country) => country.name === featuredNameMap[code]))
       .filter(Boolean) as FailedCountryOption[];
 
-    return featured.length > 0 ? featured : failedToQualifyCountries.slice(0, 6);
-  }, [failedToQualifyCountries]);
+    return featured.length > 0 ? featured : visibleFailedToQualifyCountries.slice(0, 6);
+  }, [visibleFailedToQualifyCountries]);
+
+  useEffect(() => {
+    if (customCountries.some((country) => country.code === selectedCode)) return;
+    if (failedToQualifyCountries.some((country) => country.selectionCode === selectedCode)) return;
+
+    const fallbackCode =
+      customCountries[0]?.code ||
+      featuredTeams[0]?.selectionCode ||
+      visibleFailedToQualifyCountries[0]?.selectionCode ||
+      DEFAULT_FAILED_COUNTRY_CODE;
+
+    if (fallbackCode && fallbackCode !== selectedCode) {
+      setSelectedCode(fallbackCode);
+    }
+  }, [selectedCode, customCountries, failedToQualifyCountries, featuredTeams, visibleFailedToQualifyCountries]);
+
+  const flagQuickSelectCountries = useMemo(() => {
+    const featuredPool = visibleFailedToQualifyCountries
+      .filter((country) => FLAG_QUICK_SELECT_CODES.includes(country.code));
+
+    return featuredPool.length > 0
+      ? featuredPool
+      : visibleFailedToQualifyCountries.slice(0, 8);
+  }, [visibleFailedToQualifyCountries]);
 
   const selectedFailedCountry = useMemo(() => {
     return failedToQualifyCountries.find((country) => country.selectionCode === selectedCode) || null;
@@ -261,7 +299,8 @@ export function WildcardCountrySection() {
   const selectedTeamDetails = useMemo(() => {
     const custom = customCountries.find((cc) => cc.code === selectedCode);
     if (custom) {
-      const orig = teams.find((t) => t.code === custom.replacedCode);
+      const baselineTeam = teams.find((t) => t.code === custom.baselineCode);
+      const replacedTeam = teams.find((t) => t.code === custom.replacedCode);
       return {
         code: custom.code,
         name: custom.name,
@@ -270,11 +309,11 @@ export function WildcardCountrySection() {
         elo: custom.elo,
         attack: custom.attack,
         defense: custom.defense,
-        power: orig?.power || 75,
-        squadValueM: orig?.squadValueM || 100,
-        confederation: orig?.confederation || "UEFA",
+        power: baselineTeam?.power || 75,
+        squadValueM: baselineTeam?.squadValueM || 100,
+        confederation: replacedTeam?.confederation || baselineTeam?.confederation || "UEFA",
         isCustom: true,
-        replacedName: orig?.name || "",
+        replacedName: replacedTeam?.name || "",
       };
     }
     if (selectedFailedCountry) {
@@ -293,6 +332,24 @@ export function WildcardCountrySection() {
         replacedName: "",
       };
     }
+    const fallbackFailedCountry = featuredTeams[0] || visibleFailedToQualifyCountries[0] || null;
+    if (fallbackFailedCountry) {
+      return {
+        code: fallbackFailedCountry.selectionCode,
+        name: fallbackFailedCountry.name,
+        flag: fallbackFailedCountry.flag,
+        rank: "Wildcard",
+        elo: 1650,
+        attack: 78,
+        defense: 78,
+        power: 75,
+        squadValueM: 100,
+        confederation: "Wildcard",
+        isCustom: false,
+        replacedName: "",
+      };
+    }
+
     const team = teams.find((t) => t.code === selectedCode) || teams[0];
     return {
       code: team?.code || "ARG",
@@ -308,28 +365,7 @@ export function WildcardCountrySection() {
       isCustom: false,
       replacedName: "",
     };
-  }, [selectedCode, customCountries, teams, selectedFailedCountry]);
-
-  // Suggested replacements based on baseline's confederation/region
-  const suggestedReplacements = useMemo(() => {
-    const baselineTeam = teams.find((t) => t.code === baselineCode);
-    if (!baselineTeam) return [];
-
-    const regionalWcTeams = teams.filter(
-      (t) => worldCupCodes.includes(t.code) && t.confederation === baselineTeam.confederation
-    );
-
-    return regionalWcTeams.length > 0
-      ? regionalWcTeams
-      : teams.filter((t) => worldCupCodes.includes(t.code));
-  }, [baselineCode, teams, worldCupCodes]);
-
-  // Auto-select replacement suggestion when suggestions list changes
-  useEffect(() => {
-    if (suggestedReplacements.length > 0) {
-      setReplacedCode(suggestedReplacements[0].code);
-    }
-  }, [suggestedReplacements]);
+  }, [selectedCode, customCountries, teams, selectedFailedCountry, featuredTeams, visibleFailedToQualifyCountries]);
 
   const resetBuilder = () => {
     setIsBuilding(false);
@@ -337,11 +373,21 @@ export function WildcardCountrySection() {
     setCustomName("");
     setCustomFlag("🇳🇬");
     setBaselineCode("ENG");
+    setReplacedCode("SEN");
     setFlagSearch("");
     setIsFlagDropdownOpen(false);
     setCustomElo(1650);
     setCustomAttack(78);
     setCustomDefense(78);
+  };
+
+  const applyBaselineTeam = (teamCode: string) => {
+    const baselineTeam = teams.find((team) => team.code === teamCode);
+    setBaselineCode(teamCode);
+    if (!baselineTeam) return;
+    setCustomElo(Math.round(baselineTeam.elo || 1650));
+    setCustomAttack(formatTeamScaleRating(baselineTeam.attack));
+    setCustomDefense(formatTeamScaleRating(baselineTeam.defense));
   };
 
   const prefillBuilderFromFailedCountry = (country: FailedCountryOption) => {
@@ -354,7 +400,13 @@ export function WildcardCountrySection() {
   };
 
   const handleStartCreate = () => {
-    resetBuilder();
+    setEditingCode(null);
+    setCustomName(selectedTeam?.name || "");
+    setCustomFlag(selectedTeam?.flag || "🇳🇬");
+    setReplacedCode("SEN");
+    setFlagSearch("");
+    setIsFlagDropdownOpen(false);
+    applyBaselineTeam("ENG");
     setIsBuilding(true);
   };
 
@@ -384,16 +436,34 @@ export function WildcardCountrySection() {
     setIsFlagDropdownOpen(false);
   };
 
-  const handleSaveCustomCountryPreview = async () => {
-    if (!customName.trim()) {
+  const persistCustomCountry = async ({
+    code,
+    name,
+    flag,
+    baselineTeamCode,
+    elo,
+    attack,
+    defense,
+    replacementTeamCode,
+  }: {
+    code?: string;
+    name: string;
+    flag: string;
+    baselineTeamCode: string;
+    elo: number;
+    attack: number;
+    defense: number;
+    replacementTeamCode: string;
+  }) => {
+    if (!name.trim()) {
       alert("Please enter a country name.");
       return null;
     }
 
-    const generatedCode = editingCode || "CC_" + customName.trim().substring(0, 3).toUpperCase();
+    const generatedCode = code || "CC_" + name.trim().substring(0, 3).toUpperCase();
 
     const isWcConflict = teams.some(
-      (t) => worldCupCodes.includes(t.code) && t.name.toLowerCase() === customName.trim().toLowerCase()
+      (t) => worldCupCodes.includes(t.code) && t.name.toLowerCase() === name.trim().toLowerCase()
     );
     if (isWcConflict) {
       alert("This country is already in the World Cup! Please enter a wildcard country name.");
@@ -402,13 +472,13 @@ export function WildcardCountrySection() {
 
     const newCC: CustomCountry = {
       code: generatedCode,
-      name: customName.trim(),
-      flag: customFlag,
-      baselineCode,
-      elo: customElo,
-      attack: customAttack,
-      defense: customDefense,
-      replacedCode,
+      name: name.trim(),
+      flag,
+      baselineCode: baselineTeamCode,
+      elo,
+      attack,
+      defense,
+      replacedCode: replacementTeamCode,
     };
 
     const updated = [newCC, ...customCountries.filter((c) => c.code !== generatedCode)];
@@ -432,8 +502,25 @@ export function WildcardCountrySection() {
     }
 
     setSelectedCode(generatedCode);
-    resetBuilder();
     return generatedCode;
+  };
+
+  const handleSaveCustomCountryPreview = async () => {
+    const savedCode = await persistCustomCountry({
+      code: editingCode || undefined,
+      name: customName,
+      flag: customFlag,
+      baselineTeamCode: baselineCode,
+      elo: customElo,
+      attack: customAttack,
+      defense: customDefense,
+      replacementTeamCode: replacedCode,
+    });
+
+    if (!savedCode) return null;
+
+    resetBuilder();
+    return savedCode;
   };
 
   const handleConfirmRun = async () => {
@@ -445,9 +532,23 @@ export function WildcardCountrySection() {
       teamCode = savedCode;
     }
 
+    if (!isBuilding && selectedFailedCountry && !customCountries.some((country) => country.code === teamCode)) {
+      const savedCode = await persistCustomCountry({
+        name: selectedFailedCountry.name,
+        flag: selectedFailedCountry.flag,
+        baselineTeamCode: baselineCode,
+        elo: customElo,
+        attack: customAttack,
+        defense: customDefense,
+        replacementTeamCode: replacedCode,
+      });
+      if (!savedCode) return;
+      teamCode = savedCode;
+    }
+
     if (!teamCode) return;
     setConfirmRunOpen(false);
-    router.push(`/predictions/country?team=${teamCode}&autorun=true`);
+    router.push(`/predictions/country?team=${teamCode}&autorun=true&wildcard=true&model=base`);
   };
 
   const previewTeam = isBuilding
@@ -468,12 +569,18 @@ export function WildcardCountrySection() {
         elo: customElo,
         attack: customAttack,
         defense: customDefense,
+        power: teams.find((team) => team.code === baselineCode)?.power || selectedTeamDetails.power,
+        squadValueM: teams.find((team) => team.code === baselineCode)?.squadValueM || selectedTeamDetails.squadValueM,
         confederation:
           teams.find((team) => team.code === replacedCode)?.confederation || selectedTeamDetails.confederation,
         isCustom: true,
         replacedName: teams.find((team) => team.code === replacedCode)?.name || selectedTeamDetails.replacedName,
       }
     : selectedTeamDetails;
+
+  const previewEloBarWidth = Math.max(0, Math.min(100, ((previewDetails.elo - 1200) / 1000) * 100));
+  const hasSavedSelectedCountry = customCountries.some((country) => country.code === selectedCode);
+  const canRunPathToGlory = hasSavedSelectedCountry && !isBuilding;
 
   return (
     <div className="py-2">
@@ -596,7 +703,7 @@ export function WildcardCountrySection() {
                   Browse Failed-To-Qualify Nations
                 </label>
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
-                  {failedToQualifyCountries.length} available
+                  {visibleFailedToQualifyCountries.length} available
                 </span>
               </div>
               <select
@@ -614,7 +721,7 @@ export function WildcardCountrySection() {
                   </optgroup>
                 )}
                 <optgroup label="Failed To Qualify" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
-                  {failedToQualifyCountries.map((country) => (
+                  {visibleFailedToQualifyCountries.map((country) => (
                     <option key={country.selectionCode} value={country.selectionCode}>
                       {country.name}
                     </option>
@@ -625,17 +732,11 @@ export function WildcardCountrySection() {
 
             {/* Selected Team Analysis Preview */}
             <div className="space-y-4 pt-4 border-t border-slate-200/50 dark:border-white/5">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
                 <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold">FIFA Rank / Region</span>
                   <span className="text-sm font-extrabold text-slate-900 dark:text-white mt-1 block">
                     {previewDetails.isCustom ? previewDetails.rank : `${previewDetails.rank} (${previewDetails.confederation})`}
-                  </span>
-                </div>
-                <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold">Elo Rating</span>
-                  <span className="text-sm font-extrabold text-slate-900 dark:text-white mt-1 block font-mono">
-                    {previewDetails.elo}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
@@ -652,8 +753,17 @@ export function WildcardCountrySection() {
                 </div>
               </div>
 
-              {/* Progress bars for Att & Def */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4">
+              {/* Progress bars for Elo, Att & Def */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4">
+                <div>
+                  <div className="flex justify-between text-[11px] text-muted-foreground font-bold mb-1.5 uppercase tracking-wide">
+                    <span>Elo Rating</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">{previewDetails.elo}</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-neon rounded-full" style={{ width: `${previewEloBarWidth}%` }} />
+                  </div>
+                </div>
                 <div>
                   <div className="flex justify-between text-[11px] text-muted-foreground font-bold mb-1.5 uppercase tracking-wide">
                     <span>Attack Power</span>
@@ -676,9 +786,20 @@ export function WildcardCountrySection() {
 
               {/* Custom Flag Indicator Banner */}
               {previewDetails.isCustom && (
-                <div className="flex items-center gap-2.5 text-xs text-neon bg-neon/8 px-4 py-3 rounded-2xl border border-neon/20 font-bold transition-all">
-                  <Sparkles className="w-4 h-4 text-neon shrink-0 animate-pulse" />
-                  <span>Custom wildcard team replacing {previewDetails.replacedName} (baseline cloned from {teams.find(t => t.code === (isBuilding ? baselineCode : customCountries.find(cc => cc.code === selectedCode)?.baselineCode))?.name})</span>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-neon/25 bg-neon/8 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-neon">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Hypothetical Wildcard
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                      Base Model Only
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-xs text-neon bg-neon/8 px-4 py-3 rounded-2xl border border-neon/20 font-bold transition-all">
+                    <Sparkles className="w-4 h-4 text-neon shrink-0 animate-pulse" />
+                    <span>Custom wildcard team replacing {previewDetails.replacedName} (baseline cloned from {teams.find(t => t.code === (isBuilding ? baselineCode : customCountries.find(cc => cc.code === selectedCode)?.baselineCode))?.name}). This run will open in Country Predict using the Base model.</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -688,12 +809,18 @@ export function WildcardCountrySection() {
           <div className="relative z-10 pt-8 border-t border-slate-200/50 dark:border-white/5 mt-6">
             <button
               onClick={() => setConfirmRunOpen(true)}
-              className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-6 text-sm font-black text-background transition hover:opacity-95 active:scale-[0.98] shadow-lg shadow-neon/20 hover:shadow-neon/30 cursor-pointer"
+              disabled={!canRunPathToGlory}
+              className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-6 text-sm font-black text-background transition hover:opacity-95 active:scale-[0.98] shadow-lg shadow-neon/20 hover:shadow-neon/30 cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
             >
               <Sparkles className="h-4.5 w-4.5 fill-current" />
               <span>Run Path To Glory</span>
               <ArrowRight className="h-4.5 w-4.5" />
             </button>
+            {!canRunPathToGlory && (
+              <p className="mt-2 text-center text-[11px] font-semibold text-muted-foreground">
+                Save the country profile first to enable this run.
+              </p>
+            )}
           </div>
         </div>
 
@@ -809,8 +936,8 @@ export function WildcardCountrySection() {
                                 key={c.code}
                                 type="button"
                                 onClick={() => {
-                                  setCustomFlag(c.emoji);
-                                  if (!customName.trim() || countriesList.some(ac => ac.name.toLowerCase() === customName.trim().toLowerCase())) {
+                                  setCustomFlag(c.flag);
+                                  if (!customName.trim() || visibleFailedToQualifyCountries.some(ac => ac.name.toLowerCase() === customName.trim().toLowerCase())) {
                                     setCustomName(c.name);
                                   }
                                   setFlagSearch("");
@@ -818,7 +945,7 @@ export function WildcardCountrySection() {
                                 }}
                                 className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer text-slate-900 dark:text-white"
                               >
-                                <CountryFlag flag={c.emoji} className="h-4.5 w-6 rounded object-cover shrink-0" />
+                                <CountryFlag code={c.code} flag={c.flag} name={c.name} className="h-4.5 w-6 rounded object-cover shrink-0" />
                                 <span className="font-semibold">{c.name}</span>
                                 <span className="text-[10px] text-muted-foreground ml-auto uppercase font-mono">{c.code}</span>
                               </button>
@@ -836,21 +963,21 @@ export function WildcardCountrySection() {
                   {/* Quick Select Row */}
                   <div className="flex flex-wrap gap-1.5 items-center pt-0.5">
                     <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mr-1">Quick Select:</span>
-                    {countriesList.filter(c => ["NG", "NO", "IT", "CL", "IN", "ZA", "EG", "SE"].includes(c.code)).map((c) => (
+                    {flagQuickSelectCountries.map((country) => (
                       <button
-                        key={c.code}
+                        key={country.selectionCode}
                         type="button"
                         onClick={() => {
-                          setCustomFlag(c.emoji);
-                          if (!customName.trim() || countriesList.some(ac => ac.name.toLowerCase() === customName.trim().toLowerCase())) {
-                            setCustomName(c.name);
+                          setCustomFlag(country.flag);
+                          if (!customName.trim() || visibleFailedToQualifyCountries.some(ac => ac.name.toLowerCase() === customName.trim().toLowerCase())) {
+                            setCustomName(country.name);
                           }
                         }}
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center border hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer ${customFlag === c.emoji ? "border-neon bg-neon/10" : "border-slate-200 dark:border-white/10"
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center border hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer ${customFlag === country.flag ? "border-neon bg-neon/10" : "border-slate-200 dark:border-white/10"
                           }`}
-                        title={c.name}
+                        title={country.name}
                       >
-                        <CountryFlag flag={c.emoji} className="h-4.5 w-6 rounded object-cover" emojiClassName="text-lg" />
+                        <CountryFlag flag={country.flag} className="h-4.5 w-6 rounded object-cover" emojiClassName="text-lg" />
                       </button>
                     ))}
                   </div>
@@ -863,10 +990,10 @@ export function WildcardCountrySection() {
                   </label>
                   <select
                     value={baselineCode}
-                    onChange={(e) => setBaselineCode(e.target.value)}
+                    onChange={(e) => applyBaselineTeam(e.target.value)}
                     className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
                   >
-                    {sortedTeams.map((team) => (
+                    {worldCupTeams.map((team) => (
                       <option key={team.code} value={team.code}>
                         Clone: {team.name} ({team.code})
                       </option>
@@ -940,23 +1067,11 @@ export function WildcardCountrySection() {
                     onChange={(e) => setReplacedCode(e.target.value)}
                     className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
                   >
-                    <optgroup label="Suggested (Same Confederation)" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
-                      {suggestedReplacements.map((team) => (
-                        <option key={team.code} value={team.code}>
-                          Replace: {team.name} ({team.code})
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="All World Cup Teams" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
-                      {teams
-                        .filter((t) => worldCupCodes.includes(t.code))
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((team) => (
-                          <option key={team.code} value={team.code}>
-                            Replace: {team.name} ({team.code})
-                          </option>
-                        ))}
-                    </optgroup>
+                    {worldCupTeams.map((team) => (
+                      <option key={team.code} value={team.code}>
+                        Replace: {team.name} ({team.code})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -988,7 +1103,7 @@ export function WildcardCountrySection() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 font-display text-xl font-bold">
               <Sparkles className="h-5 w-5 text-neon" />
-              <span>Run Path To Glory?</span>
+              <span>Run Hypothetical Path To Glory?</span>
             </AlertDialogTitle>
             <AlertDialogDescription className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
               {isBuilding

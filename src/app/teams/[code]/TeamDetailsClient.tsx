@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useSimulationStore, PlayerStats, TeamStats } from "@/lib/store/simulationStore";
-import { ArrowLeft, User, Image as ImageIcon, Save } from "lucide-react";
+import { ArrowLeft, User, Image as ImageIcon, Save, Check, X, Info, Lock, Brain, Cpu, Sparkles, ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,14 +13,15 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { UpgradeModal } from "@/components/site/UpgradeModal";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
-export default function TeamDetailsClient({ 
-  teamCode, 
+export default function TeamDetailsClient({
+  teamCode,
   flagMap,
   initialTeams,
   initialPlayers
-}: { 
-  teamCode: string, 
+}: {
+  teamCode: string,
   flagMap: Record<string, string>,
   initialTeams: TeamStats[],
   initialPlayers: PlayerStats[]
@@ -28,7 +29,8 @@ export default function TeamDetailsClient({
   const { isInitialized, teams, players, updateTeam, updatePlayer, initializeData } = useSimulationStore();
   const appTeams = useTeams();
   const [mounted, setMounted] = useState(false);
-  
+  const [capabilitiesExpanded, setCapabilitiesExpanded] = useState(false);
+
   // State for the Player Edit Modal
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [showAllStats, setShowAllStats] = useState(false);
@@ -79,7 +81,7 @@ export default function TeamDetailsClient({
   }, [appTeam]);
 
   const team = teams[teamCode];
-  
+
   const teamPlayers = useMemo(() => {
     return Object.values(players)
       .filter(p => p["Team Code"] === teamCode)
@@ -242,11 +244,10 @@ export default function TeamDetailsClient({
             <button
               onClick={handleSaveTeam}
               disabled={isSavingTeam || !canEditTeam}
-              className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 ${
-                hasChanges && canEditTeam
-                  ? "bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:shadow-[0_0_25px_rgba(239,68,68,0.6)]" 
+              className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 ${hasChanges && canEditTeam
+                  ? "bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:shadow-[0_0_25px_rgba(239,68,68,0.6)]"
                   : "bg-gradient-to-r from-neon via-cyan-500 to-blue-600 text-white shadow-[0_0_15px_rgba(0,255,255,0.4)] hover:shadow-[0_0_25px_rgba(0,255,255,0.6)]"
-              }`}
+                }`}
             >
               {isSavingTeam ? (
                 <>
@@ -326,18 +327,375 @@ export default function TeamDetailsClient({
           </div>
         </div>
 
-        {(!session?.user?.id || !canEditTeam) && (
-          <div className="mt-6 p-3 rounded-lg bg-[#a855f7]/10 border border-[#a855f7]/20 text-[#c084fc] text-xs flex items-center justify-between">
+        {!session?.user?.id && (
+          <div className="mt-6 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center justify-between">
             <span className="flex items-center">
-              {!session?.user?.id 
-                ? "⚠️ You are not signed in. Any rating overrides will not be saved to the database. Sign in to customize."
-                : "⚠️ Team rating customization is restricted on the Advanced plan. Upgrade to Pro/Expert for full editing."}
+              ⚠️ You are not signed in. Any rating overrides will not be saved to the database. Sign in to customize.
             </span>
-            {session?.user?.id && !canEditTeam && (
-              <Link href="/subscription" className="bg-[#a855f7]/20 hover:bg-[#a855f7]/30 border border-[#a855f7]/40 px-3 py-1 rounded-full text-[10px] font-bold text-white transition-all uppercase tracking-wide">
-                Upgrade to Pro
-              </Link>
+          </div>
+        )}
+      </div>
+
+      {/* Plan Capabilities Accordion */}
+      <div className="rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-[0_20px_50px_rgba(15,23,42,0.06)] backdrop-blur-md dark:border-white/5 dark:bg-slate-900/60 overflow-hidden mb-12 animate-in fade-in duration-500">
+        <button
+          onClick={() => setCapabilitiesExpanded(!capabilitiesExpanded)}
+          className="w-full flex items-center justify-between p-6 text-left transition-colors hover:bg-slate-500/[0.01]"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/15 text-cyan-650 dark:text-neon border border-cyan-500/20">
+              <Info className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-display text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                Plan Customization & Simulation Capabilities
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Compare what you can edit, view, and simulate across Free, Advanced, and Expert Predictor tiers
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase block tracking-wider">Current Plan</span>
+              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${subTier === "pro"
+                  ? "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-400 border border-fuchsia-500/20 shadow-[0_0_12px_rgba(217,70,239,0.15)]"
+                  : subTier === "plus"
+                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.15)]"
+                    : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+                }`}>
+                {subTier === "pro" ? "Expert Predictor" : subTier === "plus" ? "Advanced Predictor" : "Free Predictor"}
+              </span>
+            </div>
+            {capabilitiesExpanded ? (
+              <ChevronUp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
             )}
+          </div>
+        </button>
+
+        {capabilitiesExpanded && (
+          <div className="border-t border-slate-200/60 dark:border-white/5 p-6 bg-slate-500/[0.01] animate-in slide-in-from-top duration-300">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Free Predictor Column */}
+              <div className={`group relative overflow-hidden rounded-[2rem] border p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-lg ${subTier === "free"
+                  ? "border-emerald-500/40 bg-emerald-50/25 dark:border-emerald-500/30 dark:bg-emerald-500/[0.04] shadow-[0_0_30px_rgba(16,185,129,0.12)] hover:border-emerald-500/55"
+                  : "border-emerald-200/60 bg-emerald-50/[0.08] dark:border-emerald-500/10 dark:bg-emerald-500/[0.01] hover:border-emerald-500/30 hover:bg-emerald-50/15 dark:hover:bg-emerald-500/[0.02] hover:shadow-lg hover:shadow-emerald-500/[0.02]"
+                }`}>
+                {/* Background Watermark */}
+                <span className="absolute -right-4 -bottom-6 font-display text-9xl font-black text-emerald-500/[0.04] dark:text-emerald-500/[0.02] select-none pointer-events-none">
+                  01
+                </span>
+
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-450">
+                        Free
+                      </span>
+                      {subTier === "free" && (
+                        <span className="text-[9px] font-black uppercase bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
+                      )}
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <Cpu className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <h3 className="mt-3 font-display text-xl font-bold text-slate-900 dark:text-white">
+                    Free Predictor
+                  </h3>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Basic team-level ratings edits and base match predictions.
+                  </p>
+
+                  <div className="mt-6 space-y-3">
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-450">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-250">Team Rating Edits</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Edit Elo ratings</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Edit Attack ratings (Att)</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Edit Defense ratings (Def)</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-455">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-250">Standard Visibility</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Access team rankings</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Access player rankings</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Detailed player profiles are blurred</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-455">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-250">Base Simulation Engine</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Base simulation model access</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-emerald-500/70 dark:text-emerald-400/80 shrink-0 mt-0.5" />
+                          <span>Capped at 5 free runs total</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Predictor Column */}
+              <div className={`group relative overflow-hidden rounded-[2rem] border p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-lg ${subTier === "plus"
+                  ? "border-blue-500/40 bg-blue-50/25 dark:border-blue-500/30 dark:bg-blue-500/[0.04] shadow-[0_0_30px_rgba(59,130,246,0.12)] hover:border-blue-500/55"
+                  : "border-blue-200/60 bg-blue-50/[0.08] dark:border-blue-500/10 dark:bg-blue-500/[0.01] hover:border-blue-500/30 hover:bg-blue-50/15 dark:hover:bg-blue-500/[0.02] hover:shadow-lg hover:shadow-blue-500/[0.02]"
+                }`}>
+                {/* Background Watermark */}
+                <span className="absolute -right-4 -bottom-6 font-display text-9xl font-black text-blue-500/[0.04] dark:text-blue-500/[0.02] select-none pointer-events-none">
+                  02
+                </span>
+
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        Advanced
+                      </span>
+                      <span className="text-[9px] font-bold uppercase bg-blue-150/40 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/10">
+                        Free features included
+                      </span>
+                      {subTier === "plus" && (
+                        <span className="text-[9px] font-black uppercase bg-blue-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
+                      )}
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      <Brain className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <h3 className="mt-3 font-display text-xl font-bold text-slate-900 dark:text-white">
+                    Advanced Predictor
+                  </h3>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Squad averages adjustments and Top Player override controls.
+                  </p>
+
+                  <div className="mt-6 space-y-3">
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Top Player Overrides</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Edit overall rating</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Edit form shifts</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Edit player stats</span>
+                        </li>
+                        {/* <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Edit profile image URL</span>
+                        </li> */}
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-650 dark:bg-blue-500/20 dark:text-blue-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Full Data Visibility</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Unblurred player profile stats</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Detailed player rating summaries</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Unrestricted team/player lists</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-655 dark:bg-blue-500/20 dark:text-blue-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Advanced Engine</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Squad analytics integration</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-blue-500/70 dark:text-blue-400/80 shrink-0 mt-0.5" />
+                          <span>Unlimited bracket simulations</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expert Predictor Column */}
+              <div className={`group relative overflow-hidden rounded-[2rem] border p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-lg ${subTier === "pro"
+                  ? "border-fuchsia-500/40 bg-fuchsia-50/25 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/[0.04] shadow-[0_0_30px_rgba(217,70,239,0.12)] hover:border-fuchsia-500/55"
+                  : "border-fuchsia-200/60 bg-fuchsia-50/[0.08] dark:border-fuchsia-500/10 dark:bg-fuchsia-500/[0.01] hover:border-fuchsia-500/30 hover:bg-fuchsia-50/15 dark:hover:bg-fuchsia-500/[0.02] hover:shadow-lg hover:shadow-fuchsia-500/[0.02]"
+                }`}>
+                {/* Background Watermark */}
+                <span className="absolute -right-4 -bottom-6 font-display text-9xl font-black text-fuchsia-500/[0.04] dark:text-fuchsia-500/[0.02] select-none pointer-events-none">
+                  03
+                </span>
+
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-fuchsia-600 dark:text-fuchsia-400">
+                        Expert
+                      </span>
+                      <span className="text-[9px] font-bold uppercase bg-fuchsia-150/40 text-fuchsia-700 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 px-2 py-0.5 rounded-full border border-fuchsia-500/10">
+                        Free + Advanced features
+                      </span>
+                      {subTier === "pro" && (
+                        <span className="text-[9px] font-black uppercase bg-fuchsia-500 text-white px-2 py-0.5 rounded-full shadow-sm animate-pulse">Active</span>
+                      )}
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-fuchsia-500/10 dark:bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400 border border-fuchsia-500/20">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <h3 className="mt-3 font-display text-xl font-bold text-slate-900 dark:text-white">
+                    Expert Predictor
+                  </h3>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Complete squad control, active line-up edits, and Pro model simulations.
+                  </p>
+
+                  <div className="mt-6 space-y-3">
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-fuchsia-500/10 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Full Roster Control</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Edit ratings for all roster players</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Edit form shifts for all players</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Edit profile images for all players</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-fuchsia-500/10 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Full Parameter Control</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Edit overall rating, base quality, form, and intl experience</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Customize attacking/defending impact, passing, and discipline risk</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Modify match importance, rating tier, and active roster selections (in/out)</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-col gap-2 p-3 rounded-xl bg-white/40 dark:bg-slate-950/40 border border-slate-200/40 dark:border-white/[0.02] shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-fuchsia-500/10 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-400">
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <strong className="text-xs font-bold text-slate-900 dark:text-slate-255">Pro Simulation Engine</strong>
+                      </div>
+                      <ul className="pl-5.5 space-y-1 text-slate-500 dark:text-slate-400 text-[11px] list-none leading-relaxed">
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Pro simulation model access</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Factor in tactical changes & fitness</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <ChevronRight className="h-3 w-3 text-fuchsia-500/70 dark:text-fuchsia-400/80 shrink-0 mt-0.5" />
+                          <span>Unlimited bracket simulations</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -396,7 +754,7 @@ export default function TeamDetailsClient({
         <User className="mr-3 text-neon" />
         Squad Roster
       </h2>
-      
+
       <div className="glass overflow-x-auto rounded-xl border border-slate-200/80 dark:border-white/10">
         <table className="w-full text-sm text-left whitespace-nowrap">
           <thead className="border-b border-slate-200/80 bg-slate-100/80 text-[10px] uppercase tracking-wider text-slate-600 dark:border-white/10 dark:bg-black/40 dark:text-muted-foreground">
@@ -414,7 +772,7 @@ export default function TeamDetailsClient({
           <tbody>
             {teamPlayers.map((player) => {
               const pId = `${player["Team Code"]}-${player["Player Name"]}`;
-              
+
               const getStatColor = (valueStr: string) => {
                 const val = parseInt(valueStr?.replace("%", "") || "0");
                 if (val >= 80) return "bg-green-700 text-green-50 border-green-600";
@@ -431,11 +789,11 @@ export default function TeamDetailsClient({
               };
 
               return (
-                <tr 
-                  key={pId} 
+                <tr
+                  key={pId}
                   className="border-b border-slate-200/70 transition-colors dark:border-white/5"
                 >
-                  <td 
+                  <td
                     onClick={() => setSelectedPlayerId(pId)}
                     className="px-4 py-2 flex items-center space-x-3 cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"
                   >
@@ -451,7 +809,7 @@ export default function TeamDetailsClient({
                       <div className="text-[10px] text-muted-foreground">{player.Club}</div>
                     </div>
                   </td>
-                  <td 
+                  <td
                     onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
                     className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
                   >
@@ -459,7 +817,7 @@ export default function TeamDetailsClient({
                       {player["Position Code"]}
                     </span>
                   </td>
-                  <td 
+                  <td
                     onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
                     className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
                   >
@@ -467,7 +825,7 @@ export default function TeamDetailsClient({
                       {player["Overall Rating"]}
                     </span>
                   </td>
-                  <td 
+                  <td
                     onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
                     className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
                   >
@@ -475,7 +833,7 @@ export default function TeamDetailsClient({
                       {player["Base Quality"]}
                     </span>
                   </td>
-                  <td 
+                  <td
                     onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
                     className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
                   >
@@ -483,7 +841,7 @@ export default function TeamDetailsClient({
                       {player["Recent Form"]}
                     </span>
                   </td>
-                  <td 
+                  <td
                     onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
                     className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
                   >
@@ -491,7 +849,7 @@ export default function TeamDetailsClient({
                       {player["International Experience"]}
                     </span>
                   </td>
-                  <td 
+                  <td
                     onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
                     className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
                   >
@@ -499,7 +857,7 @@ export default function TeamDetailsClient({
                       {player["Attacking Impact"]}
                     </span>
                   </td>
-                  <td 
+                  <td
                     onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeReason("plus"); setUpgradeOpen(true); } : () => setSelectedPlayerId(pId)}
                     className={`px-2 py-2 text-center ${subTier === "free" ? "cursor-pointer hover:bg-slate-200/50 dark:hover:bg-white/10" : "cursor-pointer hover:bg-slate-100/70 dark:hover:bg-white/5"}`}
                   >
@@ -546,11 +904,64 @@ export default function TeamDetailsClient({
                   </div>
                 </DialogTitle>
               </DialogHeader>
-              
+
+              {/* Contextual Tier Notice */}
+              <div className="mt-4">
+                {subTier === "free" && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Lock className="h-3.5 w-3.5 shrink-0" />
+                      <span><strong>Player customization locked:</strong> Upgrade to Advanced Predictor or Expert Predictor to edit player ratings and stats.</span>
+                    </span>
+                    <button
+                      onClick={() => { setUpgradeReason("plus"); setUpgradeOpen(true); }}
+                      className="bg-rose-500 hover:bg-rose-600 px-3 py-1 rounded-full text-[10px] font-black text-white transition-all uppercase tracking-wide shrink-0"
+                    >
+                      Upgrade
+                    </button>
+                  </div>
+                )}
+                {subTier === "plus" && (
+                  isTopPlayer ? (
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                        <span><strong>Top Player unlocked:</strong> You have edit access to this player under the Advanced Predictor plan.</span>
+                      </span>
+                      <button
+                        onClick={() => { setUpgradeReason("pro"); setUpgradeOpen(true); }}
+                        className="bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-full text-[10px] font-black text-white transition-all uppercase tracking-wide shrink-0"
+                      >
+                        Upgrade to Edit More
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <Lock className="h-3.5 w-3.5 shrink-0" />
+                        <span><strong>Roster locked:</strong> Customizing other players requires Expert Predictor. Only the Top Player is unlocked on Advanced Predictor.</span>
+                      </span>
+                      <button
+                        onClick={() => { setUpgradeReason("pro"); setUpgradeOpen(true); }}
+                        className="bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-full text-[10px] font-black text-white transition-all uppercase tracking-wide shrink-0"
+                      >
+                        Upgrade to Expert
+                      </button>
+                    </div>
+                  )
+                )}
+                {subTier === "pro" && (
+                  <div className="p-3 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400 text-xs flex items-center gap-2">
+                    <Sparkles className="h-3.5 w-3.5 shrink-0 animate-pulse" />
+                    <span><strong>Full Access:</strong> You can edit ratings and stats for all players under the Expert Predictor plan.</span>
+                  </div>
+                )}
+              </div>
+
               <div className="mt-6 relative">
                 {subTier === "free" && (
-                  <div 
-                    className="absolute inset-0 z-10 cursor-pointer bg-transparent" 
+                  <div
+                    className="absolute inset-0 z-10 cursor-pointer bg-transparent"
                     onClick={(e) => {
                       e.stopPropagation();
                       setUpgradeReason("plus");
@@ -564,9 +975,9 @@ export default function TeamDetailsClient({
                       <ImageIcon className="w-4 h-4 mr-2" />
                       Player Image URL
                     </Label>
-                    <Input 
+                    <Input
                       placeholder="https://example.com/image.jpg"
-                      value={selectedPlayer.ImageUrl || ""} 
+                      value={selectedPlayer.ImageUrl || ""}
                       onChange={(e) => handlePlayerEdit("ImageUrl", e.target.value)}
                       disabled={!canEditPlayer}
                       className="bg-background/60 border-white/10 text-foreground font-mono text-sm focus-visible:ring-neon"
@@ -577,8 +988,8 @@ export default function TeamDetailsClient({
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Overall Rating</Label>
-                      <Input 
-                        value={selectedPlayer["Overall Rating"] || ""} 
+                      <Input
+                        value={selectedPlayer["Overall Rating"] || ""}
                         onChange={(e) => handlePlayerEdit("Overall Rating", e.target.value)}
                         disabled={!canEditPlayer}
                         className="bg-background/50 border-white/10 text-foreground font-bold focus-visible:ring-neon"
@@ -586,8 +997,8 @@ export default function TeamDetailsClient({
                     </div>
                     <div className="space-y-2">
                       <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Base Quality</Label>
-                      <Input 
-                        value={selectedPlayer["Base Quality"] || ""} 
+                      <Input
+                        value={selectedPlayer["Base Quality"] || ""}
                         onChange={(e) => handlePlayerEdit("Base Quality", e.target.value)}
                         disabled={!canEditPlayer}
                         className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
@@ -595,8 +1006,8 @@ export default function TeamDetailsClient({
                     </div>
                     <div className="space-y-2">
                       <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Recent Form</Label>
-                      <Input 
-                        value={selectedPlayer["Recent Form"] || ""} 
+                      <Input
+                        value={selectedPlayer["Recent Form"] || ""}
                         onChange={(e) => handlePlayerEdit("Recent Form", e.target.value)}
                         disabled={!canEditPlayer}
                         className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
@@ -604,8 +1015,8 @@ export default function TeamDetailsClient({
                     </div>
                     <div className="space-y-2">
                       <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Intl Experience</Label>
-                      <Input 
-                        value={selectedPlayer["International Experience"] || ""} 
+                      <Input
+                        value={selectedPlayer["International Experience"] || ""}
                         onChange={(e) => handlePlayerEdit("International Experience", e.target.value)}
                         disabled={!canEditPlayer}
                         className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
@@ -613,8 +1024,8 @@ export default function TeamDetailsClient({
                     </div>
                     <div className="space-y-2">
                       <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Attacking Impact</Label>
-                      <Input 
-                        value={selectedPlayer["Attacking Impact"] || ""} 
+                      <Input
+                        value={selectedPlayer["Attacking Impact"] || ""}
                         onChange={(e) => handlePlayerEdit("Attacking Impact", e.target.value)}
                         disabled={!canEditPlayer}
                         className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
@@ -622,8 +1033,8 @@ export default function TeamDetailsClient({
                     </div>
                     <div className="space-y-2">
                       <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Defensive Impact</Label>
-                      <Input 
-                        value={selectedPlayer["Defensive Impact"] || ""} 
+                      <Input
+                        value={selectedPlayer["Defensive Impact"] || ""}
                         onChange={(e) => handlePlayerEdit("Defensive Impact", e.target.value)}
                         disabled={!canEditPlayer}
                         className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
@@ -634,8 +1045,8 @@ export default function TeamDetailsClient({
                       <>
                         <div className="space-y-2">
                           <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Passing / Creativity</Label>
-                          <Input 
-                            value={selectedPlayer["Passing / Creativity"] || ""} 
+                          <Input
+                            value={selectedPlayer["Passing / Creativity"] || ""}
                             onChange={(e) => handlePlayerEdit("Passing / Creativity", e.target.value)}
                             disabled={!canEditPlayer}
                             className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
@@ -643,8 +1054,8 @@ export default function TeamDetailsClient({
                         </div>
                         <div className="space-y-2">
                           <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Fitness / Availability</Label>
-                          <Input 
-                            value={selectedPlayer["Fitness / Availability"] || ""} 
+                          <Input
+                            value={selectedPlayer["Fitness / Availability"] || ""}
                             onChange={(e) => handlePlayerEdit("Fitness / Availability", e.target.value)}
                             disabled={!canEditPlayer}
                             className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
@@ -652,8 +1063,8 @@ export default function TeamDetailsClient({
                         </div>
                         <div className="space-y-2">
                           <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Discipline Risk</Label>
-                          <Input 
-                            value={selectedPlayer["Discipline Risk"] || ""} 
+                          <Input
+                            value={selectedPlayer["Discipline Risk"] || ""}
                             onChange={(e) => handlePlayerEdit("Discipline Risk", e.target.value)}
                             disabled={!canEditPlayer}
                             className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
@@ -661,8 +1072,8 @@ export default function TeamDetailsClient({
                         </div>
                         <div className="space-y-2">
                           <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Match Importance</Label>
-                          <Input 
-                            value={selectedPlayer["Match Importance"] || ""} 
+                          <Input
+                            value={selectedPlayer["Match Importance"] || ""}
                             onChange={(e) => handlePlayerEdit("Match Importance", e.target.value)}
                             disabled={!canEditPlayer}
                             className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
@@ -670,12 +1081,20 @@ export default function TeamDetailsClient({
                         </div>
                         <div className="space-y-2">
                           <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Rating Tier</Label>
-                          <Input 
-                            value={selectedPlayer["Rating Tier"] || ""} 
+                          <select
+                            value={selectedPlayer["Rating Tier"] || ""}
                             onChange={(e) => handlePlayerEdit("Rating Tier", e.target.value)}
                             disabled={!canEditPlayer}
-                            className="bg-background/50 border-white/10 text-foreground focus-visible:ring-neon"
-                          />
+                            className="flex h-10 w-full rounded-md border border-white/10 bg-background/50 px-3 py-2 text-sm text-foreground outline-none transition focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-neon dark:focus:ring-neon"
+                          >
+                            <option value="">Select tier</option>
+                            <option value="Elite">Elite</option>
+                            <option value="Very Strong">Very Strong</option>
+                            <option value="Strong">Strong</option>
+                            <option value="Good/Average">Good/Average</option>
+                            <option value="Developing">Developing</option>
+                            <option value="Unknown">Unknown</option>
+                          </select>
                         </div>
                       </>
                     )}

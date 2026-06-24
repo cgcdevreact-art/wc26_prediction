@@ -1,11 +1,11 @@
 "use client";
 
 import React from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { X, Shield, Sparkles, Trophy, Lock } from "lucide-react";
+import { Shield, Sparkles, Trophy, Lock } from "lucide-react";
 import { buildAuthModalHref } from "@/lib/auth-modal";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -17,9 +17,6 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
-  if (!isOpen) return null;
-  if (typeof document === "undefined") return null;
 
   const getModalDetails = () => {
     switch (reason) {
@@ -40,14 +37,14 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
       case "plus":
         return {
           title: "Unlock Advanced Model",
-          description: "The Advanced Model incorporates squad quality metrics, recent form, and Elo weights for highly accurate results. Upgrade to Advanced or Expert Predictor to unlock!",
+          description: "The Advanced Model scales the base predictions by incorporating squad quality metrics and average player overall ratings. Upgrade to Advanced or Expert Predictor to unlock!",
           highlightText: "Get Advanced Model",
           icon: <Sparkles className="h-6 w-6 text-blue-400" />,
         };
       case "pro":
         return {
           title: "Unlock Pro Model",
-          description: "The Pro Model simulates matches using team characteristics, pitch variables (weather, crowd support), discipline, and tactical aspects. Upgrade to Expert Predictor to unlock!",
+          description: "The Pro Model integrates detailed individual player stats, form, fitness, and discipline risk for the deepest, most realistic match simulations. Upgrade to Expert Predictor to unlock!",
           highlightText: "Get Pro Model",
           icon: <Lock className="h-6 w-6 text-purple-400" />,
         };
@@ -65,29 +62,12 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
     }));
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 overflow-y-auto flex justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-300"
-        onClick={onClose}
-      />
-
-      {/* Content Card */}
-      <div className="relative my-auto w-full max-w-lg overflow-hidden rounded-3xl border border-border dark:border-white/10 bg-card/95 dark:bg-[#0f172a]/95 p-6 shadow-2xl md:p-8 animate-fade-in text-foreground">
-
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-lg overflow-hidden rounded-[2rem] border border-border dark:border-white/10 bg-card/95 dark:bg-[#0f172a]/95 p-6 shadow-2xl md:p-8 text-foreground">
         {/* Glow Effects */}
         <div className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-neon/15 blur-2xl" />
         <div className="pointer-events-none absolute -right-16 -bottom-16 h-48 w-48 rounded-full bg-neon-2/15 blur-2xl" />
-
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground hover:bg-muted dark:hover:bg-white/5 hover:text-foreground transition"
-          aria-label="Close"
-        >
-          <X className="h-5 w-5" />
-        </button>
 
         <div className="flex flex-col items-center text-center">
           {/* Header Icon */}
@@ -113,13 +93,11 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
               <div className="text-[10px] text-neon/80 font-bold mt-1.5">5 Simulations</div>
             </div>
             <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 relative overflow-hidden">
-              {/* <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-blue-400 animate-pulse" /> */}
               <div className="font-semibold text-blue-600 dark:text-blue-400 mb-1">Advanced</div>
               <div className="text-muted-foreground">Advanced Model</div>
               <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold mt-1.5">Unlimited</div>
             </div>
             <div className="rounded-xl bg-purple-500/10 border border-purple-500/20 p-3 relative overflow-hidden">
-              {/* <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-purple-400 animate-pulse" /> */}
               <div className="font-semibold text-purple-600 dark:text-purple-400 mb-1">Expert</div>
               <div className="text-muted-foreground">Pro Model</div>
               <div className="text-[10px] text-purple-600 dark:text-purple-400 font-bold mt-1.5">Unlimited</div>
@@ -153,8 +131,7 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
             </button>
           </div>
         </div>
-      </div>
-    </div>,
-    document.body
+      </DialogContent>
+    </Dialog>
   );
 }

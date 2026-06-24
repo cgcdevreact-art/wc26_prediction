@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ProbabilityExplorer } from "@/components/site/ProbabilityExplorer";
 import { WildcardCountrySection } from "@/components/site/WildcardCountrySection";
@@ -8,6 +8,8 @@ import { FixturesExplorer } from "@/components/site/FixturesExplorer";
 import { ChevronDown } from "lucide-react";
 
 const DEFAULT_OPEN_SECTIONS = [ "fixtures"];
+export const HOME_SECTION_OPEN_EVENT = "wc26:open-home-section";
+const PROBABILITY_SECTION_VALUE = "probability";
 
 const SECTIONS = [
   {
@@ -22,7 +24,7 @@ const SECTIONS = [
     value: "wildcard",
     eyebrow: "Dream Route",
     title: "Your team didn't make the World Cup?",
-    sub: "Drop them in anyway. Build your custom country profile, swap them into the tournament brackets, and run their path to glory.",
+    sub: "Drop them in anyway. Build your custom country profile, swap them into the tournament brackets, and run their path hypothetical to glory.",
     contentClassName: "pt-6",
     content: <WildcardCountrySection />,
   },
@@ -39,6 +41,40 @@ const SECTIONS = [
 export function HomeSectionsAccordion() {
   const [openItems, setOpenItems] = useState<string[]>(DEFAULT_OPEN_SECTIONS);
 
+  useEffect(() => {
+    const openProbabilitySection = () => {
+      setOpenItems((current) => (
+        current.includes(PROBABILITY_SECTION_VALUE)
+          ? current
+          : [...current, PROBABILITY_SECTION_VALUE]
+      ));
+    };
+
+    const handleOpenRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{ section?: string }>).detail;
+      const targetSection = detail?.section;
+      if (targetSection) {
+        setOpenItems((current) =>
+          current.includes(targetSection) ? current : [...current, targetSection]
+        );
+      }
+    };
+
+    window.addEventListener(HOME_SECTION_OPEN_EVENT, handleOpenRequest);
+
+    if (window.location.hash === "#predict") {
+      openProbabilitySection();
+    } else if (window.location.hash === "#fixtures") {
+      setOpenItems((current) =>
+        current.includes("fixtures") ? current : [...current, "fixtures"]
+      );
+    }
+
+    return () => {
+      window.removeEventListener(HOME_SECTION_OPEN_EVENT, handleOpenRequest);
+    };
+  }, []);
+
   return (
     <Accordion
       type="multiple"
@@ -50,33 +86,46 @@ export function HomeSectionsAccordion() {
         const isOpen = openItems.includes(section.value);
 
         return (
-          <AccordionItem
-            key={section.value}
-            value={section.value}
-            className="overflow-visible border-none bg-transparent shadow-none"
-          >
-            <AccordionTrigger className="w-full flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-slate-200 dark:border-white/10 pb-6 hover:no-underline text-left cursor-pointer group [&>svg]:hidden">
-              <div className="max-w-3xl">
-                <div className="text-xs uppercase tracking-[0.25em] text-neon font-bold">{section.eyebrow}</div>
-                <h2 className="mt-2 font-display text-3xl font-extrabold sm:text-4xl text-foreground dark:text-white tracking-tight">
-                  {section.title}
-                </h2>
-                {section.sub && (
-                  <p className="mt-3 text-muted-foreground text-sm font-normal leading-relaxed">
-                    {section.sub}
-                  </p>
-                )}
+          <Fragment key={section.value}>
+            <AccordionItem
+              value={section.value}
+              id={section.value === PROBABILITY_SECTION_VALUE ? "predict" : section.value === "fixtures" ? "fixtures" : undefined}
+              className="overflow-visible border-none bg-transparent shadow-none"
+            >
+              <AccordionTrigger className="w-full flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-slate-200 dark:border-white/10 pb-6 hover:no-underline text-left cursor-pointer group [&>svg]:hidden">
+                <div className="max-w-3xl">
+                  <div className="text-xs uppercase tracking-[0.25em] text-neon font-bold">{section.eyebrow}</div>
+                  <h2 className="mt-2 font-display text-3xl font-extrabold sm:text-4xl text-foreground dark:text-white tracking-tight">
+                    {section.title}
+                  </h2>
+                  {section.sub && (
+                    <p className="mt-3 text-muted-foreground text-sm font-normal leading-relaxed">
+                      {section.sub}
+                    </p>
+                  )}
+                </div>
+                <div className="shrink-0 self-start sm:self-auto pt-2 sm:pt-0">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-white/70 text-foreground/80 shadow-sm transition group-hover:bg-black/5 dark:border-white/10 dark:bg-white/5 dark:group-hover:bg-white/10">
+                    <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${isOpen ? "rotate-180" : "rotate-0"}`} />
+                  </span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="[&>div]:pb-0">
+                <div className={section.contentClassName}>{section.content}</div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Banner element between Team Probability Explorer and Dream Route */}
+            {section.value === "probability" && (
+              <div className="my-20 overflow-hidden rounded-2xl border border-black/8 dark:border-white/10 shadow-lg hover:opacity-95 transition-opacity duration-300">
+                <img
+                  src="/banner.png"
+                  alt="FIFA World Cup 2026 Banner"
+                  className="w-full h-auto"
+                />
               </div>
-              <div className="shrink-0 self-start sm:self-auto pt-2 sm:pt-0">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-white/70 text-foreground/80 shadow-sm transition group-hover:bg-black/5 dark:border-white/10 dark:bg-white/5 dark:group-hover:bg-white/10">
-                  <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${isOpen ? "rotate-180" : "rotate-0"}`} />
-                </span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="[&>div]:pb-0">
-              <div className={section.contentClassName}>{section.content}</div>
-            </AccordionContent>
-          </AccordionItem>
+            )}
+          </Fragment>
         );
       })}
     </Accordion>
