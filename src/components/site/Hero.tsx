@@ -210,10 +210,10 @@ export function Hero() {
       <div className="mx-auto container px-4 pb-12 md:px-6 relative z-10 mt-2">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-            <Calendar className="h-3.5 w-3.5 text-red-500" />
-            <span>Today's <span className="text-red-500">Matches</span></span>
+            <Calendar className="h-3.5 w-3.5 text-neon" />
+            <span>Today's <span className="text-neon">Matches</span></span>
             {todayMatches.length > 0 && (
-              <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-[10px] font-bold text-red-500 tracking-normal normal-case">
+              <span className="rounded-full bg-neon/10 px-2.5 py-0.5 text-[10px] font-bold text-neon tracking-normal normal-case">
                 {todayMatches.length}
               </span>
             )}
@@ -244,7 +244,7 @@ export function Hero() {
 
         {loading ? (
           <div className="glass rounded-2xl p-6 flex flex-col items-center justify-center min-h-[120px] gap-2 border border-border dark:border-white/5">
-            <div className="h-6 w-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="h-6 w-6 border-2 border-neon border-t-transparent rounded-full animate-spin"></div>
             <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">Loading matches...</span>
           </div>
         ) : todayMatches.length > 0 ? (
@@ -254,14 +254,14 @@ export function Hero() {
                 <CarouselItem key={match.match_no} className="pl-3 basis-[85%] sm:basis-[48%] md:basis-[32%] lg:basis-[24%]">
                   <div
                     onClick={handleMatchCardClick}
-                    className="glass hover:bg-white/10 hover:border-red-500/40 hover:scale-[1.01] transition-all duration-300 rounded-2xl p-3.5 cursor-pointer relative overflow-hidden group select-none border border-white/5"
+                    className="glass hover:bg-white/10 hover:border-neon/40 hover:scale-[1.01] transition-all duration-300 rounded-2xl p-3.5 cursor-pointer relative overflow-hidden group select-none border border-white/5"
                   >
                     {/* Shimmer effect on hover */}
                     <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
 
                     <div className="flex items-center justify-between text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-2">
-                      <span className="text-red-500 font-extrabold">Match #{match.match_no}</span>
-                      <span className="text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full font-extrabold">
+                      <span className="text-neon font-extrabold">Match #{match.match_no}</span>
+                      <span className="text-neon bg-neon/10 px-2 py-0.5 rounded-full font-extrabold">
                         {match.group ? `Group ${match.group}` : match.stageName}
                       </span>
                     </div>
@@ -297,8 +297,8 @@ export function Hero() {
                           </>
                         ) : (
                           <>
-                            <span className="font-mono text-[10px] font-black text-red-500">{match.kickoffTime || "VS"}</span>
-                            <span className="text-[7px] text-muted-foreground uppercase font-extrabold mt-0.5">UPCOMING</span>
+                            <span className="font-mono text-[10px] font-black text-neon">{match.kickoffTime || "VS"}</span>
+                            <span className="text-[7px] text-neon/80 uppercase font-extrabold mt-0.5">UPCOMING</span>
                           </>
                         )}
                       </div>
@@ -321,7 +321,7 @@ export function Hero() {
                     </div>
 
                     <div className="text-[9px] text-center text-muted-foreground/80 mt-2.5 pt-1.5 border-t border-white/5 flex items-center justify-center gap-1 font-medium truncate">
-                      <MapPin className="h-2.5 w-2.5 text-red-500 shrink-0" />
+                      <MapPin className="h-2.5 w-2.5 text-neon shrink-0" />
                       <span className="truncate">{match.stageName} · {match.city}</span>
                     </div>
                   </div>
@@ -332,10 +332,10 @@ export function Hero() {
         ) : (
           <div
             onClick={handleMatchCardClick}
-            className="glass hover:bg-white/10 hover:border-red-500/40 hover:scale-[1.01] transition-all duration-300 rounded-2xl p-6 cursor-pointer text-center relative overflow-hidden group select-none border border-white/5"
+            className="glass hover:bg-white/10 hover:border-neon/40 hover:scale-[1.01] transition-all duration-300 rounded-2xl p-6 cursor-pointer text-center relative overflow-hidden group select-none border border-white/5"
           >
             <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-            <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-500/15 text-red-500 mb-2 border border-red-500/20">
+            <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-neon/15 text-neon mb-2 border border-neon/20">
               <Calendar className="h-4.5 w-4.5" />
             </div>
             <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">No matches scheduled today</h4>
