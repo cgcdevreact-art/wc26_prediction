@@ -565,7 +565,9 @@ export function WildcardCountrySection() {
         code: editingCode || "CC_NEW",
         name: customName.trim() || selectedTeamDetails.name,
         flag: customFlag,
-        rank: "Custom",
+        rank: teams.find((team) => team.code === baselineCode)?.rank
+          ? `#${teams.find((team) => team.code === baselineCode)?.rank}`
+          : selectedTeamDetails.rank,
         elo: customElo,
         attack: customAttack,
         defense: customDefense,
@@ -578,9 +580,14 @@ export function WildcardCountrySection() {
       }
     : selectedTeamDetails;
 
+  const activeBaselineTeam = teams.find((team) => team.code === baselineCode);
+  const activeReplacedTeam = teams.find((team) => team.code === replacedCode);
   const previewEloBarWidth = Math.max(0, Math.min(100, ((previewDetails.elo - 1200) / 1000) * 100));
   const hasSavedSelectedCountry = customCountries.some((country) => country.code === selectedCode);
   const canRunPathToGlory = hasSavedSelectedCountry && !isBuilding;
+  const runButtonLabel = canRunPathToGlory && previewTeam?.name
+    ? `Run ${previewTeam.name}'s Hypothetical Path To Glory`
+    : "Run Path To Glory";
 
   return (
     <div className="py-2">
@@ -617,7 +624,7 @@ export function WildcardCountrySection() {
                       <button
                         type="button"
                         onClick={() => handleEditCustomCountry(selectedCode)}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600 transition hover:border-neon/40 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300 dark:hover:text-white"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gradient-to-r from-neon to-neon-2 px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-neon/20 transition hover:opacity-95 hover:shadow-neon/30"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                         <span>Edit</span>
@@ -633,7 +640,8 @@ export function WildcardCountrySection() {
               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block">
                 Quick Selection
               </label>
-              <div className="flex flex-wrap gap-2.5">
+              <div className="-mx-1 overflow-x-auto pb-2 sm:mx-0">
+                <div className="grid grid-flow-col auto-cols-[calc((100%-1.875rem)/4)] gap-2.5 px-1 sm:flex sm:flex-wrap sm:px-0">
                 {featuredTeams.map((team) => {
                   if (!team) return null;
                   const active = team.selectionCode === selectedCode;
@@ -641,7 +649,7 @@ export function WildcardCountrySection() {
                     <button
                       key={team.selectionCode}
                       onClick={() => handleSelectCode(team.selectionCode)}
-                      className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition cursor-pointer ${active
+                      className={`inline-flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition cursor-pointer sm:w-auto ${active
                         ? "border-neon/40 bg-neon/10 text-slate-950 dark:text-white font-bold shadow-[0_0_12px_rgba(6,182,212,0.15)]"
                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.02] dark:text-muted-foreground dark:hover:bg-white/5 dark:hover:text-white"
                         }`}
@@ -653,7 +661,7 @@ export function WildcardCountrySection() {
                         className="h-4.5 w-6.5 rounded object-cover"
                         emojiClassName="text-lg leading-none"
                       />
-                      <span>{team.name}</span>
+                      <span className="truncate">{team.name}</span>
                     </button>
                   );
                 })}
@@ -664,7 +672,7 @@ export function WildcardCountrySection() {
                     <div
                       key={cc.code}
                       onClick={() => handleSelectCode(cc.code)}
-                      className={`inline-flex items-center gap-2 rounded-xl border pl-3 pr-2 py-2 text-sm font-semibold transition cursor-pointer relative overflow-hidden group ${
+                      className={`inline-flex min-w-0 items-center gap-2 rounded-xl border pl-3 pr-2 py-2 text-sm font-semibold transition cursor-pointer relative overflow-hidden group sm:w-auto ${
                         active
                           ? "border-neon-2/45 bg-neon-2/15 text-slate-950 dark:text-white font-bold shadow-[0_0_15px_rgba(178,57,210,0.18)]"
                           : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.02] dark:text-muted-foreground dark:hover:bg-white/5 dark:hover:text-white"
@@ -677,7 +685,7 @@ export function WildcardCountrySection() {
                         className="h-4.5 w-6 rounded object-cover"
                         emojiClassName="text-lg leading-none"
                       />
-                      <span>{cc.name}</span>
+                      <span className="truncate">{cc.name}</span>
                       <span className="text-[8px] tracking-wider uppercase bg-neon-2/20 text-neon-2 font-bold px-1.5 py-0.5 rounded">Custom</span>
                       <button
                         type="button"
@@ -693,6 +701,7 @@ export function WildcardCountrySection() {
                     </div>
                   );
                 })}
+                </div>
               </div>
             </div>
 
@@ -736,7 +745,9 @@ export function WildcardCountrySection() {
                 <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold">FIFA Rank / Region</span>
                   <span className="text-sm font-extrabold text-slate-900 dark:text-white mt-1 block">
-                    {previewDetails.isCustom ? previewDetails.rank : `${previewDetails.rank} (${previewDetails.confederation})`}
+                    {previewDetails.isCustom && !isBuilding
+                      ? previewDetails.rank
+                      : `${previewDetails.rank} (${previewDetails.confederation})`}
                   </span>
                 </div>
                 <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
@@ -800,6 +811,14 @@ export function WildcardCountrySection() {
                     <Sparkles className="w-4 h-4 text-neon shrink-0 animate-pulse" />
                     <span>Custom wildcard team replacing {previewDetails.replacedName} (baseline cloned from {teams.find(t => t.code === (isBuilding ? baselineCode : customCountries.find(cc => cc.code === selectedCode)?.baselineCode))?.name}). This run will open in Country Predict using the Base model.</span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => handleEditCustomCountry(selectedCode)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-neon/20 transition hover:opacity-95 hover:shadow-neon/30"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    <span>Edit {previewTeam?.name || "Custom Country"}</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -813,12 +832,12 @@ export function WildcardCountrySection() {
               className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-6 text-sm font-black text-background transition hover:opacity-95 active:scale-[0.98] shadow-lg shadow-neon/20 hover:shadow-neon/30 cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
             >
               <Sparkles className="h-4.5 w-4.5 fill-current" />
-              <span>Run Path To Glory</span>
+              <span>{runButtonLabel}</span>
               <ArrowRight className="h-4.5 w-4.5" />
             </button>
             {!canRunPathToGlory && (
               <p className="mt-2 text-center text-[11px] font-semibold text-muted-foreground">
-                Save the country profile first to enable this run.
+                Customize country profile first to run their hypothetical path to glory.
               </p>
             )}
           </div>
@@ -841,10 +860,11 @@ export function WildcardCountrySection() {
                 </p>
 
                 <div className="space-y-2.5 pt-2">
-                  <MiniDetail number="01" text="Clone and customize initial ratings" />
-                  <MiniDetail number="02" text="Slot into region suggested group position" />
-                  <MiniDetail number="03" text="Test squad quality in simulation brackets" />
-                  <MiniDetail number="04" text="Run their path to glory" />
+                  <MiniDetail number="01" text="Clone a baseline World Cup squad" />
+                  <MiniDetail number="02" text="Customize ELO, attack, and defense" />
+                  <MiniDetail number="03" text="Slot into a region-suggested group position" />
+                  <MiniDetail number="04" text="Test squad quality in simulation brackets" />
+                  <MiniDetail number="05" text="Run their hypothetical path to glory" />
                 </div>
               </div>
 
@@ -859,7 +879,7 @@ export function WildcardCountrySection() {
           ) : (
             /* Active Creator Form (Single Screen Layout) */
             <div className="flex flex-col h-full justify-between space-y-5">
-              <div className="space-y-3.5 flex-1 min-h-0 overflow-y-auto pr-1 scrollbar-custom">
+              <div className="space-y-5 flex-1 min-h-0 overflow-y-auto pr-1 scrollbar-custom">
                 <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-white/5">
                   <h4 className="font-display text-lg font-bold text-slate-950 dark:text-white flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-neon" />
@@ -874,8 +894,8 @@ export function WildcardCountrySection() {
                 </div>
                      {/* Country Name */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block flex items-center">
-                    <span>Country Name</span>
+                  <label className="text-[10px] font-bold uppercase tracking-widest block flex items-center text-emerald-700 dark:text-emerald-300">
+                    <span>1.A Country Name</span>
                     <InfoTooltip content="The name of your custom wildcard country (e.g. Italy, Nigeria)." />
                   </label>
                   <input
@@ -890,8 +910,8 @@ export function WildcardCountrySection() {
                  {/* Flag & Country Picker */}
                 <div className="space-y-2 relative">
                   <div className="flex justify-between items-center">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block flex items-center">
-                      <span>Flag & Country Profile</span>
+                    <label className="text-[10px] font-bold uppercase tracking-widest block flex items-center text-emerald-700 dark:text-emerald-300">
+                      <span>1.B Flag & Country Profile</span>
                       <InfoTooltip content="Search and select any flag image, or click on a quick select shortcut." />
                     </label>
                   </div>
@@ -984,8 +1004,8 @@ export function WildcardCountrySection() {
                 </div>
                      {/* Clone Baseline */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block flex items-center">
-                    <span>Clone Baseline Squad</span>
+                  <label className="text-[10px] font-bold uppercase tracking-widest block flex items-center text-cyan-700 dark:text-cyan-300">
+                    <span>2. Clone Baseline Squad</span>
                     <InfoTooltip content="Clones the selected country's real player names, statistics, and value to use as the base for this team." />
                   </label>
                   <select
@@ -1001,15 +1021,22 @@ export function WildcardCountrySection() {
                   </select>
                 </div>
 
+                <div className="rounded-2xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+                  Cloning <span className="font-black text-slate-950 dark:text-white">{activeBaselineTeam?.name || "England"}</span>
+                  {" "}means this profile starts from FIFA rank{" "}
+                  <span className="font-black text-neon">{activeBaselineTeam?.rank ? `#${activeBaselineTeam.rank}` : "N/A"}</span>
+                  {" "}with {activeBaselineTeam?.confederation || "UEFA"} as its baseline region.
+                </div>
+
                      {/* Ratings Sliders (Elo, Att, Def) */}
                 <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-white/5">
                   <div>
-                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 items-center">
+                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-1.5 items-center text-cyan-700 dark:text-cyan-300">
                       <span className="flex items-center">
-                        <span>Elo Rating</span>
+                        <span>2.A Elo Rating</span>
                         <InfoTooltip content="Overall skill rating of the country. Higher ELO increases the probability of winning matches." />
                       </span>
-                      <span className="text-neon font-mono font-bold">{customElo}</span>
+                      <span className="font-mono font-bold text-cyan-700 dark:text-cyan-300">{customElo}</span>
                     </div>
                     <input
                       type="range"
@@ -1021,12 +1048,12 @@ export function WildcardCountrySection() {
                     />
                   </div>
                   <div>
-                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 items-center">
+                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-1.5 items-center text-cyan-700 dark:text-cyan-300">
                       <span className="flex items-center">
-                        <span>Attack Power</span>
+                        <span>2.B Attack Power</span>
                         <InfoTooltip content="Influences the average number of goals scored per match by this team." />
                       </span>
-                      <span className="text-neon font-mono font-bold">{customAttack}</span>
+                      <span className="font-mono font-bold text-cyan-700 dark:text-cyan-300">{customAttack}</span>
                     </div>
                     <input
                       type="range"
@@ -1038,12 +1065,12 @@ export function WildcardCountrySection() {
                     />
                   </div>
                   <div>
-                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 items-center">
+                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-1.5 items-center text-cyan-700 dark:text-cyan-300">
                       <span className="flex items-center">
-                        <span>Defense Strength</span>
+                        <span>2.C Defense Strength</span>
                         <InfoTooltip content="Influences the average number of goals conceded per match by this team." />
                       </span>
-                      <span className="text-neon font-mono font-bold">{customDefense}</span>
+                      <span className="font-mono font-bold text-cyan-700 dark:text-cyan-300">{customDefense}</span>
                     </div>
                     <input
                       type="range"
@@ -1058,8 +1085,8 @@ export function WildcardCountrySection() {
 
                 {/* Replacement Choice */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-neon-2 uppercase tracking-widest block flex items-center">
-                    <span>Replacement Team (Slots in)</span>
+                  <label className="text-[10px] font-bold uppercase tracking-widest block flex items-center text-fuchsia-700 dark:text-fuchsia-300">
+                    <span>3. Replacement Team (Slots In)</span>
                     <InfoTooltip content="The original tournament team that will be replaced by your custom country in the final brackets." />
                   </label>
                   <select
@@ -1073,6 +1100,10 @@ export function WildcardCountrySection() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className="rounded-2xl border border-fuchsia-200/70 bg-fuchsia-50 px-4 py-3 text-xs font-semibold text-fuchsia-700 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10 dark:text-fuchsia-300">
+                  This custom country will take <span className="font-black">{activeReplacedTeam?.name || "Senegal"}</span>'s tournament slot when you run the simulation.
                 </div>
               </div>
 
