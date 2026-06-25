@@ -26,7 +26,7 @@ export function Footer() {
           title="Predict"
           items={[
             { label: "Simulator", href: "/simulator" },
-            { label: "Compare", href: "/compare" },
+            { label: "Compare", href: "/teams/compare" },
             { label: "Bracket", href: "/bracket" },
             { label: "Home", href: "/" }
           ]}

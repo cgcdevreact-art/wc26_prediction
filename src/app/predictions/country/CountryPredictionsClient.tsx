@@ -62,6 +62,26 @@ function clampRating(value: number, min = 1, max = 99) {
 
 type SimulationModel = "base" | "advanced" | "pro";
 
+const COUNTRY_SIMULATION_SNAPSHOT_KEY = "wc26_country_last_simulation_v1";
+
+type CountrySimulationResults = {
+  stages: Record<string, number>;
+  opponents: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>>;
+  mockTournament?: any;
+};
+
+type SimulationSnapshot = {
+  selectedCode: string;
+  selectedModel: SimulationModel;
+  customElo: number;
+  customAttack: number;
+  customDefense: number;
+  customPlayerRatingDelta: number;
+  playersIn: string[];
+  playersOut: string[];
+  simResults: CountrySimulationResults;
+};
+
 function InfoTooltip({ content }: { content: string }) {
   return (
     <TooltipProvider delayDuration={150}>
@@ -266,6 +286,17 @@ export default function CountryPredictionsClient({
 
       if (data.simResults) {
         setSimResults(data.simResults);
+        persistSimulationSnapshot({
+          selectedCode: data.code,
+          selectedModel: (data.modelName ?? selectedModel ?? "base") as SimulationModel,
+          customElo: data.customElo ?? data.elo ?? 1500,
+          customAttack: data.customAttack ?? 75,
+          customDefense: data.customDefense ?? 75,
+          customPlayerRatingDelta: data.customPlayerRatingDelta ?? 0,
+          playersIn: data.playersIn ?? [],
+          playersOut: data.playersOut ?? [],
+          simResults: data.simResults,
+        });
       } else {
         const reconstructedStages = data.stages || {
           group: 1000,
@@ -276,10 +307,22 @@ export default function CountryPredictionsClient({
           final: 0,
           champion: (data.championProb ?? 0) * 10
         };
-        setSimResults({
+        const reconstructedResults = {
           stages: reconstructedStages,
           opponents: {},
           mockTournament: null
+        };
+        setSimResults(reconstructedResults);
+        persistSimulationSnapshot({
+          selectedCode: data.code,
+          selectedModel: (data.modelName ?? selectedModel ?? "base") as SimulationModel,
+          customElo: data.customElo ?? data.elo ?? 1500,
+          customAttack: data.customAttack ?? 75,
+          customDefense: data.customDefense ?? 75,
+          customPlayerRatingDelta: data.customPlayerRatingDelta ?? 0,
+          playersIn: data.playersIn ?? [],
+          playersOut: data.playersOut ?? [],
+          simResults: reconstructedResults,
         });
       }
 
@@ -433,6 +476,7 @@ export default function CountryPredictionsClient({
   const hasSeenSelectionChange = useRef(false);
   const hasAppliedSearchSelection = useRef(false);
   const hasInitializedCustomizer = useRef(false);
+  const hasRestoredSimulationSnapshot = useRef(false);
   const ignoreResetRef = useRef(false);
   const deletedCustomCodesRef = useRef<Set<string>>(new Set());
   const formattedModelName = selectedModel ? selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1) : "";
@@ -480,11 +524,7 @@ export default function CountryPredictionsClient({
   };
 
   // Simulation results state
-  const [simResults, setSimResults] = useState<{
-    stages: Record<string, number>;
-    opponents: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>>;
-    mockTournament?: any;
-  } | null>(null);
+  const [simResults, setSimResults] = useState<CountrySimulationResults | null>(null);
 
   const [customCountries, setCustomCountries] = useState<CustomCountry[]>([]);
 
@@ -561,6 +601,18 @@ export default function CountryPredictionsClient({
       const params = new URLSearchParams(window.location.search);
       params.set("team", "ARG");
       window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+    }
+
+    try {
+      const stored = localStorage.getItem(COUNTRY_SIMULATION_SNAPSHOT_KEY);
+      if (stored) {
+        const snapshot = JSON.parse(stored) as SimulationSnapshot;
+        if (snapshot.selectedCode === code) {
+          localStorage.removeItem(COUNTRY_SIMULATION_SNAPSHOT_KEY);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to clear cached country simulation snapshot", err);
     }
 
     if (session?.user?.id) {
@@ -672,6 +724,15 @@ export default function CountryPredictionsClient({
     };
   };
 
+  const persistSimulationSnapshot = (snapshot: SimulationSnapshot) => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(COUNTRY_SIMULATION_SNAPSHOT_KEY, JSON.stringify(snapshot));
+    } catch (err) {
+      console.error("Failed to cache country simulation snapshot", err);
+    }
+  };
+
   const [customElo, setCustomElo] = useState<number>(selectedTeam?.elo || 1500);
   const [customAttack, setCustomAttack] = useState<number>(formatTeamScaleRating(selectedTeam?.attack));
   const [customDefense, setCustomDefense] = useState<number>(formatTeamScaleRating(selectedTeam?.defense));
@@ -699,6 +760,84 @@ export default function CountryPredictionsClient({
     }
     setSimResults(null);
   }, [customElo, customAttack, customDefense, customPlayerRatingDelta, playersIn, playersOut]);
+
+  useEffect(() => {
+    if (!mounted || !isInitialized || isLoadingCustomCountries || hasRestoredSimulationSnapshot.current) {
+      return;
+    }
+
+    const loadId = searchParams.get("load");
+    if (loadId) {
+      hasRestoredSimulationSnapshot.current = true;
+      return;
+    }
+
+    if (typeof window === "undefined") return;
+
+    try {
+      const stored = localStorage.getItem(COUNTRY_SIMULATION_SNAPSHOT_KEY);
+      if (!stored) {
+        hasRestoredSimulationSnapshot.current = true;
+        return;
+      }
+
+      const snapshot = JSON.parse(stored) as SimulationSnapshot;
+      if (!snapshot?.selectedCode || !snapshot?.simResults) {
+        localStorage.removeItem(COUNTRY_SIMULATION_SNAPSHOT_KEY);
+        hasRestoredSimulationSnapshot.current = true;
+        return;
+      }
+
+      const requestedTeam = (searchParams.get("team") || searchParams.get("country") || snapshot.selectedCode)
+        .trim()
+        .toUpperCase();
+
+      if (requestedTeam !== snapshot.selectedCode) {
+        hasRestoredSimulationSnapshot.current = true;
+        return;
+      }
+
+      const snapshotExists = snapshot.selectedCode.startsWith("CC_")
+        ? customCountries.some((cc) => cc.code === snapshot.selectedCode)
+        : appTeams.some((team) => team.code === snapshot.selectedCode);
+
+      if (!snapshotExists) {
+        localStorage.removeItem(COUNTRY_SIMULATION_SNAPSHOT_KEY);
+        hasRestoredSimulationSnapshot.current = true;
+        return;
+      }
+
+      ignoreResetRef.current = true;
+      hasSeenSelectionChange.current = false;
+      setSelectedCode(snapshot.selectedCode);
+      setSelectedModel(snapshot.selectedModel);
+      setCustomElo(snapshot.customElo);
+      setCustomAttack(snapshot.customAttack);
+      setCustomDefense(snapshot.customDefense);
+      setCustomPlayerRatingDelta(snapshot.customPlayerRatingDelta);
+      setPlayersIn(snapshot.playersIn ?? []);
+      setPlayersOut(snapshot.playersOut ?? []);
+      setSimResults(snapshot.simResults);
+      setSaveSuccess(true);
+
+      setTimeout(() => {
+        ignoreResetRef.current = false;
+      }, 100);
+    } catch (err) {
+      console.error("Failed to restore cached country simulation snapshot", err);
+      localStorage.removeItem(COUNTRY_SIMULATION_SNAPSHOT_KEY);
+    } finally {
+      hasRestoredSimulationSnapshot.current = true;
+    }
+  }, [
+    mounted,
+    isInitialized,
+    isLoadingCustomCountries,
+    searchParams,
+    appTeams,
+    customCountries,
+    setSelectedModel,
+  ]);
 
   const togglePlayerSelection = (bucket: "in" | "out", playerId: string) => {
     const canUseFeature = promptFeatureAccess({
@@ -807,6 +946,8 @@ export default function CountryPredictionsClient({
     setIsSimulating(true);
     setSaveSuccess(false);
     setSimProgress(0);
+
+    try {
 
     const iterations = 1000;
     const CHUNK_SIZE = 50;
@@ -1189,13 +1330,35 @@ export default function CountryPredictionsClient({
       }); // end Promise
     } // end main loop
 
-    setSimResults({
+    if (!bestMockTournament) {
+      throw new Error("Simulation completed without producing a valid bracket.");
+    }
+
+    const nextResults = {
       stages: stageCounts,
       opponents: stageOpponents,
       mockTournament: bestMockTournament
+    };
+
+    setSimResults(nextResults);
+    persistSimulationSnapshot({
+      selectedCode,
+      selectedModel,
+      customElo,
+      customAttack,
+      customDefense,
+      customPlayerRatingDelta,
+      playersIn,
+      playersOut,
+      simResults: nextResults,
     });
-    setIsSimulating(false);
-    setShowConfirmPopup(false);
+    } catch (err) {
+      console.error("Country simulation failed:", err);
+      toast.error("Simulation failed before results could render. Please try again.");
+    } finally {
+      setIsSimulating(false);
+      setShowConfirmPopup(false);
+    }
   };
 
   const handleSavePrediction = async () => {
@@ -2315,9 +2478,50 @@ export default function CountryPredictionsClient({
       <Accordion type="multiple" defaultValue={["path-to-glory"]} className="w-full bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-[2rem] relative shadow-[0_18px_50px_rgba(15,23,42,0.08)] mt-8">
         <AccordionItem value="path-to-glory" className="border-none">
           <AccordionTrigger className="px-6 md:px-8 pt-6 md:pt-8 pb-3 hover:no-underline">
-            <div>
-              <div className="font-display font-extrabold text-xl text-foreground dark:text-white tracking-tight">Path to Glory</div>
-              <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">Most likely path to lifting the trophy for {selectedTeam.name}</div>
+            <div className="flex w-full flex-col gap-3 pr-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-left">
+                <div className="font-display font-extrabold text-xl text-foreground dark:text-white tracking-tight">Path to Glory</div>
+                <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">Most likely path to lifting the trophy for {selectedTeam.name}</div>
+              </div>
+              {simResults && (
+                <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {session ? (
+                    <button
+                      onClick={handleSavePrediction}
+                      disabled={isSaving || isSimulating || saveSuccess}
+                      className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all ${saveSuccess
+                        ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 cursor-not-allowed opacity-80"
+                        : "border border-transparent bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] text-white shadow-[0_10px_25px_rgba(44,124,135,0.2)] hover:opacity-95 active:scale-95 disabled:opacity-50"
+                        }`}
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : saveSuccess ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400 animate-in zoom-in duration-300" />
+                          <span>Saved!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 text-white" />
+                          <span>Save to Predictions</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => openAuthModal("signin")}
+                      className="flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-all dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/[0.08]"
+                    >
+                      <Lock className="h-4 w-4" />
+                      <span>Sign In to Save</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 md:px-8 pb-6 md:pb-8">

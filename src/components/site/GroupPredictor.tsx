@@ -36,6 +36,43 @@ interface PredictorMatch {
   awayScore: number | "";
 }
 
+function normalizePredictorScore(value: unknown): number | "" {
+  if (value === "" || value === null || value === undefined) return "";
+  if (typeof value === "string" && value.toLowerCase() === "nan") return "";
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : "";
+}
+
+function hasValidPredictorScore(value: number | ""): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function hasAssignedMatchScores(match: PredictorMatch): boolean {
+  return hasValidPredictorScore(match.homeScore) && hasValidPredictorScore(match.awayScore);
+}
+
+function hasStartedLiveGame(game: any): boolean {
+  const progress = String(game?.time_elapsed ?? game?.status ?? "").toLowerCase().trim();
+  if (!progress) return false;
+  if (progress.includes("notstarted")) return false;
+  if (/^\d+$/.test(progress)) return true;
+
+  return [
+    "live",
+    "finished",
+    "ft",
+    "fulltime",
+    "halftime",
+    "half-time",
+    "1h",
+    "2h",
+    "extra",
+    "pen",
+    "playing",
+    "inprogress",
+  ].some((keyword) => progress.includes(keyword));
+}
+
 function clearPredictorMatchScores(match: PredictorMatch): PredictorMatch {
   return {
     ...match,
@@ -372,7 +409,6 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   useEffect(() => {
     // Fetch games + stadiums from worldcup26.ir live API.
-    // Falls back to locally cached snapshot files if the live API is unreachable.
     async function fetchLiveData() {
       try {
         const controller = new AbortController();
@@ -392,18 +428,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
         setLiveGames(gData.games || []);
         setLiveStadiums(sData.stadiums || []);
-      } catch {
-        // Fallback: load cached snapshot files from /public
-        try {
-          const [gFallback, sFallback] = await Promise.all([
-            fetch("/games_live.json").then(r => r.json()),
-            fetch("/stadiums_live.json").then(r => r.json()),
-          ]);
-          setLiveGames(gFallback.games || []);
-          setLiveStadiums(sFallback.stadiums || []);
-        } catch (e2) {
-          console.error("Failed to load games/stadiums from both API and fallback", e2);
-        }
+      } catch (error) {
+        console.error("Failed to load live games/stadiums from real API", error);
+        setLiveGames([]);
+        setLiveStadiums([]);
       }
     }
 
@@ -615,8 +643,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         if (result) {
           return {
             ...m,
-            homeScore: result.homeGoals ?? "",
-            awayScore: result.awayGoals ?? "",
+            homeScore: normalizePredictorScore(result.homeGoals),
+            awayScore: normalizePredictorScore(result.awayGoals),
           };
         }
         return m;
@@ -635,24 +663,38 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setPreRealScoresMatches(null);
   };
 
+  const getAssignedLiveScoreForMatch = useCallback((match: PredictorMatch) => {
+    const suffix = parseInt(match.id.split("-")[1]);
+    const details = getGroupMatchDetails(match.group, suffix, liveGames, liveStadiums, match.homeCode, match.awayCode, teams);
+    if (!details || details.matchNumber <= 0) return null;
+
+    const game = liveGames.find((g: any) => parseInt(g.id) === details.matchNumber);
+    if (!game) return null;
+    if (!hasStartedLiveGame(game)) return null;
+
+    const homeScore = normalizePredictorScore(game.home_score);
+    const awayScore = normalizePredictorScore(game.away_score);
+
+    if (!hasValidPredictorScore(homeScore) || !hasValidPredictorScore(awayScore)) {
+      return null;
+    }
+
+    return { homeScore, awayScore };
+  }, [liveGames, liveStadiums, teams]);
+
   const applyRealScores = useCallback((currentMatches: PredictorMatch[]) => {
     return currentMatches.map((m) => {
-      const suffix = parseInt(m.id.split("-")[1]);
-      const details = getGroupMatchDetails(m.group, suffix, liveGames, liveStadiums, m.homeCode, m.awayCode, teams);
-      if (details && details.matchNumber > 0) {
-        const game = liveGames.find((g: any) => parseInt(g.id) === details.matchNumber);
-        if (game && game.home_score !== null && game.home_score !== undefined && game.home_score !== "" &&
-            game.away_score !== null && game.away_score !== undefined && game.away_score !== "") {
-          return {
-            ...m,
-            homeScore: Number(game.home_score),
-            awayScore: Number(game.away_score)
-          };
-        }
+      const liveScore = getAssignedLiveScoreForMatch(m);
+      if (liveScore) {
+        return {
+          ...m,
+          homeScore: liveScore.homeScore,
+          awayScore: liveScore.awayScore,
+        };
       }
-      return m;
+      return clearPredictorMatchScores(m);
     });
-  }, [liveGames, liveStadiums, teams]);
+  }, [getAssignedLiveScoreForMatch]);
 
   const handleToggleRealScores = (checked: boolean) => {
     setUseRealScores(checked);
@@ -672,6 +714,80 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       setMatches((prev) => applyRealScores(prev));
     }
   }, [liveGames, useRealScores, applyRealScores]);
+
+  const simulatePendingMatches = useCallback(() => {
+    const updatedMatches = matches.map((m) => {
+      if (hasAssignedMatchScores(m)) return m;
+      const liveScore = getAssignedLiveScoreForMatch(m);
+      if (liveScore) {
+        return {
+          ...m,
+          homeScore: liveScore.homeScore,
+          awayScore: liveScore.awayScore,
+        };
+      }
+
+      const homeTeam = getTeam(m.homeCode);
+      const awayTeam = getTeam(m.awayCode);
+      const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, players, selectedModel);
+      return {
+        ...m,
+        homeScore: getPoisson(homeLambda),
+        awayScore: getPoisson(awayLambda),
+      };
+    });
+
+    setMatches(updatedMatches);
+
+    const clearedWinners = {
+      r32: Array(16).fill(null),
+      r16: Array(8).fill(null),
+      qf: Array(4).fill(null),
+      sf: Array(2).fill(null),
+      final: Array(1).fill(null),
+    };
+    setKoWinners(clearedWinners);
+    setKoScores({});
+    setThirdWinner(null);
+    setThirdScores({ home: "", away: "" });
+
+    saveBulkToDb(updatedMatches, clearedWinners, {}, null, { home: "", away: "" });
+  }, [getAssignedLiveScoreForMatch, getTeam, matches, players, selectedModel]);
+
+  const simulatePendingGroupMatches = useCallback((groupName: string) => {
+    const updatedMatches = matches.map((m) => {
+      if (m.group !== groupName) return m;
+      if (hasAssignedMatchScores(m)) return m;
+      const liveScore = getAssignedLiveScoreForMatch(m);
+      if (liveScore) {
+        return {
+          ...m,
+          homeScore: liveScore.homeScore,
+          awayScore: liveScore.awayScore,
+        };
+      }
+      const homeTeam = getTeam(m.homeCode);
+      const awayTeam = getTeam(m.awayCode);
+      const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, players, selectedModel);
+      return {
+        ...m,
+        homeScore: getPoisson(homeLambda),
+        awayScore: getPoisson(awayLambda),
+      };
+    });
+    setMatches(updatedMatches);
+    saveBulkToDb(updatedMatches);
+  }, [getAssignedLiveScoreForMatch, getTeam, matches, players, selectedModel]);
+
+  const hasRealCupResult = useCallback((match: PredictorMatch): boolean => {
+    const [gName, idxStr] = match.id.split("-");
+    const cupKey = `${gName}-${idxStr.padStart(2, "0")}`;
+    return !!cupResults[cupKey];
+  }, [cupResults]);
+
+  const pendingMatchesCount = useMemo(() => {
+    return matches.filter((m) => !hasAssignedMatchScores(m)).length;
+  }, [matches]);
 
   // Slots and multi-saves states
   const [currentSlot, setCurrentSlot] = useState<number | null>(null);
@@ -992,8 +1108,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             if (pred) {
               return {
                 ...m,
-                homeScore: pred.predictedHomeScore ?? "",
-                awayScore: pred.predictedAwayScore ?? "",
+                homeScore: normalizePredictorScore(pred.predictedHomeScore),
+                awayScore: normalizePredictorScore(pred.predictedAwayScore),
               };
             }
             return m;
@@ -1021,16 +1137,16 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             else if (id === 501) {
               setThirdWinner(team);
               setThirdScores({
-                home: p.predictedHomeScore ?? "",
-                away: p.predictedAwayScore ?? ""
+                home: normalizePredictorScore(p.predictedHomeScore),
+                away: normalizePredictorScore(p.predictedAwayScore)
               });
             }
 
             if (round) {
               next[round][idx] = team;
               nextScores[`${round}-${idx}`] = {
-                home: p.predictedHomeScore ?? "",
-                away: p.predictedAwayScore ?? ""
+                home: normalizePredictorScore(p.predictedHomeScore),
+                away: normalizePredictorScore(p.predictedAwayScore)
               };
             }
           });
@@ -1058,8 +1174,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         const pred = groupPreds.find((p: any) => p.matchId === numId);
         return {
           ...m,
-          homeScore: pred ? (pred.predictedHomeScore ?? "") : "",
-          awayScore: pred ? (pred.predictedAwayScore ?? "") : "",
+          homeScore: pred ? normalizePredictorScore(pred.predictedHomeScore) : "",
+          awayScore: pred ? normalizePredictorScore(pred.predictedAwayScore) : "",
         };
       })
     );
@@ -1090,16 +1206,16 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       else if (id === 501) {
         loadedThirdWinner = team;
         loadedThirdScores = {
-          home: p.predictedHomeScore ?? "",
-          away: p.predictedAwayScore ?? ""
+          home: normalizePredictorScore(p.predictedHomeScore),
+          away: normalizePredictorScore(p.predictedAwayScore)
         };
       }
 
       if (round) {
         nextWinners[round][idx] = team;
         nextScores[`${round}-${idx}`] = {
-          home: p.predictedHomeScore ?? "",
-          away: p.predictedAwayScore ?? ""
+          home: normalizePredictorScore(p.predictedHomeScore),
+          away: normalizePredictorScore(p.predictedAwayScore)
         };
       }
     });
@@ -1175,7 +1291,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     tWinner: string | null,
     tScores: typeof thirdScores
   ) => {
-    const groupPredictedCount = mList.filter(m => m.homeScore !== "" && m.awayScore !== "").length;
+    const groupPredictedCount = mList.filter((m) => hasAssignedMatchScores(m)).length;
 
     const data: Record<string, Record<string, any>> = {};
     Object.entries(GROUPS_CONFIG).forEach(([group, codes]) => {
@@ -1195,7 +1311,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       const g = m.group;
       const h = m.homeCode;
       const a = m.awayCode;
-      if (m.homeScore !== "" && m.awayScore !== "") {
+      if (hasAssignedMatchScores(m)) {
         const hs = Number(m.homeScore);
         const as = Number(m.awayScore);
 
@@ -1274,8 +1390,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       payload.push({
         matchId: getNumericId(m.id),
         type: matchType,
-        predictedHomeScore: m.homeScore !== "" ? Number(m.homeScore) : null,
-        predictedAwayScore: m.awayScore !== "" ? Number(m.awayScore) : null,
+        predictedHomeScore: hasValidPredictorScore(m.homeScore) ? m.homeScore : null,
+        predictedAwayScore: hasValidPredictorScore(m.awayScore) ? m.awayScore : null,
       });
     });
 
@@ -1470,9 +1586,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       const h = m.homeCode;
       const a = m.awayCode;
 
-      if (m.homeScore !== "" && m.awayScore !== "") {
-        const hs = m.homeScore;
-        const as = m.awayScore;
+      if (hasAssignedMatchScores(m)) {
+        const hs = Number(m.homeScore);
+        const as = Number(m.awayScore);
 
         data[g][h].played += 1;
         data[g][a].played += 1;
@@ -1529,7 +1645,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   // Check if all group stage matches have scores predicted
   const isGroupStageComplete = useMemo(() => {
-    return matches.every((m) => m.homeScore !== "" && m.awayScore !== "");
+    return matches.every((m) => hasAssignedMatchScores(m));
   }, [matches]);
 
   // Seeding R32 qualified teams
@@ -2260,6 +2376,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 <Sparkles className="h-4 w-4" />
                 Simulate All
               </button>
+              {pendingMatchesCount > 0 && (
+                <button
+                  onClick={simulatePendingMatches}
+                  className={toolbarButtonClass}
+                >
+                  <Play className="h-4 w-4 text-emerald-400" />
+                  Simulate Empty ({pendingMatchesCount})
+                </button>
+              )}
               <button
                 onClick={handleReset}
                 className={toolbarButtonClass}
@@ -2400,9 +2525,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         <div className="space-y-6">
           {/* Real-life Scores Integrator */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl glass-strong border border-border/40 bg-slate-900/10 dark:bg-black/10 shadow-glass">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
                 id="use-actual-scores"
                 checked={useRealScores}
                 onChange={(e) => handleToggleRealScores(e.target.checked)}
@@ -2412,18 +2537,34 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 Use actual / real-life scores for group stage matches
               </label>
             </div>
-            {useRealScores && (
-              <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse">
-                Real-life scores assigned
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {pendingMatchesCount > 0 && (
+                <button
+                  type="button"
+                  onClick={simulatePendingMatches}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-emerald-600 transition hover:bg-emerald-500/15 dark:text-emerald-400"
+                >
+                  <Play className="h-3.5 w-3.5" />
+                  <span>Simulate Pending Matches</span>
+                </button>
+              )}
+              {useRealScores && (
+                <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse">
+                  Real-life scores assigned
+                </span>
+              )}
+            </div>
           </div>
 
           <div className={`grid gap-4 sm:gap-6 ${fullWidth ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}>
             {Object.keys(GROUPS_CONFIG).map((groupName) => {
               const groupMatches = matches.filter((m) => m.group === groupName);
               const groupStandings = standings[groupName];
-              const isGroupPredicted = groupMatches.length > 0 && groupMatches.every((m) => m.homeScore !== "" && m.awayScore !== "");
+              const isGroupPredicted = groupMatches.length > 0 && groupMatches.every((m) => hasAssignedMatchScores(m));
+              const assignedRealDataMatches = groupMatches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
+              const realDataPercent = groupMatches.length > 0
+                ? Math.round((assignedRealDataMatches / groupMatches.length) * 100)
+                : 0;
 
               return (
                 <div
@@ -2443,7 +2584,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                         {isGroupPredicted ? (
                           <>
                             <span className="text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 shadow-sm flex items-center gap-1">
-                              <Check className="h-3 w-3" /> Simulated
+                              <Check className="h-3 w-3" /> {realDataPercent > 0 ? `${realDataPercent}% Real Data` : "Simulated"}
                             </span>
                             <button
                               onClick={() => setDeleteGroupTarget(groupName)}
@@ -2454,17 +2595,36 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             </button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => {
-                              setConfirmSimType("group");
-                              setConfirmSimGroup(groupName);
-                              setConfirmSimOpen(true);
-                            }}
-                            title="Predict Group"
-                            className="text-cyan-500 hover:text-cyan-400 hover:underline transition font-black"
-                          >
-                            Run Simulation
-                          </button>
+                          <>
+                            {(() => {
+                              const groupPending = groupMatches.filter((m) => !hasAssignedMatchScores(m)).length;
+                              if (groupPending > 0 && groupPending < groupMatches.length) {
+                                return (
+                                  <button
+                                    onClick={() => simulatePendingGroupMatches(groupName)}
+                                    title={`Simulate ${groupPending} pending match${groupPending > 1 ? "es" : ""}`}
+                                    className="text-emerald-500 hover:text-emerald-400 hover:underline transition font-black flex items-center gap-1"
+                                  >
+                                    <Play className="h-3 w-3" />
+                                    Simulate Pending ({groupPending})
+                                  </button>
+                                );
+                              }
+                              return (
+                                <button
+                                  onClick={() => {
+                                    setConfirmSimType("group");
+                                    setConfirmSimGroup(groupName);
+                                    setConfirmSimOpen(true);
+                                  }}
+                                  title="Predict Group"
+                                  className="text-cyan-500 hover:text-cyan-400 hover:underline transition font-black"
+                                >
+                                  Run Simulation
+                                </button>
+                              );
+                            })()}
+                          </>
                         )}
                       </div>
                     </div>
@@ -2485,7 +2645,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           const teamPlayers = getTeamPlayers(row.code);
                           const topPlayer = teamPlayers[0];
                           const topPlayerName = topPlayer ? (topPlayer["Name on Shirt"] || topPlayer["Player Name"]) : "";
-                          const topPlayerRating = topPlayer ? (topPlayer["Overall Rating"] || "") : "";
+                          const rawRating = topPlayer ? (topPlayer["Overall Rating"] || "") : "";
+                          const topPlayerRating = (rawRating && String(rawRating).toLowerCase() !== "nan") ? rawRating : "";
                           const topPlayerDisp = topPlayerName ? `${topPlayerName} (${topPlayerRating})` : "N/A";
 
                           return (
@@ -2513,36 +2674,40 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 <span className="truncate">{row.team.name}</span>
                               </td>
                               <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
-                                {row.team.elo ? Math.round(row.team.elo) : "-"}
+                                {row.team.elo && Number.isFinite(row.team.elo) ? Math.round(row.team.elo) : "-"}
                               </td>
                               <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
                                 {(() => {
                                   const val = row.team.attack;
-                                  if (val === undefined || val === null) return "-";
+                                  if (val === undefined || val === null || !Number.isFinite(val)) return "-";
                                   if (val < 10) {
                                     const minM = 0.75;
                                     const maxM = 1.10;
                                     const minR = 50;
                                     const maxR = 95;
                                     const rating = ((val - minM) / (maxM - minM)) * (maxR - minR) + minR;
-                                    return Math.max(15, Math.min(99, Math.round(rating)));
+                                    const rounded = Math.max(15, Math.min(99, Math.round(rating)));
+                                    return Number.isFinite(rounded) ? rounded : "-";
                                   }
-                                  return Math.round(val);
+                                  const rounded = Math.round(val);
+                                  return Number.isFinite(rounded) ? rounded : "-";
                                 })()}
                               </td>
                               <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
                                 {(() => {
                                   const val = row.team.defense;
-                                  if (val === undefined || val === null) return "-";
+                                  if (val === undefined || val === null || !Number.isFinite(val)) return "-";
                                   if (val < 10) {
                                     const minM = 0.75;
                                     const maxM = 1.10;
                                     const minR = 50;
                                     const maxR = 95;
                                     const rating = ((val - minM) / (maxM - minM)) * (maxR - minR) + minR;
-                                    return Math.max(15, Math.min(99, Math.round(rating)));
+                                    const rounded = Math.max(15, Math.min(99, Math.round(rating)));
+                                    return Number.isFinite(rounded) ? rounded : "-";
                                   }
-                                  return Math.round(val);
+                                  const rounded = Math.round(val);
+                                  return Number.isFinite(rounded) ? rounded : "-";
                                 })()}
                               </td>
                               <td className="py-1 text-right text-muted-foreground truncate max-w-[100px]" title={topPlayerDisp}>
@@ -2589,12 +2754,12 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
                             {/* Score Display */}
                             <div className="flex items-center gap-1 shrink-0 bg-black/10 dark:bg-black/40 px-2 py-1 rounded-lg border border-border font-mono text-xs font-bold w-12 justify-center">
-                              <span className={m.homeScore !== "" ? "text-neon" : "text-foreground/30"}>
-                                {m.homeScore !== "" ? m.homeScore : "-"}
+                              <span className={hasValidPredictorScore(m.homeScore) ? "text-neon" : "text-foreground/30"}>
+                                {hasValidPredictorScore(m.homeScore) ? m.homeScore : "-"}
                               </span>
                               <span className="text-foreground/30">:</span>
-                              <span className={m.awayScore !== "" ? "text-neon" : "text-foreground/30"}>
-                                {m.awayScore !== "" ? m.awayScore : "-"}
+                              <span className={hasValidPredictorScore(m.awayScore) ? "text-neon" : "text-foreground/30"}>
+                                {hasValidPredictorScore(m.awayScore) ? m.awayScore : "-"}
                               </span>
                             </div>
 
@@ -2785,7 +2950,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   {row.team.name}
                                 </span>
                               </div>
-                              <span className="font-mono text-[9px] text-muted-foreground/60">{Math.round(row.team.elo)}</span>
+                              <span className="font-mono text-[9px] text-muted-foreground/60">{row.team.elo && Number.isFinite(row.team.elo) ? Math.round(row.team.elo) : "-"}</span>
                             </div>
                           );
                         })}
@@ -3418,7 +3583,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       </span>
                     </div>
                     <span className="text-[9px] uppercase font-bold tracking-wider text-neon mt-1 bg-neon/10 px-2 py-0.5 rounded-full border border-neon/20">
-                      {simHomeGoals !== "" ? "Simulated" : "Not Simulated"}
+                      {simHomeGoals !== "" ? (simMatch && getAssignedLiveScoreForMatch({ id: simMatch.id || "", group: "", homeCode: simMatch.homeCode, awayCode: simMatch.awayCode, homeScore: "", awayScore: "" }) ? "Real Data" : "Simulated") : "Not Simulated"}
                     </span>
                   </div>
 

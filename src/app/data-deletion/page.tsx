@@ -294,7 +294,7 @@ export default function DataDeletionPage() {
           <div className="space-y-6">
             
             {/* OAuth Compliance */}
-            <div className="bg-white/50 dark:bg-white/[0.02] border border-slate-200/50 dark:border-white/5 rounded-3xl p-6 shadow-xl backdrop-blur-md space-y-4">
+            {/* <div className="bg-white/50 dark:bg-white/[0.02] border border-slate-200/50 dark:border-white/5 rounded-3xl p-6 shadow-xl backdrop-blur-md space-y-4">
               <div className="flex items-center gap-2 font-display text-sm font-bold text-slate-900 dark:text-white">
                 <Globe className="w-4.5 h-4.5 text-primary" />
                 <h3>OAuth & Callback Info</h3>
@@ -311,7 +311,7 @@ export default function DataDeletionPage() {
                   https://wc26predict.com/data-deletion
                 </div>
               </div>
-            </div>
+            </div> */}
 
             {/* SLA Deletion Timing */}
             <div className="bg-white/50 dark:bg-white/[0.02] border border-slate-200/50 dark:border-white/5 rounded-3xl p-6 shadow-xl backdrop-blur-md space-y-4">

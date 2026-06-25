@@ -124,7 +124,7 @@ export function HomeSectionsAccordion() {
                 className="my-20 block overflow-hidden rounded-2xl border border-black/8 shadow-lg transition-opacity duration-300 hover:opacity-95 dark:border-white/10"
               >
                 <img
-                  src="/banner.png"
+                  src="/banner2.png"
                   alt="FIFA World Cup 2026 Banner"
                   className="h-auto w-full"
                 />
