@@ -88,6 +88,22 @@ interface FailedCountryOption {
   selectionCode: string;
 }
 
+interface TeamPreviewDetails {
+  code: string;
+  name: string;
+  flag: string;
+  rank: string;
+  rankLabel?: string;
+  elo: number;
+  attack: number;
+  defense: number;
+  power: number;
+  squadValueM?: number;
+  confederation: string;
+  isCustom: boolean;
+  replacedName: string;
+}
+
 export function WildcardCountrySection() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -303,7 +319,7 @@ export function WildcardCountrySection() {
   }, [selectedCode, customCountries, selectedFailedCountry, featuredTeams]);
 
   // Selected Team Details for Dashboard Preview
-  const selectedTeamDetails = useMemo(() => {
+  const selectedTeamDetails = useMemo<TeamPreviewDetails>(() => {
     const custom = customCountries.find((cc) => cc.code === selectedCode);
     if (custom) {
       const baselineTeam = teams.find((t) => t.code === custom.baselineCode);
@@ -312,7 +328,8 @@ export function WildcardCountrySection() {
         code: custom.code,
         name: custom.name,
         flag: custom.flag,
-        rank: "Custom",
+        rankLabel: "Custom Rank",
+        rank: baselineTeam?.rank ? `#${baselineTeam.rank}` : "N/A",
         elo: custom.elo,
         attack: custom.attack,
         defense: custom.defense,
@@ -328,6 +345,7 @@ export function WildcardCountrySection() {
         code: selectedFailedCountry.selectionCode,
         name: selectedFailedCountry.name,
         flag: selectedFailedCountry.flag,
+        rankLabel: "FIFA Rank / Region",
         rank: "Wildcard",
         elo: 1650,
         attack: 78,
@@ -345,6 +363,7 @@ export function WildcardCountrySection() {
         code: fallbackFailedCountry.selectionCode,
         name: fallbackFailedCountry.name,
         flag: fallbackFailedCountry.flag,
+        rankLabel: "FIFA Rank / Region",
         rank: "Wildcard",
         elo: 1650,
         attack: 78,
@@ -362,6 +381,7 @@ export function WildcardCountrySection() {
       code: team?.code || "ARG",
       name: team?.name || "Argentina",
       flag: team?.flag || "🇦🇷",
+      rankLabel: "FIFA Rank / Region",
       rank: team?.rank ? `#${team.rank}` : "N/A",
       elo: team?.elo ? Math.round(team.elo) : 1500,
       attack: team?.attack ? Math.round(team.attack < 10 ? team.attack * 80 : team.attack) : 75,
@@ -572,6 +592,7 @@ export function WildcardCountrySection() {
         code: editingCode || "CC_NEW",
         name: customName.trim() || selectedTeamDetails.name,
         flag: customFlag,
+        rankLabel: "FIFA Rank / Region",
         rank: teams.find((team) => team.code === baselineCode)?.rank
           ? `#${teams.find((team) => team.code === baselineCode)?.rank}`
           : selectedTeamDetails.rank,
@@ -804,9 +825,11 @@ export function WildcardCountrySection() {
             <div className="space-y-4 pt-4 border-t border-slate-200/50 dark:border-white/5">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
                 <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 rounded-2xl p-4 transition-colors">
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold">FIFA Rank / Region</span>
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold">
+                    {previewDetails.rankLabel || "FIFA Rank / Region"}
+                  </span>
                   <span className="text-sm font-extrabold text-slate-900 dark:text-white mt-1 block">
-                    {previewDetails.isCustom && !isBuilding
+                    {previewDetails.rankLabel === "Custom Rank"
                       ? previewDetails.rank
                       : `${previewDetails.rank} (${previewDetails.confederation})`}
                   </span>
