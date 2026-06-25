@@ -21,6 +21,7 @@ import { TeamsProvider } from "@/components/TeamsProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { GlobalAuthModal } from "@/components/site/GlobalAuthModal";
+import { CookieConsent } from "@/components/site/CookieConsent";
 
 export const metadata: Metadata = {
   title: "WC26 Predict",
@@ -68,6 +69,8 @@ export default async function RootLayout({
             `,
           }}
         />
+
+      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4746258958164249" crossOrigin="anonymous"></script>
       </head>
       <body className={`${inter.variable} ${spaceGrotesk.variable} min-h-full flex flex-col`} suppressHydrationWarning>
         <SessionProvider session={session}>
@@ -75,6 +78,7 @@ export default async function RootLayout({
             <TeamsProvider teams={teams} groupsConfig={groupsConfig} results={cupResults}>
               {children}
               <GlobalAuthModal />
+              <CookieConsent />
               <Toaster />
             </TeamsProvider>
           </ThemeProvider>
