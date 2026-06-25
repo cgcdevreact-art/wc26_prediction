@@ -194,7 +194,7 @@ export function Hero() {
 
             <div className="mt-5 h-56">
               <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                <BarChart data={top} margin={{ top: 16, right: 8, left: 0, bottom: 0 }} barCategoryGap={18}>
+                <BarChart data={top} margin={{ top: 16, right: 4, left: 4, bottom: 0 }} barCategoryGap={2}>
                   <defs>
                     <linearGradient id="barFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="var(--color-neon)" />
@@ -207,7 +207,7 @@ export function Hero() {
                     contentStyle={{ background: "var(--color-popover)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12 }}
                     formatter={(v: any) => [`${Number(v).toFixed(1)}%`, "Win Cup"]}
                   />
-                  <Bar dataKey="prob.champion" radius={[8, 8, 4, 4]}>
+                  <Bar dataKey="prob.champion" radius={[12, 12, 8, 8]} barSize={44} maxBarSize={48}>
                     {top.map((t, i) => <Cell key={i} fill="url(#barFill)" />)}
                   </Bar>
                 </BarChart>
@@ -234,12 +234,7 @@ export function Hero() {
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 flex items-center gap-2">
             <Calendar className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-            {todayMatches.length > 0 && (
-              <span className="rounded-full bg-slate-500/10 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-white/5 dark:text-slate-350 tracking-normal normal-case">
-                {todayMatches.length}
-              </span>
-            )}
-            <span>Today's Matches</span>
+            <span>{todayMatches.length > 0 ? `Today's ${todayMatches.length} Matches` : "Today's Matches"}</span>
           </h3>
 
           {/* Navigation buttons */}

@@ -130,7 +130,7 @@ export function ProbabilityExplorer() {
 
   return (
     <div className="py-2">
-      <div className="grid gap-5 lg:grid-cols-[280px_1fr] min-w-0">
+      <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)] min-w-0">
         {/* Team list */}
         <div className="glass self-start h-fit rounded-2xl border border-border/70 dark:border-white/10 overflow-hidden">
           <div className="px-4 pt-4 pb-3 text-left">
@@ -138,7 +138,7 @@ export function ProbabilityExplorer() {
             <div className="text-xs text-muted-foreground mt-0.5">Browse every team by title probability</div>
           </div>
           <div className="px-2 pb-2">
-            <div className="max-h-[320px] overflow-y-auto px-2 pb-1 lg:max-h-[960px] lg:px-0 scrollbar-custom">
+            <div className="max-h-[232px] overflow-y-auto px-2 pb-1 xl:max-h-[960px] xl:px-0 scrollbar-custom">
               <div className="grid grid-cols-1 gap-1">
                 {sortedTeams.map((t) => {
                   const active = t.code === code;
@@ -193,7 +193,7 @@ export function ProbabilityExplorer() {
               <div className="relative overflow-hidden">
                   <div className="absolute -right-16 -top-16 w-56 h-56 bg-neon/10 rounded-full filter blur-3xl pointer-events-none" />
                   <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-neon-2/10 rounded-full filter blur-3xl pointer-events-none" />
-                  <div className="flex flex-col lg:flex-row justify-between items-stretch gap-6 border-b border-white/5 pb-6 mb-6">
+                  <div className="flex flex-col xl:flex-row justify-between items-stretch gap-6 border-b border-white/5 pb-6 mb-6">
                     {/* Team Profile Basic Details */}
                     <div className="flex flex-col justify-between flex-grow gap-4">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
@@ -246,7 +246,7 @@ export function ProbabilityExplorer() {
                     </div>
 
                     {/* Circular Gauge for Champion Probability */}
-                    <div className="flex flex-col items-center justify-center bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/10 rounded-2xl p-6 min-w-[200px] text-center shadow-glass relative group overflow-hidden">
+                    <div className="flex w-full flex-col items-center justify-center rounded-2xl border border-border bg-muted/60 p-6 text-center shadow-glass relative group overflow-hidden dark:border-white/10 dark:bg-white/[0.04] xl:max-w-sm xl:min-w-[200px] xl:w-auto">
                       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-neon/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-extrabold relative z-10">
                         Championship Prob
@@ -295,7 +295,7 @@ export function ProbabilityExplorer() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-3">
                     {stages.map((s) => {
                       const pct = team.prob[s.key as keyof typeof team.prob] as number;
                       const active = pct > 0;
@@ -384,7 +384,7 @@ export function ProbabilityExplorer() {
                 </div>
               </div>
               <div className="px-5 pb-5">
-                <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start">
+                <div className="grid gap-6 xl:grid-cols-[180px_minmax(0,1fr)] xl:items-start">
                   <div className="flex min-h-[220px] flex-col justify-center rounded-[2rem] border border-border bg-muted/45 p-6 text-center shadow-glass">
                     <div className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</div>
                     <div className="mt-3 text-5xl font-black font-mono text-foreground">
@@ -398,7 +398,7 @@ export function ProbabilityExplorer() {
 
                   <div className="space-y-5">
                     {squadQuality.tiers.map((tier) => (
-                      <div key={tier.label} className="grid grid-cols-[minmax(110px,140px)_minmax(0,1fr)_auto] items-center gap-4">
+                      <div key={tier.label} className="grid grid-cols-[minmax(88px,120px)_minmax(0,1fr)_auto] items-center gap-2 sm:gap-4">
                         <div className="text-sm font-semibold text-foreground">{tier.label}</div>
                         <div className="h-4 rounded-full bg-black/6 dark:bg-white/8 overflow-hidden">
                           <div
@@ -406,7 +406,7 @@ export function ProbabilityExplorer() {
                             style={{ width: `${Math.max(tier.percentage, tier.count > 0 ? 4 : 0)}%` }}
                           />
                         </div>
-                        <div className="min-w-[72px] text-right font-mono text-sm font-bold tabular-nums text-foreground">
+                        <div className="min-w-[58px] text-right font-mono text-sm font-bold tabular-nums text-foreground sm:min-w-[72px]">
                           {tier.count}
                           <span className="ml-2 text-xs text-muted-foreground">({tier.percentage}%)</span>
                         </div>

@@ -26,9 +26,9 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-slate-200 bg-white">
+    <aside className="sticky top-0 z-30 border-b border-slate-200 bg-white lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
       {/* Logo area */}
-      <div className="flex h-16 items-center gap-3 border-b border-slate-200 px-5">
+      <div className="flex items-center gap-3 px-4 py-4 lg:h-16 lg:border-b lg:border-slate-200 lg:px-5 lg:py-0">
         <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-500 shadow-lg shadow-violet-500/20">
           <Shield className="h-5 w-5 text-white" strokeWidth={2.4} />
         </div>
@@ -43,11 +43,11 @@ export function AdminSidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+      <nav className="overflow-x-auto px-3 py-3 lg:flex-1 lg:overflow-y-auto lg:px-3 lg:py-4">
+        <div className="mb-2 hidden px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400 lg:block">
           Management
         </div>
-        <div className="space-y-0.5">
+        <div className="flex gap-2 lg:flex-col lg:gap-0.5">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -59,7 +59,7 @@ export function AdminSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                className={`group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                   isActive
                     ? "bg-violet-50 text-violet-700 shadow-sm border border-violet-100"
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent"
@@ -83,7 +83,7 @@ export function AdminSidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-slate-200 p-3 space-y-1">
+      <div className="flex flex-wrap gap-2 border-t border-slate-200 p-3 lg:block lg:space-y-1">
         <Link
           href="/"
           className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600"

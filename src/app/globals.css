@@ -161,11 +161,12 @@
 @layer base {
   * {
     border-color: var(--color-border);
+    min-width: 0;
   }
 
   html, body {
-    overflow-x: hidden;
     max-width: 100%;
+    overflow-x: clip;
   }
 
   body {
@@ -173,6 +174,9 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+  img, svg, canvas, video {
+    max-width: 100%;
   }
   h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 }

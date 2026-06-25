@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
 import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle, Brain, Cpu } from "lucide-react";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { getMatchExpectedGoals } from "@/lib/simulation/model";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { UpgradeModal } from "./UpgradeModal";
+import { ScoreTrendGraph } from "./ScoreTrendGraph";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
 import { CountryFlag } from "@/components/ui/CountryFlag";
@@ -109,7 +110,10 @@ function getGroupMatchDetails(
   group: string,
   suffix: number,
   allGames: any[],
-  allStadiums: any[]
+  allStadiums: any[],
+  homeCode: string,
+  awayCode: string,
+  teams: any[]
 ) {
   const groupOffset = group.charCodeAt(0) - 65; // A=0, B=1, ... L=11
 
@@ -121,28 +125,57 @@ function getGroupMatchDetails(
   else if (suffix === 5) time = "06:30 AM";
   else if (suffix === 6) time = "06:30 AM";
 
-  // Filter games by group from the live API data
-  const groupGames = allGames.filter((g: any) => g.group === group);
-  // Sort them by game id (match number)
-  const sortedGames = [...groupGames].sort((a: any, b: any) => parseInt(a.id) - parseInt(b.id));
-
-  // Suffix-to-sorted-index mapping:
-  // suffix 1 → index 0 (t1 vs t2)
-  // suffix 2 → index 1 (t3 vs t4)
-  // suffix 3 → index 3 (t1 vs t3)
-  // suffix 4 → index 4 (t2 vs t4)
-  // suffix 5 → index 5 (t4 vs t1)
-  // suffix 6 → index 2 (t2 vs t3)
-  const suffixToSortedIndex: Record<number, number> = {
-    1: 0,
-    2: 1,
-    3: 3,
-    4: 4,
-    5: 5,
-    6: 2
+  const normalizeCode = (c: string) => {
+    if (!c) return "";
+    const clean = c.toUpperCase().trim();
+    if (clean === "KSA") return "SAU";
+    return clean;
   };
-  const sortedIndex = suffixToSortedIndex[suffix] ?? (suffix - 1);
-  const game = sortedGames[sortedIndex];
+
+  const getCode = (id: string | number, nameEn: string) => {
+    const normalizeName = (n: string) => {
+      if (!n) return "";
+      const lower = n.toLowerCase().trim();
+      if (lower.includes("congo")) return "congo";
+      if (lower.includes("korea") || lower.includes("south korea")) return "south korea";
+      if (lower.includes("usa") || lower.includes("united states")) return "united states";
+      return lower;
+    };
+
+    const targetName = normalizeName(nameEn);
+    const t = teams.find((x: any) => 
+      (x.id !== undefined && x.id !== null && String(x.id) === String(id)) ||
+      (x.name && targetName && normalizeName(x.name) === targetName)
+    );
+    return t ? normalizeCode(t.code) : "";
+  };
+
+  const groupGames = allGames.filter((g: any) => g.group === group);
+  
+  // Find match dynamically based on team codes
+  let game = groupGames.find((g: any) => {
+    const hCode = getCode(g.home_team_id, g.home_team_name_en || "");
+    const aCode = getCode(g.away_team_id, g.away_team_name_en || "");
+    const targetH = normalizeCode(homeCode);
+    const targetA = normalizeCode(awayCode);
+    return (hCode === targetH && aCode === targetA) ||
+           (hCode === targetA && aCode === targetH);
+  });
+
+  // Fallback to suffix-to-sorted-index if not found
+  if (!game) {
+    const sortedGames = [...groupGames].sort((a: any, b: any) => parseInt(a.id) - parseInt(b.id));
+    const suffixToSortedIndex: Record<number, number> = {
+      1: 0,
+      2: 1,
+      3: 3,
+      4: 4,
+      5: 5,
+      6: 2
+    };
+    const sortedIndex = suffixToSortedIndex[suffix] ?? (suffix - 1);
+    game = sortedGames[sortedIndex];
+  }
 
   if (!game) {
     return { date: "TBD", time, matchNumber: 0, venue: "TBD" };
@@ -594,6 +627,51 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   }, [GROUPS_CONFIG, cupResults]);
 
   const [matches, setMatches] = useState<PredictorMatch[]>(initialMatches);
+  const [useRealScores, setUseRealScores] = useState(false);
+  const [preRealScoresMatches, setPreRealScoresMatches] = useState<PredictorMatch[] | null>(null);
+
+  const disableRealScoresState = () => {
+    setUseRealScores(false);
+    setPreRealScoresMatches(null);
+  };
+
+  const applyRealScores = useCallback((currentMatches: PredictorMatch[]) => {
+    return currentMatches.map((m) => {
+      const suffix = parseInt(m.id.split("-")[1]);
+      const details = getGroupMatchDetails(m.group, suffix, liveGames, liveStadiums, m.homeCode, m.awayCode, teams);
+      if (details && details.matchNumber > 0) {
+        const game = liveGames.find((g: any) => parseInt(g.id) === details.matchNumber);
+        if (game && game.home_score !== null && game.home_score !== undefined && game.home_score !== "" &&
+            game.away_score !== null && game.away_score !== undefined && game.away_score !== "") {
+          return {
+            ...m,
+            homeScore: Number(game.home_score),
+            awayScore: Number(game.away_score)
+          };
+        }
+      }
+      return m;
+    });
+  }, [liveGames, liveStadiums, teams]);
+
+  const handleToggleRealScores = (checked: boolean) => {
+    setUseRealScores(checked);
+    if (checked) {
+      setPreRealScoresMatches(matches);
+      setMatches((prev) => applyRealScores(prev));
+    } else {
+      if (preRealScoresMatches) {
+        setMatches(preRealScoresMatches);
+      }
+      setPreRealScoresMatches(null);
+    }
+  };
+
+  useEffect(() => {
+    if (useRealScores && liveGames.length > 0) {
+      setMatches((prev) => applyRealScores(prev));
+    }
+  }, [liveGames, useRealScores, applyRealScores]);
 
   // Slots and multi-saves states
   const [currentSlot, setCurrentSlot] = useState<number | null>(null);
@@ -803,6 +881,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     const aGoals = simAwayGoals;
 
     if (simMatch.type === "group") {
+      disableRealScoresState();
       const matchId = simMatch.id!;
       setMatches((prev) =>
         prev.map((m) =>
@@ -965,6 +1044,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   }, [session]);
 
   const handleLoadFromSlot = async (slotId: number | null) => {
+    disableRealScoresState();
     const matchType = slotId ? `MATCH_SCORE_SLOT_${slotId}` : "MATCH_SCORE";
     const koType = slotId ? `KNOCKOUT_WINNER_SLOT_${slotId}` : "KNOCKOUT_WINNER";
 
@@ -1346,6 +1426,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   // Handle score input change
   const handleScoreChange = (matchId: string, side: "home" | "away", val: string) => {
+    disableRealScoresState();
     const score = val === "" ? "" : Math.max(0, parseInt(val) || 0);
     setMatches((prev) =>
       prev.map((m) => {
@@ -1788,6 +1869,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   // AI Poisson Predict
   const handleAiPredict = () => {
+    disableRealScoresState();
     const targetGroups = selectedGroups.length > 0 ? selectedGroups : Object.keys(GROUPS_CONFIG);
     const predicted = matches.map((m) => {
       if (!targetGroups.includes(m.group)) return m;
@@ -1820,6 +1902,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   // Wild Random scores
   const handleRandomize = () => {
+    disableRealScoresState();
     const targetGroups = selectedGroups.length > 0 ? selectedGroups : Object.keys(GROUPS_CONFIG);
     const random = matches.map((m) => {
       if (!targetGroups.includes(m.group)) return m;
@@ -1849,6 +1932,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   // Clear Board
   const handleReset = () => {
+    disableRealScoresState();
     const resetMatches = matches.map(clearPredictorMatchScores);
     setMatches(resetMatches);
 
@@ -2076,9 +2160,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   }, [selectedModel, isInitialized]);
 
   const toolbarButtonClass =
-    "inline-flex min-h-[56px] min-w-[156px] items-center justify-center gap-2 rounded-[1.2rem] border border-slate-300 bg-white px-4 py-2.5 text-center text-sm font-black text-slate-950 shadow-sm transition-all duration-200 hover:border-transparent hover:bg-gradient-to-r hover:from-[#0a8a45] hover:via-[#2c7c87] hover:to-[#af3fd1] hover:text-white hover:shadow-[0_16px_35px_rgba(44,124,135,0.22)] active:scale-[0.98] dark:border-white/10 dark:bg-slate-900 dark:text-white dark:hover:border-transparent";
+    "inline-flex min-h-[56px] w-full items-center justify-center gap-2 rounded-[1.2rem] border border-slate-300 bg-white px-4 py-2.5 text-center text-sm font-black text-slate-950 shadow-sm transition-all duration-200 hover:border-transparent hover:bg-gradient-to-r hover:from-[#0a8a45] hover:via-[#2c7c87] hover:to-[#af3fd1] hover:text-white hover:shadow-[0_16px_35px_rgba(44,124,135,0.22)] active:scale-[0.98] dark:border-white/10 dark:bg-slate-900 dark:text-white dark:hover:border-transparent sm:w-auto sm:min-w-[156px]";
   const primaryToolbarButtonClass =
-    "inline-flex min-h-[56px] min-w-[156px] items-center justify-center gap-2 rounded-[1.2rem] border border-transparent bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] px-4 py-2.5 text-center text-sm font-black text-white shadow-[0_16px_35px_rgba(44,124,135,0.22)] transition-all duration-200 hover:opacity-95 hover:shadow-[0_20px_40px_rgba(44,124,135,0.28)] active:scale-[0.98]";
+    "inline-flex min-h-[56px] w-full items-center justify-center gap-2 rounded-[1.2rem] border border-transparent bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] px-4 py-2.5 text-center text-sm font-black text-white shadow-[0_16px_35px_rgba(44,124,135,0.22)] transition-all duration-200 hover:opacity-95 hover:shadow-[0_20px_40px_rgba(44,124,135,0.28)] active:scale-[0.98] sm:w-auto sm:min-w-[156px]";
 
   return (
     <div className={`container mx-auto px-4  py-8  transition-all duration-300 ${fullWidth || activeTab === "knockout" ? "container" : "container"}`}>
@@ -2124,7 +2208,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           {!session ? (
             <div className="text-xs text-muted-foreground mr-2 hidden md:block">
               Guest Sims: <strong className="text-neon">{guestCreditsUsed}</strong> / 3
@@ -2233,8 +2317,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 <Bar
                   dataKey="winProb"
                   fill="url(#barGradient)"
-                  radius={[6, 6, 6, 6]}
-                  barSize={40}
+                  radius={[10, 10, 10, 10]}
+                  barSize={96}
                   minPointSize={15}
                 />
               </BarChart>
@@ -2267,6 +2351,16 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             ))}
           </div>
         </div>
+      )}
+
+      {activeTab === "group" && (
+        <ScoreTrendGraph
+          matches={matches}
+          teams={teams}
+          liveGames={liveGames}
+          liveStadiums={liveStadiums}
+          getGroupMatchDetails={getGroupMatchDetails}
+        />
       )}
 
       {/* Tab Selectors */}
@@ -2303,7 +2397,28 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
       {/* Group Stage View */}
       {activeTab === "group" && (
-        <div className="space-y-12">
+        <div className="space-y-6">
+          {/* Real-life Scores Integrator */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl glass-strong border border-border/40 bg-slate-900/10 dark:bg-black/10 shadow-glass">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="use-actual-scores"
+                checked={useRealScores}
+                onChange={(e) => handleToggleRealScores(e.target.checked)}
+                className="h-5 w-5 rounded-md border-border bg-black/10 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-background cursor-pointer accent-cyan-500"
+              />
+              <label htmlFor="use-actual-scores" className="text-sm font-semibold text-foreground/90 select-none cursor-pointer">
+                Use actual / real-life scores for group stage matches
+              </label>
+            </div>
+            {useRealScores && (
+              <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse">
+                Real-life scores assigned
+              </span>
+            )}
+          </div>
+
           <div className={`grid gap-4 sm:gap-6 ${fullWidth ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}>
             {Object.keys(GROUPS_CONFIG).map((groupName) => {
               const groupMatches = matches.filter((m) => m.group === groupName);
@@ -2447,7 +2562,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       const tAway = getTeam(m.awayCode);
 
                       const matchSuffix = parseInt(m.id.split("-")[1]);
-                      const details = getGroupMatchDetails(groupName, matchSuffix, liveGames, liveStadiums);
+                      const details = getGroupMatchDetails(groupName, matchSuffix, liveGames, liveStadiums, m.homeCode, m.awayCode, teams);
 
                       return (
                         <div key={m.id} className="flex items-center justify-between text-xs py-2 border-b border-border last:border-0 hover:bg-black/5 dark:hover:bg-white/5 px-2 rounded-xl transition duration-200 gap-2">
@@ -2522,6 +2637,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               );
             })}
           </div>
+
+
 
           {/* Third Place Standings Grid */}
           <div className="glass rounded-2xl p-6 border border-white/5 max-w-4xl mx-auto shadow-glass">
@@ -3453,9 +3570,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       })()}
 
       {isGroupStageComplete && activeTab === "group" && pathname === "/simulator" && !simMatch && !upgradeModalOpen && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-8 duration-500 w-[calc-100%-2rem)] max-w-md animate-float">
-          <div className="glass-strong border border-neon/40 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-[0_10px_40px_rgba(6,182,212,0.25)] bg-black/85 backdrop-blur-xl">
-            <div className="flex items-center gap-3">
+        <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md -translate-x-1/2 animate-float animate-in fade-in slide-in-from-bottom-8 duration-500 sm:bottom-6 sm:w-[calc(100vw-2rem)]">
+          <div className="glass-strong flex flex-col gap-4 rounded-2xl border border-neon/40 bg-black/85 p-4 shadow-[0_10px_40px_rgba(6,182,212,0.25)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-xl bg-neon/10 border border-neon/30 flex items-center justify-center text-neon shrink-0 shadow-[0_0_10px_rgba(6,182,212,0.15)]">
                 <Trophy className="h-4.5 w-4.5 animate-pulse" />
               </div>
@@ -3473,7 +3590,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                   document.getElementById("knockout-bracket-view")?.scrollIntoView({ behavior: "smooth" });
                 }, 50);
               }}
-              className="rounded-xl bg-gradient-to-r from-neon to-neon-2 px-4 py-2.5 text-xs font-bold text-background neon-border transition hover:opacity-90 hover:scale-105 shrink-0 shadow-neon active:scale-95 duration-200"
+              className="w-full shrink-0 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-4 py-2.5 text-xs font-bold text-background shadow-neon transition duration-200 hover:scale-105 hover:opacity-90 active:scale-95 sm:w-auto"
             >
               Show Brackets
             </button>

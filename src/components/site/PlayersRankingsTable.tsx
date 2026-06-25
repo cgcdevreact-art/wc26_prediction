@@ -223,8 +223,8 @@ export function PlayersRankingsTable({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] md:grid-cols-2 xl:grid-cols-5 dark:border-white/10 dark:bg-slate-950">
-        <div className="relative xl:col-span-2">
+      <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 dark:border-white/10 dark:bg-slate-950">
+        <div className="relative md:col-span-2 lg:col-span-2 xl:col-span-2">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <Search className="h-5 w-5 text-muted-foreground" />
           </div>

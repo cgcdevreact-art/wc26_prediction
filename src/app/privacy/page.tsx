@@ -1,7 +1,6 @@
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
-import Link from "next/link";
-import { Shield, FileText, Lock, Eye, Trash2, HelpCircle } from "lucide-react";
+import { Shield } from "lucide-react";
 
 export const metadata = {
   title: "Privacy Policy - WC26 Predict",
@@ -28,114 +27,155 @@ export default function PrivacyPolicyPage() {
         </div>
 
         <div className="bg-white/50 dark:bg-white/[0.02] border border-slate-200/50 dark:border-white/5 rounded-3xl p-6 sm:p-10 shadow-xl backdrop-blur-md space-y-10">
-          
-          {/* Section 1: Overview */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2 text-slate-900 dark:text-white font-display text-lg sm:text-xl font-bold">
-              <Eye className="w-5 h-5 text-emerald-500" />
-              <h2>1. Overview & Scope</h2>
+          <section className="space-y-6">
+            <div className="space-y-2">
+              <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+                10A. Additional Privacy Rights for EU, UK, and California Residents
+              </h2>
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              At <strong>26WC Prediction</strong>, we are committed to protecting the privacy of our global sports analytics fan base. 
-              This Privacy Policy explains how we collect, store, use, and process your personal and simulation-specific data 
-              when you use our web platform.
-            </p>
+
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white">
+                  A. GDPR & UK GDPR Compliance
+                </h3>
+                <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  If you are located in the European Economic Area (EEA), European Union (EU), or the United Kingdom (UK), you are entitled to additional rights under the <strong>General Data Protection Regulation (GDPR)</strong> and <strong>UK GDPR</strong>.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-base font-bold text-slate-900 dark:text-white">Legal Bases for Processing</h4>
+                <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  We process your personal data under one or more of the following legal bases:
+                </p>
+                <ul className="list-disc space-y-1.5 pl-6 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  <li><strong>Consent</strong> – where you have given clear permission.</li>
+                  <li><strong>Contractual Necessity</strong> – to provide and operate our services.</li>
+                  <li><strong>Legitimate Interests</strong> – to improve our platform, security, and AI prediction systems.</li>
+                  <li><strong>Legal Obligation</strong> – where required by law.</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-base font-bold text-slate-900 dark:text-white">Your GDPR Rights</h4>
+                <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  Subject to applicable law, you may have the right to:
+                </p>
+                <ul className="list-disc space-y-1.5 pl-6 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  <li>Request access to your personal data.</li>
+                  <li>Request correction of inaccurate or incomplete data.</li>
+                  <li>Request deletion (&ldquo;Right to be Forgotten&rdquo;).</li>
+                  <li>Request restriction of processing.</li>
+                  <li>Object to processing based on legitimate interests.</li>
+                  <li>Withdraw consent at any time.</li>
+                  <li>Request portability of your data in a machine-readable format.</li>
+                  <li>Lodge a complaint with your local data protection authority.</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-base font-bold text-slate-900 dark:text-white">International Data Transfers</h4>
+                <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  Where your personal data is transferred outside the EEA or UK, we implement appropriate safeguards, including:
+                </p>
+                <ul className="list-disc space-y-1.5 pl-6 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  <li>Standard Contractual Clauses (SCCs)</li>
+                  <li>Contractual data protection obligations with service providers</li>
+                  <li>Other legally recognized transfer mechanisms</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-base font-bold text-slate-900 dark:text-white">Automated Decision-Making</h4>
+                <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  Our platform uses algorithmic analysis, AI systems, and numerical simulation to generate football predictions. These processes are designed for informational and entertainment purposes only and do not produce legal, financial, or similarly significant decisions affecting users.
+                </p>
+              </div>
+            </div>
           </section>
 
           <hr className="border-slate-200/50 dark:border-white/5" />
 
-          {/* Section 2: Data We Collect */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2 text-slate-900 dark:text-white font-display text-lg sm:text-xl font-bold">
-              <FileText className="w-5 h-5 text-blue-500" />
-              <h2>2. Information We Collect</h2>
+          <section className="space-y-6">
+            <div className="space-y-3">
+              <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white">
+                B. California Privacy Rights (CCPA/CPRA)
+              </h3>
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                If you are a California resident, you may have rights under the <strong>California Consumer Privacy Act (CCPA)</strong> and <strong>California Privacy Rights Act (CPRA)</strong>.
+              </p>
             </div>
-            <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              <p>We collect information you directly provide, as well as data automatically generated by your activities on the site:</p>
-              <ul className="list-disc pl-6 space-y-1.5">
-                <li>
-                  <strong className="text-slate-800 dark:text-slate-200">Account Credentials:</strong> Email, username, profile picture, and hashed password if you register an account directly or authorize using Google or GitHub.
-                </li>
-                <li>
-                  <strong className="text-slate-800 dark:text-slate-200">Prediction Data:</strong> Submissions you make for matches, bracket stages, customized teams, and customized player values.
-                </li>
-                <li>
-                  <strong className="text-slate-800 dark:text-slate-200">Transaction & Billing:</strong> If you upgrade to Advanced or Expert Predictor plans, payment processing is handled securely by Stripe. We do not store full credit card details.
-                </li>
-                <li>
-                  <strong className="text-slate-800 dark:text-slate-200">Technical Analytics:</strong> Device IP addresses, browser types, referral links, and page visit behaviors compiled via analytics cookies.
-                </li>
+
+            <div className="space-y-3">
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">Your California Rights</h4>
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                You may have the right to:
+              </p>
+              <ul className="list-disc space-y-1.5 pl-6 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                <li>Know what personal information we collect.</li>
+                <li>Know how we use and disclose your information.</li>
+                <li>Request deletion of your personal information.</li>
+                <li>Correct inaccurate personal information.</li>
+                <li>Limit the use of sensitive personal information (if applicable).</li>
+                <li>Request access to specific categories and pieces of personal data.</li>
+                <li>Opt out of the sale or sharing of personal information.</li>
               </ul>
             </div>
-          </section>
 
-          <hr className="border-slate-200/50 dark:border-white/5" />
-
-          {/* Section 3: How We Use Data */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2 text-slate-900 dark:text-white font-display text-lg sm:text-xl font-bold">
-              <Lock className="w-5 h-5 text-purple-500" />
-              <h2>3. How We Use Your Information</h2>
+            <div className="space-y-3">
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">No Sale of Personal Information</h4>
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                We do <strong>not sell</strong> your personal information as defined under the CCPA/CPRA.
+              </p>
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                If our business model changes in the future, we will provide a clear &ldquo;Do Not Sell or Share My Personal Information&rdquo; option where required by law.
+              </p>
             </div>
-            <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              <p>We process your data for the following essential purposes:</p>
-              <ul className="list-disc pl-6 space-y-1.5">
-                <li>To calculate match prediction points and rank you on global/regional leaderboards.</li>
-                <li>To synchronize and persist your custom tournament simulation states and team overrides.</li>
-                <li>To check subscription permissions and manage billing lifecycles through Stripe billing portals.</li>
-                <li>To protect our system from bot activities, spamming predictions, and fraudulent activities.</li>
-              </ul>
-            </div>
-          </section>
 
-          <hr className="border-slate-200/50 dark:border-white/5" />
-
-          {/* Section 4: Data Retention & Deletion */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2 text-slate-900 dark:text-white font-display text-lg sm:text-xl font-bold">
-              <Trash2 className="w-5 h-5 text-rose-500" />
-              <h2>4. Your Rights & Data Deletion</h2>
-            </div>
-            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              You own your predictions and profile details. You have the right to request deletion of your account and predictions at any time.
-            </p>
-            <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/10 text-sm text-slate-600 dark:text-slate-300">
-              <p className="leading-relaxed">
-                To delete all database records tied to your email or social credentials, you can proceed to our dedicated{" "}
-                <Link href="/data-deletion" className="text-rose-500 hover:text-rose-600 font-semibold underline transition-colors">
-                  User Data Deletion Page
-                </Link>
-                . Deletion is instantaneous and permanent. All Elo configurations, points, badges, and subscription statuses will be deleted.
+            <div className="space-y-3">
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">Non-Discrimination</h4>
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                We will not discriminate against you for exercising your privacy rights.
               </p>
             </div>
           </section>
 
           <hr className="border-slate-200/50 dark:border-white/5" />
 
-          {/* Section 5: Cookies & Third-Party Analytics */}
-          <section className="space-y-3">
-            <div className="flex items-center gap-2 text-slate-900 dark:text-white font-display text-lg sm:text-xl font-bold">
-              <HelpCircle className="w-5 h-5 text-amber-500" />
-              <h2>5. Advertising and Cookies</h2>
+          <section className="space-y-4">
+            <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white">
+              Exercising Your Rights
+            </h3>
+            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              To submit privacy-related requests under GDPR, UK GDPR, CCPA, or CPRA, contact us:
+            </p>
+
+            <div className="rounded-2xl border border-slate-200/60 bg-slate-50/70 p-5 dark:border-white/10 dark:bg-white/[0.03]">
+              <p className="text-sm text-slate-700 dark:text-slate-200">
+                <strong>Email:</strong>{" "}
+                <a href="mailto:privacy@my2026wcprediction.com" className="font-semibold text-primary hover:underline">
+                  privacy@my2026wcprediction.com
+                </a>
+              </p>
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              We display relevant ads to help keep simulation resources free. We integrate with services like Google AdSense which utilizes DART cookies to serve ads based on your visit history. Users can opt-out of personalized advertising by visiting Google's ad settings.
+
+            <div className="space-y-2">
+              <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                Please include:
+              </p>
+              <ul className="list-disc space-y-1.5 pl-6 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                <li>Your full name</li>
+                <li>Registered email address</li>
+                <li>Country or State of residence</li>
+                <li>Nature of your request</li>
+              </ul>
+            </div>
+
+            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              We may need to verify your identity before fulfilling certain requests.
             </p>
           </section>
-
-          <hr className="border-slate-200/50 dark:border-white/5" />
-
-          {/* Contact Section */}
-          <div className="text-center bg-slate-500/[0.02] dark:bg-white/[0.01] p-6 rounded-2xl border border-slate-200/20 dark:border-white/5">
-            <h3 className="font-display font-bold text-slate-900 dark:text-white text-base">Have Questions?</h3>
-            <p className="text-xs text-muted-foreground mt-1">
-              Reach out to our security compliance team at{" "}
-              <a href="mailto:support@wc26predict.com" className="text-primary hover:underline font-semibold">
-                support@wc26predict.com
-              </a>
-            </p>
-          </div>
-
         </div>
       </main>
 
