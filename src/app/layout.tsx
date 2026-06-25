@@ -24,12 +24,12 @@ import { GlobalAuthModal } from "@/components/site/GlobalAuthModal";
 import { CookieConsent } from "@/components/site/CookieConsent";
 
 export const metadata: Metadata = {
-  title: "WC26 Predict",
+  title: "26WC Prediction",
   description: "Who will win the World Cup 2026?",
   icons: {
-    icon: "/icon.png",
-    shortcut: "/icon.png",
-    apple: "/apple-icon.png",
+    icon: "/26wc-logo.png",
+    shortcut: "/26wc-logo.png",
+    apple: "/26wc-logo.png",
   },
 };
 
@@ -70,7 +70,7 @@ export default async function RootLayout({
           }}
         />
 
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4746258958164249" crossOrigin="anonymous"></script>
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4746258958164249" crossOrigin="anonymous"></script>
       </head>
       <body className={`${inter.variable} ${spaceGrotesk.variable} min-h-full flex flex-col`} suppressHydrationWarning>
         <SessionProvider session={session}>

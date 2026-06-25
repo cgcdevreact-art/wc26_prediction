@@ -1551,7 +1551,7 @@ export default function CountryPredictionsClient({
                     />
                   </div>
 
-                  <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-custom ">
+                  <div className="max-h-[320px] flex-1 space-y-1.5 overflow-y-auto scrollbar-custom lg:max-h-none">
                     {filteredTeams.map((t) => {
                       const active = t.code === selectedCode;
                       return (

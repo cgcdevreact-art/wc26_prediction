@@ -138,15 +138,15 @@ export function ProbabilityExplorer() {
             <div className="text-xs text-muted-foreground mt-0.5">Browse every team by title probability</div>
           </div>
           <div className="px-2 pb-2">
-            <div className="lg:max-h-[930px] lg:overflow-y-auto scrollbar-custom">
-              <div className="grid grid-cols-3 gap-1 lg:grid-cols-1">
+            <div className="max-h-[320px] overflow-y-auto px-2 pb-1 lg:max-h-[960px] lg:px-0 scrollbar-custom">
+              <div className="grid grid-cols-1 gap-1">
                 {sortedTeams.map((t) => {
                   const active = t.code === code;
                   return (
                     <button
                       key={t.code}
                       onClick={() => setCode(t.code)}
-                      className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${active
+                      className={`flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-all duration-300 relative overflow-hidden group ${active
                         ? "bg-gradient-to-r from-neon/10 to-neon-2/10 border-neon/25 text-foreground font-bold shadow-[0_10px_30px_-20px_color-mix(in_oklab,var(--color-neon)_65%,transparent)]"
                         : "border-transparent bg-transparent text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
                         }`}
@@ -162,8 +162,7 @@ export function ProbabilityExplorer() {
                           className="h-6 w-8 shrink-0 group-hover:scale-110 transition-transform duration-300"
                           emojiClassName="text-lg shrink-0 select-none group-hover:scale-110 transition-transform duration-300"
                         />
-                        <span className="hidden truncate lg:inline tracking-wide">{t.name}</span>
-                        <span className="lg:hidden">{t.code}</span>
+                        <span className="truncate tracking-wide">{t.name}</span>
                       </span>
                       <span className="text-xs font-mono font-bold text-neon-2 text-right z-10">{t.prob.champion.toFixed(1)}%</span>
                     </button>
@@ -420,11 +419,23 @@ export function ProbabilityExplorer() {
           </div>
           <div className="glass self-start h-fit rounded-2xl overflow-hidden">
             <div className="px-5 pt-5 pb-3">
-              <div className="flex w-full items-center justify-between pr-3">
+              <div className="flex w-full flex-col gap-3 pr-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="text-left">
                   <div className="font-display text-lg font-semibold">Most Likely Route to the Final</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Run a simulation to unlock this team&apos;s full Path to Glory.
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">Win % per stage</div>
+                <div className="flex flex-col items-start gap-2 sm:items-end">
+                  <button
+                    onClick={handleSimulationClick}
+                    className="shrink-0 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-5 py-2.5 text-xs font-bold text-background shadow-lg shadow-neon/20 transition hover:opacity-95 hover:shadow-neon/30 active:scale-95 flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 fill-current" />
+                    <span>Run Simulation</span>
+                  </button>
+                  <div className="text-xs text-muted-foreground">Win % per stage</div>
+                </div>
               </div>
             </div>
             <div className="px-5 pb-5">
