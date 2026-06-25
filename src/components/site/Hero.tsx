@@ -234,7 +234,13 @@ export function Hero() {
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 flex items-center gap-2">
             <Calendar className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-            <span>{todayMatches.length > 0 ? `Today's ${todayMatches.length} Matches` : "Today's Matches"}</span>
+            {todayMatches.length > 0 ? (
+              <span>
+                Today&apos;s <span className="text-red-500">{todayMatches.length}</span> Matches
+              </span>
+            ) : (
+              <span>Today&apos;s Matches</span>
+            )}
           </h3>
 
           {/* Navigation buttons */}
@@ -408,7 +414,7 @@ export function Hero() {
                   <span className="text-[7px] text-muted-foreground/80 uppercase font-extrabold mt-0.5">FT</span>
                 </>
               ) : (
-                <span className="font-mono text-[9px] font-bold text-slate-700 dark:text-slate-300">
+                <span className="font-mono text-[9px] font-bold text-red-500">
                   {getCountdownString(diffMs)}
                 </span>
               )}

@@ -335,7 +335,7 @@ export function WildcardCountrySection() {
         defense: custom.defense,
         power: baselineTeam?.power || 75,
         squadValueM: baselineTeam?.squadValueM || 100,
-        confederation: replacedTeam?.confederation || baselineTeam?.confederation || "UEFA",
+        confederation: baselineTeam?.confederation || "UEFA",
         isCustom: true,
         replacedName: replacedTeam?.name || "",
       };
@@ -602,7 +602,7 @@ export function WildcardCountrySection() {
         power: teams.find((team) => team.code === baselineCode)?.power || selectedTeamDetails.power,
         squadValueM: teams.find((team) => team.code === baselineCode)?.squadValueM || selectedTeamDetails.squadValueM,
         confederation:
-          teams.find((team) => team.code === replacedCode)?.confederation || selectedTeamDetails.confederation,
+          teams.find((team) => team.code === baselineCode)?.confederation || selectedTeamDetails.confederation,
         isCustom: true,
         replacedName: teams.find((team) => team.code === replacedCode)?.name || selectedTeamDetails.replacedName,
       }
@@ -612,6 +612,7 @@ export function WildcardCountrySection() {
   const activeReplacedTeam = teams.find((team) => team.code === replacedCode);
   const previewEloBarWidth = Math.max(0, Math.min(100, ((previewDetails.elo - 1200) / 1000) * 100));
   const hasSavedSelectedCountry = customCountries.some((country) => country.code === selectedCode);
+  const canEditSavedCountry = hasSavedSelectedCountry && !isBuilding;
   const canRunPathToGlory = hasSavedSelectedCountry && !isBuilding;
   const runButtonLabel = canRunPathToGlory && previewTeam?.name
     ? `Run ${previewTeam.name}'s Hypothetical Path To Glory`
@@ -648,16 +649,6 @@ export function WildcardCountrySection() {
                       {previewTeam.name}
                     </h3>
                     </div>
-                    {previewDetails.isCustom && (
-                      <button
-                        type="button"
-                        onClick={() => handleEditCustomCountry(selectedCode)}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gradient-to-r from-neon to-neon-2 px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-neon/20 transition hover:opacity-95 hover:shadow-neon/30"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        <span>Edit</span>
-                      </button>
-                    )}
                   </div>
                 </>
               )}
@@ -895,14 +886,6 @@ export function WildcardCountrySection() {
                     <Sparkles className="w-4 h-4 text-neon shrink-0 animate-pulse" />
                     <span>Custom wildcard team replacing {previewDetails.replacedName} (baseline cloned from {teams.find(t => t.code === (isBuilding ? baselineCode : customCountries.find(cc => cc.code === selectedCode)?.baselineCode))?.name}). This run will open in Country Predict using the Base model.</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleEditCustomCountry(selectedCode)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-neon/20 transition hover:opacity-95 hover:shadow-neon/30"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    <span>Edit {previewTeam?.name || "Custom Country"}</span>
-                  </button>
                 </div>
               )}
             </div>
@@ -944,21 +927,33 @@ export function WildcardCountrySection() {
                 </p>
 
                 <div className="space-y-2.5 pt-2">
-                  <MiniDetail number="01" text="Clone a baseline World Cup squad" />
-                  <MiniDetail number="02" text="Customize ELO, attack, and defense" />
-                  <MiniDetail number="03" text="Slot into a region-suggested group position" />
-                  <MiniDetail number="04" text="Test squad quality in simulation brackets" />
-                  <MiniDetail number="05" text="Run their hypothetical path to glory" />
+                  <MiniDetail number="01" text="Create your custom country profile" />
+                  <MiniDetail number="02" text="Clone a baseline World Cup squad" />
+                  <MiniDetail number="03" text="Customize ELO, attack, and defense ratings" />
+                  <MiniDetail number="04" text="Replace a qualified team in the tournament" />
+                  <MiniDetail number="05" text="Run its hypothetical path to glory" />
                 </div>
               </div>
 
-              <button
-                onClick={handleStartCreate}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neon bg-neon/5 px-4 text-sm font-bold text-neon hover:bg-neon/10 transition cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Build Custom Country Profile</span>
-              </button>
+              <div className="space-y-3">
+                {canEditSavedCountry && (
+                  <button
+                    type="button"
+                    onClick={() => handleEditCustomCountry(selectedCode)}
+                    className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-4 text-sm font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-neon/20 transition hover:opacity-95 hover:shadow-neon/30"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    <span>Edit {previewTeam?.name || "Custom Country"}</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleStartCreate}
+                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neon bg-neon/5 px-4 text-sm font-bold text-neon hover:bg-neon/10 transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Build Custom Country Profile</span>
+                </button>
+              </div>
             </div>
           ) : (
             /* Active Creator Form (Single Screen Layout) */
@@ -979,7 +974,7 @@ export function WildcardCountrySection() {
                      {/* Country Name */}
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest block flex items-center text-emerald-700 dark:text-emerald-300">
-                    <span>1.A Country Name</span>
+                    <span>1. Country Name</span>
                     <InfoTooltip content="The name of your custom wildcard country (e.g. Italy, Nigeria)." />
                   </label>
                   <input
@@ -995,7 +990,7 @@ export function WildcardCountrySection() {
                 <div className="space-y-2 relative">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] font-bold uppercase tracking-widest block flex items-center text-emerald-700 dark:text-emerald-300">
-                      <span>1.B Flag & Country Profile</span>
+                      <span>Flag & Country Profile</span>
                       <InfoTooltip content="Search and select any flag image, or click on a quick select shortcut." />
                     </label>
                   </div>
@@ -1088,13 +1083,13 @@ export function WildcardCountrySection() {
                 </div>
                 <div className="rounded-[1.75rem] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.02]">
                   <div className="mb-3 text-[11px] font-black uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-300">
-                    2. Squad Calibration
+                    2. Clone Baseline Squad
                   </div>
 
                   {/* Clone Baseline */}
                   <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest block flex items-center text-cyan-700 dark:text-cyan-300">
-                    <span>2.A Clone Baseline Squad</span>
+                    <span>Clone Baseline Squad</span>
                     <InfoTooltip content="Clones the selected country's real player names, statistics, and value to use as the base for this team." />
                   </label>
                   <div className="relative">
@@ -1149,10 +1144,13 @@ export function WildcardCountrySection() {
 
                      {/* Ratings Sliders (Elo, Att, Def) */}
                 <div className="mt-4 space-y-3 border-t border-slate-200 pt-4 dark:border-white/5">
+                  <div className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-300">
+                    3. ELO, Attack & Defense
+                  </div>
                   <div>
                     <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-1.5 items-center text-cyan-700 dark:text-cyan-300">
                       <span className="flex items-center">
-                        <span>2.B Elo Rating</span>
+                        <span>ELO Rating</span>
                         <InfoTooltip content="Overall skill rating of the country. Higher ELO increases the probability of winning matches." />
                       </span>
                       <span className="font-mono font-bold text-cyan-700 dark:text-cyan-300">{customElo}</span>
@@ -1169,7 +1167,7 @@ export function WildcardCountrySection() {
                   <div>
                     <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-1.5 items-center text-cyan-700 dark:text-cyan-300">
                       <span className="flex items-center">
-                        <span>2.C Attack Power</span>
+                        <span>Attack Power</span>
                         <InfoTooltip content="Influences the average number of goals scored per match by this team." />
                       </span>
                       <span className="font-mono font-bold text-cyan-700 dark:text-cyan-300">{customAttack}</span>
@@ -1186,7 +1184,7 @@ export function WildcardCountrySection() {
                   <div>
                     <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-1.5 items-center text-cyan-700 dark:text-cyan-300">
                       <span className="flex items-center">
-                        <span>2.D Defense Strength</span>
+                        <span>Defense Strength</span>
                         <InfoTooltip content="Influences the average number of goals conceded per match by this team." />
                       </span>
                       <span className="font-mono font-bold text-cyan-700 dark:text-cyan-300">{customDefense}</span>
@@ -1206,11 +1204,11 @@ export function WildcardCountrySection() {
                 {/* Replacement Choice */}
                 <div className="rounded-[1.75rem] border border-fuchsia-200/70 bg-fuchsia-50/60 p-4 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10">
                   <div className="mb-3 text-[11px] font-black uppercase tracking-[0.2em] text-fuchsia-700 dark:text-fuchsia-300">
-                    3. Tournament Slot
+                    4. Replacement Team
                   </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest block flex items-center text-fuchsia-700 dark:text-fuchsia-300">
-                    <span>3.A Replacement Team (Slots In)</span>
+                    <span>Replacement Team</span>
                     <InfoTooltip content="The original tournament team that will be replaced by your custom country in the final brackets." />
                   </label>
                   <div className="relative">
