@@ -340,26 +340,27 @@ export default function TeamDetailsClient({
       <div className="rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-[0_20px_50px_rgba(15,23,42,0.06)] backdrop-blur-md dark:border-white/5 dark:bg-slate-900/60 overflow-hidden mb-12 animate-in fade-in duration-500">
         <button
           onClick={() => setCapabilitiesExpanded(!capabilitiesExpanded)}
-          className="w-full flex items-center justify-between p-6 text-left transition-colors hover:bg-slate-500/[0.01]"
+          className="w-full p-5 text-left transition-colors hover:bg-slate-500/[0.01] sm:p-6"
         >
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/15 text-cyan-650 dark:text-neon border border-cyan-500/20">
               <Info className="h-5 w-5" />
             </div>
-            <div>
-              <h3 className="font-display text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <div className="min-w-0">
+              <h3 className="font-display text-lg font-black text-slate-900 dark:text-white">
                 Plan Customization & Simulation Capabilities
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="max-w-xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                 Compare what you can edit, view, and simulate across Free, Advanced, and Expert Predictor tiers
               </p>
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-right">
+            <div className="flex items-center justify-between gap-4 sm:justify-end">
+            <div className="min-w-0 sm:text-right">
               <span className="text-[10px] font-semibold text-muted-foreground uppercase block tracking-wider">Current Plan</span>
-              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${subTier === "pro"
+              <span className={`mt-1 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${subTier === "pro"
                   ? "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-400 border border-fuchsia-500/20 shadow-[0_0_12px_rgba(217,70,239,0.15)]"
                   : subTier === "plus"
                     ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.15)]"
@@ -373,6 +374,7 @@ export default function TeamDetailsClient({
             ) : (
               <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
             )}
+          </div>
           </div>
         </button>
 
@@ -884,21 +886,21 @@ export default function TeamDetailsClient({
           setShowAllStats(false);
         }
       }}>
-        <DialogContent className="glass-strong max-w-2xl border border-slate-200/80 text-foreground dark:border-white/10">
+        <DialogContent className="glass-strong max-h-[90vh] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto border border-slate-200/80 p-4 text-foreground dark:border-white/10 sm:w-full sm:p-6">
           {selectedPlayer && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-2xl font-display font-bold flex items-center space-x-4">
-                  <div className="w-16 h-16 rounded-full bg-background/80 overflow-hidden flex items-center justify-center border-2 border-neon/50">
+                <DialogTitle className="flex flex-col items-start gap-4 text-2xl font-display font-bold sm:flex-row sm:items-center sm:space-x-4 sm:gap-0">
+                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 border-neon/50 bg-background/80">
                     {selectedPlayer.ImageUrl ? (
                       <img src={selectedPlayer.ImageUrl} alt={selectedPlayer["Player Name"]} className="w-full h-full object-cover" />
                     ) : (
                       <User className="w-8 h-8 text-muted-foreground" />
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-gradient">{selectedPlayer["Player Name"]}</div>
-                    <div className="text-sm font-sans font-normal text-muted-foreground mt-1 tracking-wide uppercase">
+                    <div className="mt-1 text-sm font-normal uppercase tracking-wide text-muted-foreground font-sans">
                       {selectedPlayer.Position} &bull; {selectedPlayer.Club}
                     </div>
                   </div>
@@ -908,8 +910,8 @@ export default function TeamDetailsClient({
               {/* Contextual Tier Notice */}
               <div className="mt-4">
                 {subTier === "free" && (
-                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center justify-between">
-                    <span className="flex items-center gap-2">
+                  <div className="flex flex-col gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-600 dark:text-rose-400 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="flex items-start gap-2">
                       <Lock className="h-3.5 w-3.5 shrink-0" />
                       <span><strong>Player customization locked:</strong> Upgrade to Advanced Predictor or Expert Predictor to edit player ratings and stats.</span>
                     </span>
@@ -923,8 +925,8 @@ export default function TeamDetailsClient({
                 )}
                 {subTier === "plus" && (
                   isTopPlayer ? (
-                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between gap-3">
-                      <span className="flex items-center gap-2">
+                    <div className="flex flex-col gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-300 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="flex items-start gap-2">
                         <Sparkles className="h-3.5 w-3.5 shrink-0" />
                         <span><strong>Top Player unlocked:</strong> You have edit access to this player under the Advanced Predictor plan.</span>
                       </span>
@@ -936,8 +938,8 @@ export default function TeamDetailsClient({
                       </button>
                     </div>
                   ) : (
-                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-between">
-                      <span className="flex items-center gap-2">
+                    <div className="flex flex-col gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-300 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="flex items-start gap-2">
                         <Lock className="h-3.5 w-3.5 shrink-0" />
                         <span><strong>Roster locked:</strong> Customizing other players requires Expert Predictor. Only the Top Player is unlocked on Advanced Predictor.</span>
                       </span>
@@ -985,7 +987,7 @@ export default function TeamDetailsClient({
                     <p className="text-xs text-muted-foreground mt-2 opacity-70">Paste a direct link to an image to replace the placeholder.</p>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div className="space-y-2">
                       <Label className="text-muted-foreground text-[10px] uppercase tracking-wider">Overall Rating</Label>
                       <Input
@@ -1100,10 +1102,10 @@ export default function TeamDetailsClient({
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between pt-6 border-t border-white/10">
+                  <div className="flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
                     <button
                       onClick={() => setShowAllStats(!showAllStats)}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full border border-white/10"
+                      className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
                     >
                       <span>{showAllStats ? "Show Less" : "Show All Stats"}</span>
                     </button>
@@ -1111,7 +1113,7 @@ export default function TeamDetailsClient({
                     <button
                       onClick={handleSavePlayer}
                       disabled={isSavingPlayer || !canEditPlayer}
-                      className="px-5 py-2 rounded-full font-bold text-sm bg-gradient-to-r from-neon via-cyan-500 to-blue-600 text-white shadow-[0_0_12px_rgba(0,255,255,0.3)] hover:shadow-[0_0_20px_rgba(0,255,255,0.5)] transition-all duration-300 disabled:opacity-50 flex items-center space-x-2"
+                      className="flex w-full items-center justify-center space-x-2 rounded-full bg-gradient-to-r from-neon via-cyan-500 to-blue-600 px-5 py-2 text-sm font-bold text-white shadow-[0_0_12px_rgba(0,255,255,0.3)] transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,255,255,0.5)] disabled:opacity-50 sm:w-auto"
                     >
                       {isSavingPlayer ? (
                         <>

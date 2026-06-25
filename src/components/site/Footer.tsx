@@ -6,8 +6,8 @@ import Link from "next/link";
 export function Footer() {
   return (
     <footer className="border-t border-white/5 mt-10">
-      <div className="container mx-auto px-4 py-10 grid gap-6 sm:grid-cols-2 md:grid-cols-5">
-        <div>
+      <div className="container mx-auto grid gap-6 px-4 py-10 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="sm:col-span-2 lg:col-span-2 xl:col-span-1">
           <div className="flex items-center gap-2">
             <span className="flex h-8 items-center">
               <Image
@@ -20,13 +20,13 @@ export function Footer() {
             </span>
             <div className="font-semibold">26WC <span className="text-gradient">PREDICTION</span></div>
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">The most intelligent way to predict World Cup 2026. Probabilities. Picks. Glory.</p>
+          <p className="mt-3 max-w-sm text-xs text-muted-foreground">The most intelligent way to predict World Cup 2026. Probabilities. Picks. Glory.</p>
         </div>
         <FooterCol
           title="Predict"
           items={[
             { label: "Simulator", href: "/simulator" },
-            { label: "Compare", href: "/compare" },
+            { label: "Compare", href: "/teams/compare" },
             { label: "Bracket", href: "/bracket" },
             { label: "Home", href: "/" }
           ]}
@@ -35,8 +35,6 @@ export function Footer() {
           title="Compete"
           items={[
             { label: "My Predictions", href: "/predictions" },
-            { label: "Daily Challenges", href: "/predictions" },
-            { label: "Badges", href: "/predictions" },
             { label: "Pricing", href: "/subscription" }
           ]}
         />

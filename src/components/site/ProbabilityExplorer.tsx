@@ -130,7 +130,7 @@ export function ProbabilityExplorer() {
 
   return (
     <div className="py-2">
-      <div className="grid gap-5 lg:grid-cols-[280px_1fr] min-w-0">
+      <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)] min-w-0">
         {/* Team list */}
         <div className="glass self-start h-fit rounded-2xl border border-border/70 dark:border-white/10 overflow-hidden">
           <div className="px-4 pt-4 pb-3 text-left">
@@ -138,15 +138,15 @@ export function ProbabilityExplorer() {
             <div className="text-xs text-muted-foreground mt-0.5">Browse every team by title probability</div>
           </div>
           <div className="px-2 pb-2">
-            <div className="lg:max-h-[930px] lg:overflow-y-auto scrollbar-custom">
-              <div className="grid grid-cols-3 gap-1 lg:grid-cols-1">
+            <div className="max-h-[232px] overflow-y-auto px-2 pb-1 xl:max-h-[960px] xl:px-0 scrollbar-custom">
+              <div className="grid grid-cols-1 gap-1">
                 {sortedTeams.map((t) => {
                   const active = t.code === code;
                   return (
                     <button
                       key={t.code}
                       onClick={() => setCode(t.code)}
-                      className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-300 border relative overflow-hidden group ${active
+                      className={`flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-all duration-300 relative overflow-hidden group ${active
                         ? "bg-gradient-to-r from-neon/10 to-neon-2/10 border-neon/25 text-foreground font-bold shadow-[0_10px_30px_-20px_color-mix(in_oklab,var(--color-neon)_65%,transparent)]"
                         : "border-transparent bg-transparent text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
                         }`}
@@ -162,8 +162,7 @@ export function ProbabilityExplorer() {
                           className="h-6 w-8 shrink-0 group-hover:scale-110 transition-transform duration-300"
                           emojiClassName="text-lg shrink-0 select-none group-hover:scale-110 transition-transform duration-300"
                         />
-                        <span className="hidden truncate lg:inline tracking-wide">{t.name}</span>
-                        <span className="lg:hidden">{t.code}</span>
+                        <span className="truncate tracking-wide">{t.name}</span>
                       </span>
                       <span className="text-xs font-mono font-bold text-neon-2 text-right z-10">{t.prob.champion.toFixed(1)}%</span>
                     </button>
@@ -194,7 +193,7 @@ export function ProbabilityExplorer() {
               <div className="relative overflow-hidden">
                   <div className="absolute -right-16 -top-16 w-56 h-56 bg-neon/10 rounded-full filter blur-3xl pointer-events-none" />
                   <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-neon-2/10 rounded-full filter blur-3xl pointer-events-none" />
-                  <div className="flex flex-col lg:flex-row justify-between items-stretch gap-6 border-b border-white/5 pb-6 mb-6">
+                  <div className="flex flex-col xl:flex-row justify-between items-stretch gap-6 border-b border-white/5 pb-6 mb-6">
                     {/* Team Profile Basic Details */}
                     <div className="flex flex-col justify-between flex-grow gap-4">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
@@ -247,7 +246,7 @@ export function ProbabilityExplorer() {
                     </div>
 
                     {/* Circular Gauge for Champion Probability */}
-                    <div className="flex flex-col items-center justify-center bg-muted/60 dark:bg-white/[0.04] border border-border dark:border-white/10 rounded-2xl p-6 min-w-[200px] text-center shadow-glass relative group overflow-hidden">
+                    <div className="flex w-full flex-col items-center justify-center rounded-2xl border border-border bg-muted/60 p-6 text-center shadow-glass relative group overflow-hidden dark:border-white/10 dark:bg-white/[0.04] xl:max-w-sm xl:min-w-[200px] xl:w-auto">
                       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-neon/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-extrabold relative z-10">
                         Championship Prob
@@ -296,7 +295,7 @@ export function ProbabilityExplorer() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-3">
                     {stages.map((s) => {
                       const pct = team.prob[s.key as keyof typeof team.prob] as number;
                       const active = pct > 0;
@@ -385,7 +384,7 @@ export function ProbabilityExplorer() {
                 </div>
               </div>
               <div className="px-5 pb-5">
-                <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-start">
+                <div className="grid gap-6 xl:grid-cols-[180px_minmax(0,1fr)] xl:items-start">
                   <div className="flex min-h-[220px] flex-col justify-center rounded-[2rem] border border-border bg-muted/45 p-6 text-center shadow-glass">
                     <div className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</div>
                     <div className="mt-3 text-5xl font-black font-mono text-foreground">
@@ -399,7 +398,7 @@ export function ProbabilityExplorer() {
 
                   <div className="space-y-5">
                     {squadQuality.tiers.map((tier) => (
-                      <div key={tier.label} className="grid grid-cols-[minmax(110px,140px)_minmax(0,1fr)_auto] items-center gap-4">
+                      <div key={tier.label} className="grid grid-cols-[minmax(88px,120px)_minmax(0,1fr)_auto] items-center gap-2 sm:gap-4">
                         <div className="text-sm font-semibold text-foreground">{tier.label}</div>
                         <div className="h-4 rounded-full bg-black/6 dark:bg-white/8 overflow-hidden">
                           <div
@@ -407,7 +406,7 @@ export function ProbabilityExplorer() {
                             style={{ width: `${Math.max(tier.percentage, tier.count > 0 ? 4 : 0)}%` }}
                           />
                         </div>
-                        <div className="min-w-[72px] text-right font-mono text-sm font-bold tabular-nums text-foreground">
+                        <div className="min-w-[58px] text-right font-mono text-sm font-bold tabular-nums text-foreground sm:min-w-[72px]">
                           {tier.count}
                           <span className="ml-2 text-xs text-muted-foreground">({tier.percentage}%)</span>
                         </div>
@@ -420,11 +419,23 @@ export function ProbabilityExplorer() {
           </div>
           <div className="glass self-start h-fit rounded-2xl overflow-hidden">
             <div className="px-5 pt-5 pb-3">
-              <div className="flex w-full items-center justify-between pr-3">
+              <div className="flex w-full flex-col gap-3 pr-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="text-left">
                   <div className="font-display text-lg font-semibold">Most Likely Route to the Final</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Run a simulation to unlock this team&apos;s full Path to Glory.
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">Win % per stage</div>
+                <div className="flex flex-col items-start gap-2 sm:items-end">
+                  <button
+                    onClick={handleSimulationClick}
+                    className="shrink-0 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-5 py-2.5 text-xs font-bold text-background shadow-lg shadow-neon/20 transition hover:opacity-95 hover:shadow-neon/30 active:scale-95 flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 fill-current" />
+                    <span>Run Simulation</span>
+                  </button>
+                  <div className="text-xs text-muted-foreground">Win % per stage</div>
+                </div>
               </div>
             </div>
             <div className="px-5 pb-5">

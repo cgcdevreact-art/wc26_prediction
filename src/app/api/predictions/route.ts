@@ -7,18 +7,26 @@ import { normalizePredictionPayload, normalizePredictionWinnerString } from "@/l
 async function ensureMatchPlaceholder(matchId: number) {
   const matchExists = await prisma.match.findUnique({ where: { id: matchId } });
   if (!matchExists) {
-    const comp = await prisma.competition.findFirst();
-    if (comp) {
-      await prisma.match.create({
+    let comp = await prisma.competition.findFirst();
+    if (!comp) {
+      comp = await prisma.competition.create({
         data: {
-          id: matchId,
-          competitionId: comp.id,
-          utcDate: new Date(),
-          status: "PLACEHOLDER",
-          lastUpdated: new Date(),
+          id: 2000,
+          name: "FIFA World Cup 2026",
+          code: "WC",
+          type: "CUP",
         }
       });
     }
+    await prisma.match.create({
+      data: {
+        id: matchId,
+        competitionId: comp.id,
+        utcDate: new Date(),
+        status: "PLACEHOLDER",
+        lastUpdated: new Date(),
+      }
+    });
   }
 }
 

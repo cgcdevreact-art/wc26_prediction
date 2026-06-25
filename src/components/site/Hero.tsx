@@ -194,7 +194,7 @@ export function Hero() {
 
             <div className="mt-5 h-56">
               <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                <BarChart data={top} margin={{ top: 16, right: 8, left: 0, bottom: 0 }} barCategoryGap={18}>
+                <BarChart data={top} margin={{ top: 16, right: 4, left: 4, bottom: 0 }} barCategoryGap={2}>
                   <defs>
                     <linearGradient id="barFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="var(--color-neon)" />
@@ -207,7 +207,7 @@ export function Hero() {
                     contentStyle={{ background: "var(--color-popover)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12 }}
                     formatter={(v: any) => [`${Number(v).toFixed(1)}%`, "Win Cup"]}
                   />
-                  <Bar dataKey="prob.champion" radius={[8, 8, 4, 4]}>
+                  <Bar dataKey="prob.champion" radius={[12, 12, 8, 8]} barSize={44} maxBarSize={48}>
                     {top.map((t, i) => <Cell key={i} fill="url(#barFill)" />)}
                   </Bar>
                 </BarChart>
@@ -232,14 +232,15 @@ export function Hero() {
       {/* Today's Matches Section */}
       <div className="mx-auto container px-4 pb-12 md:px-6 relative z-10 mt-2">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-            <Calendar className="h-3.5 w-3.5 text-neon" />
-            {todayMatches.length > 0 && (
-              <span className="rounded-full bg-neon/10 px-2.5 py-0.5 text-[10px] font-bold text-neon tracking-normal normal-case">
-                {todayMatches.length}
+          <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 flex items-center gap-2">
+            <Calendar className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+            {todayMatches.length > 0 ? (
+              <span>
+                Today&apos;s <span className="text-red-500">{todayMatches.length}</span> Matches
               </span>
+            ) : (
+              <span>Today&apos;s Matches</span>
             )}
-            <span>Today's <span className="text-neon">Matches</span></span>
           </h3>
 
           {/* Navigation buttons */}
@@ -327,39 +328,38 @@ export function Hero() {
       const isCompleted = match.status === "COMPLETED";
 
       const getCountdownString = (diff: number) => {
-        if (diff <= 0) return "00:00:00";
+        if (diff <= 0) return "0s";
         const totalSec = Math.floor(diff / 1000);
         const hrs = Math.floor(totalSec / 3600);
         const mins = Math.floor((totalSec % 3600) / 60);
         const secs = totalSec % 60;
-        const pad = (num: number) => String(num).padStart(2, "0");
+        
         if (hrs > 0) {
-          return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+          return `${hrs}h ${mins}m ${secs}s`;
         }
-        return `${pad(mins)}:${pad(secs)}`;
+        if (mins > 0) {
+          return `${mins}m ${secs}s`;
+        }
+        return `${secs}s`;
       };
 
       // Card styles
-      let cardClass = "glass hover:bg-white/10 hover:border-neon/40 hover:scale-[1.01] transition-all duration-300 rounded-2xl p-3.5 cursor-pointer relative overflow-hidden group select-none border";
+      let cardClass = "hover:scale-[1.01] transition-all duration-300 rounded-2xl p-3.5 cursor-pointer relative overflow-hidden group select-none border";
       if (isLive) {
-        cardClass += " border-red-500/80 bg-red-500/[0.04] dark:bg-red-500/[0.08] shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-[pulse_3s_infinite]";
-      } else if (isFirstUpcoming) {
-        cardClass += " border-red-500/40 bg-red-500/[0.01] dark:bg-red-500/[0.02]";
+        cardClass += " border-red-500/80 bg-red-500/[0.04] dark:bg-red-500/[0.08] hover:bg-red-500/[0.06] dark:hover:bg-red-500/[0.1] shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-[pulse_3s_infinite]";
       } else {
-        cardClass += " border-white/5";
+        cardClass += " border-slate-200/50 dark:border-white/5 bg-slate-100/80 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-white/10 hover:shadow-sm";
       }
       if (isCompleted) {
         cardClass += " opacity-70";
       }
 
       // Center pill styles
-      let pillClass = "shrink-0 px-2 py-1 rounded-lg border text-center min-w-[85px] flex flex-col justify-center items-center transition-all duration-300";
+      let pillClass = "shrink-0 px-2 py-1.5 rounded-lg border text-center min-w-[85px] flex flex-col justify-center items-center transition-all duration-300";
       if (isLive) {
         pillClass += " bg-red-500/10 border-red-500/25 text-red-500";
-      } else if (isFirstUpcoming) {
-        pillClass += " bg-red-500/5 border-red-500/10 text-red-400";
       } else {
-        pillClass += " bg-black/10 dark:bg-black/40 border-white/5 text-muted-foreground";
+        pillClass += " bg-slate-200/40 dark:bg-black/40 border-slate-200/60 dark:border-white/5 text-slate-700 dark:text-slate-350";
       }
 
       return (
@@ -368,10 +368,10 @@ export function Hero() {
           <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
 
           <div className="flex items-center justify-between text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-2">
-            <span className={isLive || isFirstUpcoming ? "text-red-500 font-extrabold" : "text-neon font-extrabold"}>
+            <span className={isLive ? "text-red-500 font-extrabold" : "text-slate-600 dark:text-slate-400 font-extrabold"}>
               Match #{match.match_no}
             </span>
-            <span className={isLive || isFirstUpcoming ? "text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full font-extrabold" : "text-neon bg-neon/10 px-2 py-0.5 rounded-full font-extrabold"}>
+            <span className={isLive ? "text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full font-extrabold" : "text-slate-600 bg-slate-500/10 dark:text-slate-450 dark:bg-white/5 px-2 py-0.5 rounded-full font-extrabold"}>
               {match.group ? `Group ${match.group}` : match.stageName}
             </span>
           </div>
@@ -414,14 +414,9 @@ export function Hero() {
                   <span className="text-[7px] text-muted-foreground/80 uppercase font-extrabold mt-0.5">FT</span>
                 </>
               ) : (
-                <>
-                  <span className={`font-mono text-[10px] font-bold ${isFirstUpcoming ? "text-red-500" : "text-neon"}`}>
-                    {getCountdownString(diffMs)}
-                  </span>
-                  <span className={`text-[7px] ${isFirstUpcoming ? "text-red-400/80" : "text-neon/80"} uppercase font-extrabold mt-0.5`}>
-                    {isFirstUpcoming ? "NEXT UP" : "COUNTDOWN"}
-                  </span>
-                </>
+                <span className="font-mono text-[9px] font-bold text-red-500">
+                  {getCountdownString(diffMs)}
+                </span>
               )}
             </div>
 
@@ -443,7 +438,7 @@ export function Hero() {
           </div>
 
           <div className="text-[9px] text-center text-muted-foreground/80 mt-2.5 pt-1.5 border-t border-white/5 flex items-center justify-center gap-1.5 font-medium truncate">
-            <MapPin className={`h-2.5 w-2.5 shrink-0 ${isLive || isFirstUpcoming ? "text-red-500" : "text-neon"}`} />
+            <MapPin className={`h-2.5 w-2.5 shrink-0 ${isLive ? "text-red-500" : "text-slate-500 dark:text-slate-400"}`} />
             <span className="truncate">
               {match.kickoffTime} {match.timezoneLabel} · {match.venue}, {match.city}
             </span>

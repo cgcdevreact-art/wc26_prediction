@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { Search, Calendar, MapPin } from "lucide-react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { EmptyFixturesState } from "./EmptyFixturesState";
@@ -488,6 +489,17 @@ export function FixturesExplorer() {
         )}
         </div>
       </div>
+
+      <Link
+        href="/predictions/country"
+        className="mt-10 block overflow-hidden rounded-2xl border border-black/8 shadow-lg transition-opacity duration-300 hover:opacity-95 dark:border-white/10"
+      >
+        <img
+          src="/banner.png"
+          alt="FIFA World Cup 2026 Banner"
+          className="h-auto w-full"
+        />
+      </Link>
     </div>
   );
 }

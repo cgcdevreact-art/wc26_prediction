@@ -25,7 +25,7 @@ const SECTIONS = [
     value: "wildcard",
     eyebrow: "Dream Route",
     title: "Your team didn't make the World Cup?",
-    sub: "Drop them in anyway. Build your custom country profile, swap them into the tournament brackets, and run their path hypothetical to glory.",
+    sub: "Drop them in anyway. Build your custom country profile, swap them into the tournament brackets, and run their hypothetical path to glory.",
     contentClassName: "pt-6",
     content: <WildcardCountrySection />,
   },
@@ -93,7 +93,8 @@ export function HomeSectionsAccordion() {
               id={section.value === PROBABILITY_SECTION_VALUE ? "predict" : section.value === "fixtures" ? "fixtures" : undefined}
               className="overflow-visible border-none bg-transparent shadow-none"
             >
-              <AccordionTrigger className="w-full flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-b border-slate-200 dark:border-white/10 pb-6 hover:no-underline text-left cursor-pointer group [&>svg]:hidden">
+              <AccordionTrigger className="group relative w-full cursor-pointer flex-col justify-between gap-6 border-b border-slate-300/90 pb-6 text-left hover:no-underline dark:border-white/15 sm:flex-row sm:items-end [&>svg]:hidden">
+                <div className="pointer-events-none absolute inset-x-[-2%] -top-6 h-24 rounded-[2.5rem] bg-gradient-to-r from-neon/20 via-cyan-400/18 to-neon-2/20 opacity-0 blur-3xl transition-opacity duration-300 group-hover:opacity-100 dark:from-neon/16 dark:via-cyan-400/14 dark:to-neon-2/16" />
                 <div className="max-w-3xl">
                   <div className="text-xs uppercase tracking-[0.25em] text-neon font-bold">{section.eyebrow}</div>
                   <h2 className="mt-2 font-display text-3xl font-extrabold sm:text-4xl text-foreground dark:text-white tracking-tight">
@@ -105,8 +106,8 @@ export function HomeSectionsAccordion() {
                     </p>
                   )}
                 </div>
-                <div className="shrink-0 self-start sm:self-auto pt-2 sm:pt-0">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-black/8 bg-white/70 text-foreground/80 shadow-sm transition group-hover:bg-black/5 dark:border-white/10 dark:bg-white/5 dark:group-hover:bg-white/10">
+                <div className="relative shrink-0 self-start pt-2 sm:self-auto sm:pt-0">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300/80 bg-white/85 text-foreground/80 shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition group-hover:bg-white group-hover:shadow-[0_0_24px_rgba(6,182,212,0.18)] dark:border-white/12 dark:bg-white/5 dark:group-hover:bg-white/10 dark:group-hover:shadow-[0_0_24px_rgba(178,57,210,0.16)]">
                     <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${isOpen ? "rotate-180" : "rotate-0"}`} />
                   </span>
                 </div>
@@ -123,7 +124,7 @@ export function HomeSectionsAccordion() {
                 className="my-20 block overflow-hidden rounded-2xl border border-black/8 shadow-lg transition-opacity duration-300 hover:opacity-95 dark:border-white/10"
               >
                 <img
-                  src="/banner.png"
+                  src="/banner2.png"
                   alt="FIFA World Cup 2026 Banner"
                   className="h-auto w-full"
                 />
