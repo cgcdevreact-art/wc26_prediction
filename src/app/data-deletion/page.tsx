@@ -17,7 +17,8 @@ import {
   Globe, 
   Clock, 
   UserMinus, 
-  RefreshCw 
+  RefreshCw,
+  Mail 
 } from "lucide-react";
 
 export default function DataDeletionPage() {
