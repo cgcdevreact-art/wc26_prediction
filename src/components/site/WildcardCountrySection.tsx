@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
-import { ArrowRight, Sparkles, Plus, X, Info, Pencil } from "lucide-react";
+import { ArrowRight, Sparkles, Plus, X, Info, Pencil, ChevronDown, Check } from "lucide-react";
 import { ALL_COUNTRIES } from "@/lib/countries-data";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import {
@@ -109,6 +109,9 @@ export function WildcardCountrySection() {
 
   const [flagSearch, setFlagSearch] = useState("");
   const [isFlagDropdownOpen, setIsFlagDropdownOpen] = useState(false);
+  const [isBrowseDropdownOpen, setIsBrowseDropdownOpen] = useState(false);
+  const [isBaselineDropdownOpen, setIsBaselineDropdownOpen] = useState(false);
+  const [isReplacementDropdownOpen, setIsReplacementDropdownOpen] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [confirmRunOpen, setConfirmRunOpen] = useState(false);
   const [customCountryDeleteTarget, setCustomCountryDeleteTarget] = useState<CustomCountry | null>(null);
@@ -275,6 +278,10 @@ export function WildcardCountrySection() {
   const selectedFailedCountry = useMemo(() => {
     return failedToQualifyCountries.find((country) => country.selectionCode === selectedCode) || null;
   }, [failedToQualifyCountries, selectedCode]);
+
+  const selectedBrowseCountry = useMemo(() => {
+    return visibleFailedToQualifyCountries.find((country) => country.selectionCode === selectedCode) || selectedFailedCountry;
+  }, [visibleFailedToQualifyCountries, selectedCode, selectedFailedCountry]);
 
   const selectedTeam = useMemo(() => {
     const custom = customCountries.find((cc) => cc.code === selectedCode);
@@ -591,7 +598,7 @@ export function WildcardCountrySection() {
 
   return (
     <div className="py-2">
-      <div className="grid gap-8 lg:grid-cols-[1fr_400px] min-w-0">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_380px] min-w-0">
 
         {/* Left Column: Selector & Launcher Panel */}
         <div className="glass-strong rounded-3xl p-6 relative border border-slate-200 dark:border-white/10 shadow-xl overflow-hidden flex flex-col justify-between min-h-[480px]">
@@ -715,28 +722,82 @@ export function WildcardCountrySection() {
                   {visibleFailedToQualifyCountries.length} available
                 </span>
               </div>
-              <select
-                value={selectedCode}
-                onChange={(event) => handleSelectCode(event.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-neon focus:ring-1 focus:ring-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
-              >
-                {customCountries.length > 0 && (
-                  <optgroup label="Custom Wildcard Teams" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
-                    {customCountries.map((cc) => (
-                      <option key={cc.code} value={cc.code}>
-                        {cc.flag} {cc.name}
-                      </option>
-                    ))}
-                  </optgroup>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsBrowseDropdownOpen((open) => !open)}
+                  className="flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-left text-sm font-semibold text-slate-900 outline-none transition hover:border-slate-300 focus:border-neon focus:ring-1 focus:ring-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    {selectedBrowseCountry ? (
+                      <CountryFlag
+                        code={selectedBrowseCountry.code}
+                        flag={selectedBrowseCountry.flag}
+                        name={selectedBrowseCountry.name}
+                        className="h-4.5 w-6 shrink-0 rounded object-cover"
+                        emojiClassName="text-base leading-none"
+                      />
+                    ) : null}
+                    <span className="truncate">{selectedBrowseCountry?.name || "Select a country"}</span>
+                  </span>
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform dark:text-slate-300 ${isBrowseDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {isBrowseDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setIsBrowseDropdownOpen(false)} />
+                    <div className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-slate-950 scrollbar-custom">
+                      {customCountries.length > 0 && (
+                        <>
+                          <div className="px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-neon-2">
+                            Custom Wildcard Teams
+                          </div>
+                          {customCountries.map((cc) => {
+                            const active = cc.code === selectedCode;
+                            return (
+                              <button
+                                key={cc.code}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCode(cc.code);
+                                  setIsBrowseDropdownOpen(false);
+                                }}
+                                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${active ? "bg-neon-2/10 text-slate-950 dark:text-white" : "hover:bg-slate-100 dark:hover:bg-white/5"}`}
+                              >
+                                <CountryFlag code={cc.code} flag={cc.flag} name={cc.name} className="h-4.5 w-6 shrink-0 rounded object-cover" emojiClassName="text-base leading-none" />
+                                <span className="min-w-0 flex-1 truncate font-semibold">{cc.name}</span>
+                                {active ? <Check className="h-4 w-4 shrink-0 text-neon-2" /> : null}
+                              </button>
+                            );
+                          })}
+                        </>
+                      )}
+
+                      <div className="px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                        Failed To Qualify
+                      </div>
+                      {visibleFailedToQualifyCountries.map((country) => {
+                        const active = country.selectionCode === selectedCode;
+                        return (
+                          <button
+                            key={country.selectionCode}
+                            type="button"
+                            onClick={() => {
+                              handleSelectCode(country.selectionCode);
+                              setIsBrowseDropdownOpen(false);
+                            }}
+                            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${active ? "bg-neon/10 text-slate-950 dark:text-white" : "hover:bg-slate-100 dark:hover:bg-white/5"}`}
+                          >
+                            <CountryFlag code={country.code} flag={country.flag} name={country.name} className="h-4.5 w-6 shrink-0 rounded object-cover" emojiClassName="text-base leading-none" />
+                            <span className="min-w-0 flex-1 truncate font-semibold">{country.name}</span>
+                            {active ? <Check className="h-4 w-4 shrink-0 text-neon" /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
-                <optgroup label="Failed To Qualify" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-white">
-                  {visibleFailedToQualifyCountries.map((country) => (
-                    <option key={country.selectionCode} value={country.selectionCode}>
-                      {country.name}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
+              </div>
             </div>
 
             {/* Selected Team Analysis Preview */}
@@ -1002,26 +1063,61 @@ export function WildcardCountrySection() {
                     ))}
                   </div>
                 </div>
-                     {/* Clone Baseline */}
-                <div className="space-y-1">
+                <div className="rounded-[1.75rem] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.02]">
+                  <div className="mb-3 text-[11px] font-black uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-300">
+                    2. Squad Calibration
+                  </div>
+
+                  {/* Clone Baseline */}
+                  <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest block flex items-center text-cyan-700 dark:text-cyan-300">
-                    <span>2. Clone Baseline Squad</span>
+                    <span>2.A Clone Baseline Squad</span>
                     <InfoTooltip content="Clones the selected country's real player names, statistics, and value to use as the base for this team." />
                   </label>
-                  <select
-                    value={baselineCode}
-                    onChange={(e) => applyBaselineTeam(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
-                  >
-                    {worldCupTeams.map((team) => (
-                      <option key={team.code} value={team.code}>
-                        Clone: {team.name} ({team.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsBaselineDropdownOpen((open) => !open)}
+                      className="flex h-10 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 text-left text-sm font-semibold text-slate-900 outline-none transition hover:border-slate-300 focus:border-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        {activeBaselineTeam ? (
+                          <CountryFlag code={activeBaselineTeam.code} flag={activeBaselineTeam.flag} name={activeBaselineTeam.name} className="h-4.5 w-6 shrink-0 rounded object-cover" emojiClassName="text-base leading-none" />
+                        ) : null}
+                        <span className="truncate">Clone: {activeBaselineTeam?.name || "England"} ({baselineCode})</span>
+                      </span>
+                      <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform dark:text-slate-300 ${isBaselineDropdownOpen ? "rotate-180" : ""}`} />
+                    </button>
 
-                <div className="rounded-2xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+                    {isBaselineDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-30" onClick={() => setIsBaselineDropdownOpen(false)} />
+                        <div className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-slate-950 scrollbar-custom">
+                          {worldCupTeams.map((team) => {
+                            const active = team.code === baselineCode;
+                            return (
+                              <button
+                                key={team.code}
+                                type="button"
+                                onClick={() => {
+                                  applyBaselineTeam(team.code);
+                                  setIsBaselineDropdownOpen(false);
+                                }}
+                                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${active ? "bg-neon/10 text-slate-950 dark:text-white" : "hover:bg-slate-100 dark:hover:bg-white/5"}`}
+                              >
+                                <CountryFlag code={team.code} flag={team.flag} name={team.name} className="h-4.5 w-6 shrink-0 rounded object-cover" emojiClassName="text-base leading-none" />
+                                <span className="min-w-0 flex-1 truncate font-semibold">{team.name} ({team.code})</span>
+                                {active ? <Check className="h-4 w-4 shrink-0 text-neon" /> : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  </div>
+
+                <div className="mt-3 rounded-2xl border border-slate-200/70 bg-white px-4 py-3 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
                   Cloning <span className="font-black text-slate-950 dark:text-white">{activeBaselineTeam?.name || "England"}</span>
                   {" "}means this profile starts from FIFA rank{" "}
                   <span className="font-black text-neon">{activeBaselineTeam?.rank ? `#${activeBaselineTeam.rank}` : "N/A"}</span>
@@ -1029,11 +1125,11 @@ export function WildcardCountrySection() {
                 </div>
 
                      {/* Ratings Sliders (Elo, Att, Def) */}
-                <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-white/5">
+                <div className="mt-4 space-y-3 border-t border-slate-200 pt-4 dark:border-white/5">
                   <div>
                     <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-1.5 items-center text-cyan-700 dark:text-cyan-300">
                       <span className="flex items-center">
-                        <span>2.A Elo Rating</span>
+                        <span>2.B Elo Rating</span>
                         <InfoTooltip content="Overall skill rating of the country. Higher ELO increases the probability of winning matches." />
                       </span>
                       <span className="font-mono font-bold text-cyan-700 dark:text-cyan-300">{customElo}</span>
@@ -1050,7 +1146,7 @@ export function WildcardCountrySection() {
                   <div>
                     <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-1.5 items-center text-cyan-700 dark:text-cyan-300">
                       <span className="flex items-center">
-                        <span>2.B Attack Power</span>
+                        <span>2.C Attack Power</span>
                         <InfoTooltip content="Influences the average number of goals scored per match by this team." />
                       </span>
                       <span className="font-mono font-bold text-cyan-700 dark:text-cyan-300">{customAttack}</span>
@@ -1067,7 +1163,7 @@ export function WildcardCountrySection() {
                   <div>
                     <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest mb-1.5 items-center text-cyan-700 dark:text-cyan-300">
                       <span className="flex items-center">
-                        <span>2.C Defense Strength</span>
+                        <span>2.D Defense Strength</span>
                         <InfoTooltip content="Influences the average number of goals conceded per match by this team." />
                       </span>
                       <span className="font-mono font-bold text-cyan-700 dark:text-cyan-300">{customDefense}</span>
@@ -1082,28 +1178,64 @@ export function WildcardCountrySection() {
                     />
                   </div>
                 </div>
-
-                {/* Replacement Choice */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest block flex items-center text-fuchsia-700 dark:text-fuchsia-300">
-                    <span>3. Replacement Team (Slots In)</span>
-                    <InfoTooltip content="The original tournament team that will be replaced by your custom country in the final brackets." />
-                  </label>
-                  <select
-                    value={replacedCode}
-                    onChange={(e) => setReplacedCode(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
-                  >
-                    {worldCupTeams.map((team) => (
-                      <option key={team.code} value={team.code}>
-                        Replace: {team.name} ({team.code})
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
-                <div className="rounded-2xl border border-fuchsia-200/70 bg-fuchsia-50 px-4 py-3 text-xs font-semibold text-fuchsia-700 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10 dark:text-fuchsia-300">
+                {/* Replacement Choice */}
+                <div className="rounded-[1.75rem] border border-fuchsia-200/70 bg-fuchsia-50/60 p-4 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10">
+                  <div className="mb-3 text-[11px] font-black uppercase tracking-[0.2em] text-fuchsia-700 dark:text-fuchsia-300">
+                    3. Tournament Slot
+                  </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest block flex items-center text-fuchsia-700 dark:text-fuchsia-300">
+                    <span>3.A Replacement Team (Slots In)</span>
+                    <InfoTooltip content="The original tournament team that will be replaced by your custom country in the final brackets." />
+                  </label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsReplacementDropdownOpen((open) => !open)}
+                      className="flex h-10 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 text-left text-sm font-semibold text-slate-900 outline-none transition hover:border-slate-300 focus:border-neon dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        {activeReplacedTeam ? (
+                          <CountryFlag code={activeReplacedTeam.code} flag={activeReplacedTeam.flag} name={activeReplacedTeam.name} className="h-4.5 w-6 shrink-0 rounded object-cover" emojiClassName="text-base leading-none" />
+                        ) : null}
+                        <span className="truncate">Replace: {activeReplacedTeam?.name || "Senegal"} ({replacedCode})</span>
+                      </span>
+                      <ChevronDown className={`h-4 w-4 shrink-0 text-slate-500 transition-transform dark:text-slate-300 ${isReplacementDropdownOpen ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {isReplacementDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-30" onClick={() => setIsReplacementDropdownOpen(false)} />
+                        <div className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-slate-950 scrollbar-custom">
+                          {worldCupTeams.map((team) => {
+                            const active = team.code === replacedCode;
+                            return (
+                              <button
+                                key={team.code}
+                                type="button"
+                                onClick={() => {
+                                  setReplacedCode(team.code);
+                                  setIsReplacementDropdownOpen(false);
+                                }}
+                                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${active ? "bg-neon-2/10 text-slate-950 dark:text-white" : "hover:bg-slate-100 dark:hover:bg-white/5"}`}
+                              >
+                                <CountryFlag code={team.code} flag={team.flag} name={team.name} className="h-4.5 w-6 shrink-0 rounded object-cover" emojiClassName="text-base leading-none" />
+                                <span className="min-w-0 flex-1 truncate font-semibold">{team.name} ({team.code})</span>
+                                {active ? <Check className="h-4 w-4 shrink-0 text-neon-2" /> : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-fuchsia-200/70 bg-white px-4 py-3 text-xs font-semibold text-fuchsia-700 dark:border-fuchsia-500/20 dark:bg-white/[0.03] dark:text-fuchsia-300">
                   This custom country will take <span className="font-black">{activeReplacedTeam?.name || "Senegal"}</span>'s tournament slot when you run the simulation.
+                </div>
                 </div>
               </div>
 

@@ -10,9 +10,9 @@ export default async function AdminAuthenticatedLayout({
   await requireAdmin();
 
   return (
-    <div className="flex min-h-screen">
+    <div className="min-h-screen bg-slate-50">
       <AdminSidebar />
-      <main className="ml-64 flex-1 flex flex-col">{children}</main>
+      <main className="flex min-h-screen flex-1 flex-col lg:ml-64">{children}</main>
     </div>
   );
 }

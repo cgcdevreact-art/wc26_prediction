@@ -346,26 +346,27 @@ export default function TeamsClient({
       <div className="rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-[0_20px_50px_rgba(15,23,42,0.06)] backdrop-blur-md dark:border-white/5 dark:bg-slate-900/60 overflow-hidden mb-8 animate-in fade-in duration-500">
         <button
           onClick={() => setCapabilitiesExpanded(!capabilitiesExpanded)}
-          className="w-full flex items-center justify-between p-6 text-left transition-colors hover:bg-slate-500/[0.01]"
+          className="w-full p-5 text-left transition-colors hover:bg-slate-500/[0.01] sm:p-6"
         >
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/15 text-cyan-650 dark:text-neon border border-cyan-500/20">
               <Info className="h-5 w-5" />
             </div>
-            <div>
-              <h3 className="font-display text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <div className="min-w-0">
+              <h3 className="font-display text-lg font-black text-slate-900 dark:text-white">
                 Plan Customization & Simulation Capabilities
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="max-w-xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                 Compare what you can edit, view, and simulate across Free, Advanced, and Expert Predictor tiers
               </p>
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-right">
+            <div className="flex items-center justify-between gap-4 sm:justify-end">
+            <div className="min-w-0 sm:text-right">
               <span className="text-[10px] font-semibold text-muted-foreground uppercase block tracking-wider">Current Plan</span>
-              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${subTier === "pro"
+              <span className={`mt-1 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${subTier === "pro"
                 ? "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-400 border border-fuchsia-500/20 shadow-[0_0_12px_rgba(217,70,239,0.15)]"
                 : subTier === "plus"
                   ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.15)]"
@@ -379,6 +380,7 @@ export default function TeamsClient({
             ) : (
               <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
             )}
+          </div>
           </div>
         </button>
 
@@ -707,29 +709,29 @@ export default function TeamsClient({
       </div>
 
       <Tabs defaultValue="list" className="space-y-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <TabsList className="h-auto rounded-full border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <TabsList className="h-auto flex-wrap justify-start rounded-[1.5rem] border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
             <TabsTrigger
               value="list"
-              className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
             >
               Teams List
             </TabsTrigger>
             <TabsTrigger
               value="rankings"
-              className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
             >
               Team Rankings
             </TabsTrigger>
             <TabsTrigger
               value="players"
-              className="rounded-full px-6 py-2.5 text-sm font-semibold text-slate-600 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
             >
               Player Rankings
             </TabsTrigger>
           </TabsList>
 
-          <div className="xl:ml-auto">
+          <div className="self-start lg:ml-auto">
             <div className="flex items-center gap-3 rounded-[1.6rem] border border-slate-200 bg-white px-4 py-3 shadow-[0_14px_36px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
               <div className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
                 <CurrentModelIcon className="h-5.5 w-5.5" />
@@ -959,8 +961,8 @@ export default function TeamsClient({
 
         <TabsContent value="rankings" className="space-y-6">
           <div className="space-y-5">
-            <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] md:grid-cols-2 xl:grid-cols-5 dark:border-white/10 dark:bg-slate-950">
-              <div className="relative xl:col-span-3">
+            <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 dark:border-white/10 dark:bg-slate-950">
+              <div className="relative md:col-span-2 lg:col-span-2 xl:col-span-3">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                   <Search className="h-5 w-5 text-muted-foreground" />
                 </div>

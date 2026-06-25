@@ -291,7 +291,7 @@ export default function SubscriptionPage() {
         )}
 
         {/* Pricing Cards Grid */}
-        <div className="grid gap-8 lg:grid-cols-3 max-w-6xl mx-auto items-stretch mb-24 pt-4">
+        <div className="mx-auto mb-24 grid max-w-6xl items-stretch gap-8 pt-4 md:grid-cols-2 xl:grid-cols-3">
           {tiers.map((tier) => {
             const isCurrent = currentTier === tier.id;
             const isFree = tier.id === "free";
@@ -430,8 +430,8 @@ export default function SubscriptionPage() {
             </p>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200/60 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-white/5 dark:bg-slate-900/20 backdrop-blur-sm">
-            <table className="min-w-full border-separate border-spacing-0">
+          <div className="overflow-x-auto rounded-2xl border border-slate-200/60 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:border-white/5 dark:bg-slate-900/20 backdrop-blur-sm">
+            <table className="min-w-[760px] border-separate border-spacing-0">
               <thead>
                 <tr>
                   <th className="border-b border-slate-200/80 px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:border-white/10 dark:text-white/40">

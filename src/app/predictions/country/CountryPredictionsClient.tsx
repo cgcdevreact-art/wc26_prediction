@@ -1501,8 +1501,8 @@ export default function CountryPredictionsClient({
               </div>
             )}
           </div>
-          <div className="flex gap-3 shrink-0">
-            <div className="flex flex-col items-end rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 shadow-sm dark:border-white/10 dark:bg-slate-950/60">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-stretch">
+            <div className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 shadow-sm dark:border-white/10 dark:bg-slate-950/60 sm:items-end">
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Simulation Engine</span>
               <span className="text-base font-bold font-display text-cyan-700 dark:text-neon mt-0.5">{formattedModelName}</span>
             </div>
@@ -1518,9 +1518,9 @@ export default function CountryPredictionsClient({
         </div>
       </div>
 
-      <div className="mb-6 grid items-start gap-6 lg:grid-cols-[320px_1fr]">
+      <div className="mb-6 grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         {/* Left Column: Stacked Sidebar */}
-        <div className="space-y-6 lg:w-[320px] shrink-0">
+        <div className="space-y-6 shrink-0 xl:w-[320px]">
           {/* Left list of countries: Futuristic Sidebar Control */}
           <Accordion
             type="multiple"
@@ -1899,7 +1899,7 @@ export default function CountryPredictionsClient({
           >
             <AccordionItem value="team-overview" className="border-none">
               <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
-                <div className="flex flex-row items-center justify-between w-full pr-4">
+                <div className="flex w-full flex-col gap-3 pr-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-left">
                     <div className="font-display text-lg font-extrabold text-foreground">Team Overview</div>
                     <div className="text-xs text-muted-foreground mt-0.5">Profile, champion odds, and stage progression</div>
@@ -1950,7 +1950,7 @@ export default function CountryPredictionsClient({
                 <div className="relative">
                   <div className="absolute -right-16 -top-16 w-56 h-56 rounded-full filter blur-3xl pointer-events-none dark:bg-neon/10" />
                   <div className="absolute -left-16 -bottom-16 w-56 h-56 bg-fuchsia-100/70 rounded-full filter blur-3xl pointer-events-none dark:bg-neon-2/10" />
-                  <div className="flex flex-col xl:flex-row justify-between items-stretch gap-6 border-b border-slate-200 pb-6 mb-6 dark:border-white/5">
+                  <div className="flex flex-col 2xl:flex-row justify-between items-stretch gap-6 border-b border-slate-200 pb-6 mb-6 dark:border-white/5">
                     {/* Team Profile Basic Details */}
                     <div className="flex flex-col justify-between flex-grow gap-4 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
@@ -1988,7 +1988,7 @@ export default function CountryPredictionsClient({
                       </div>
 
                       {/* Core Attributes Mini Grid */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-5 gap-3 mt-2">
+                      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-5">
                         <div className="min-w-0 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3 transition-colors dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10">
                           <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-muted-foreground block font-bold leading-tight">Elo Rating</span>
                           <span className="text-base sm:text-lg font-bold font-mono text-slate-950 dark:text-foreground mt-1 block">{Math.round(customElo)}</span>
@@ -2017,7 +2017,7 @@ export default function CountryPredictionsClient({
                     </div>
 
                     {/* Circular Gauge for Champion Probability */}
-                    <div className="flex flex-col items-center justify-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 min-w-[200px] max-w-sm w-full mx-auto xl:mx-0 text-center shadow-sm relative group overflow-hidden dark:border-white/10 dark:bg-white/[0.02] dark:shadow-glass shrink-0">
+                    <div className="relative group mx-auto flex w-full max-w-sm shrink-0 flex-col items-center justify-center overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/10 dark:bg-white/[0.02] dark:shadow-glass 2xl:mx-0 2xl:min-w-[200px]">
                       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-cyan-100/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 dark:to-neon/5" />
                       <span className="text-[10px] uppercase tracking-wider text-slate-700 dark:text-muted-foreground font-extrabold relative z-10">
                         Championship Prob
@@ -2069,7 +2069,7 @@ export default function CountryPredictionsClient({
                   </div>
 
                   {/* Stages Progression Matrix */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-7 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
                     {stageCards.map((s) => {
                       const count = simResults?.stages[s.key] || 0;
                       const pct = (count / 1000) * 100;

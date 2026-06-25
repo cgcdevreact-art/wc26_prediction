@@ -16,6 +16,21 @@ export function getStaticTeamsFromCup() {
   const cupData = getCupData();
   const rawTeams = cupData.teams;
 
+  // Load teams_live.json to get the official team IDs
+  const liveTeamsMap = new Map<string, number>();
+  try {
+    const filePath = path.join(process.cwd(), "public", "teams_live.json");
+    const fileData = fs.readFileSync(filePath, "utf8");
+    const parsed = JSON.parse(fileData);
+    (parsed.teams || []).forEach((t: any) => {
+      if (t.fifa_code && t.id) {
+        liveTeamsMap.set(t.fifa_code, parseInt(t.id, 10));
+      }
+    });
+  } catch (e) {
+    console.error("Failed to read teams_live.json in getStaticTeamsFromCup:", e);
+  }
+
   // Sort by ELO descending to determine ranks dynamically
   const sortedRaw = [...rawTeams].sort((a: any, b: any) => b.elo - a.elo);
 
@@ -24,6 +39,7 @@ export function getStaticTeamsFromCup() {
 
   return sortedRaw.map((team: any, index: number) => {
     const info = TEAM_INFO[team.name] || { code: team.name.slice(0, 3).toUpperCase(), flag: "🏳️", confederation: "UEFA" };
+    const apiId = liveTeamsMap.get(info.code) || (index + 1);
     
     // Scale power between 15 and 99 based on ELO
     const power = Math.max(15, Math.min(99, Math.round(((team.elo - minElo) / (maxElo - minElo)) * 80 + 15)));
@@ -41,6 +57,7 @@ export function getStaticTeamsFromCup() {
     };
 
     return {
+      id: apiId,
       code: info.code,
       name: team.name,
       flag: info.flag,
@@ -59,18 +76,18 @@ export function getStaticTeamsFromCup() {
 }
 
 export const GROUPS_CONFIG: Record<string, string[]> = {
-  A: ["ARG", "MEX", "ALG", "UZB"],
-  B: ["ESP", "SEN", "EGY", "QAT"],
-  C: ["FRA", "USA", "CAN", "IRQ"],
-  D: ["ENG", "URU", "NOR", "RSA"],
-  E: ["POR", "JPN", "CIV", "SAU"],
-  F: ["BRA", "SUI", "PAN", "JOR"],
-  G: ["MAR", "IRN", "SWE", "BIH"],
-  H: ["NED", "TUR", "CZE", "CPV"],
-  I: ["BEL", "AUT", "PAR", "GHA"],
-  J: ["GER", "ECU", "SCO", "HAI"],
-  K: ["CRO", "KOR", "TUN", "CUW"],
-  L: ["COL", "AUS", "COD", "NZL"],
+  A: [ 'MEX', 'RSA', 'KOR', 'CZE' ],
+  B: [ 'CAN', 'BIH', 'QAT', 'SUI' ],
+  C: [ 'BRA', 'MAR', 'HAI', 'SCO' ],
+  D: [ 'USA', 'PAR', 'AUS', 'TUR' ],
+  E: [ 'GER', 'CUW', 'CIV', 'ECU' ],
+  F: [ 'NED', 'JPN', 'SWE', 'TUN' ],
+  G: [ 'BEL', 'EGY', 'IRN', 'NZL' ],
+  H: [ 'ESP', 'CPV', 'SAU', 'URU' ],
+  I: [ 'FRA', 'SEN', 'IRQ', 'NOR' ],
+  J: [ 'ARG', 'ALG', 'AUT', 'JOR' ],
+  K: [ 'POR', 'COD', 'UZB', 'COL' ],
+  L: [ 'ENG', 'CRO', 'GHA', 'PAN' ]
 };
 
 const TEAM_CODE_ALIASES: Record<string, string> = {
