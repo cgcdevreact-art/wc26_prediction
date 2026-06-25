@@ -6,7 +6,7 @@ import Link from "next/link";
 export function Footer() {
   return (
     <footer className="border-t border-white/5 mt-10">
-      <div className="mx-auto container mx-auto px-4 py-10   grid gap-6 md:grid-cols-4">
+      <div className="container mx-auto px-4 py-10 grid gap-6 sm:grid-cols-2 md:grid-cols-5">
         <div>
           <div className="flex items-center gap-2">
             <span className="flex h-8 items-center">
@@ -47,6 +47,13 @@ export function Footer() {
             { label: "Elo Ratings", href: "/teams" },
             { label: "Country Predict", href: "/predictions/country" },
             { label: "Teams Info", href: "/teams" }
+          ]}
+        />
+        <FooterCol
+          title="Legal"
+          items={[
+            { label: "Privacy Policy", href: "/privacy" },
+            { label: "Data Deletion", href: "/data-deletion" }
           ]}
         />
       </div>
