@@ -64,8 +64,31 @@ export function Hero() {
     };
   }, []);
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayMatches = fixtures.filter((f) => f.date === todayStr);
+  // Find the active date dynamically:
+  // 1. If any match is LIVE, use the date of the first LIVE match.
+  // 2. Otherwise, use the date of the first UPCOMING match.
+  // 3. Otherwise, use the date of the last COMPLETED match.
+  // 4. Fallback to client's local date.
+  const getActiveDate = (matches: any[]) => {
+    if (matches.length === 0) return new Date().toISOString().slice(0, 10);
+    
+    const liveMatch = matches.find((m) => m.status === "LIVE");
+    if (liveMatch) return liveMatch.date;
+    
+    const upcomingMatch = matches.find((m) => m.status === "UPCOMING");
+    if (upcomingMatch) return upcomingMatch.date;
+    
+    const completedMatches = matches.filter((m) => m.status === "COMPLETED");
+    if (completedMatches.length > 0) {
+      return completedMatches[completedMatches.length - 1].date;
+    }
+    
+    return new Date().toISOString().slice(0, 10);
+  };
+
+  const activeDate = getActiveDate(fixtures);
+  const todayMatches = fixtures.filter((f) => f.date === activeDate);
+  const firstUpcoming = todayMatches.find((m) => m.status === "UPCOMING");
 
   const handleSimulationClick = () => {
     if (session) {
@@ -211,12 +234,12 @@ export function Hero() {
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
             <Calendar className="h-3.5 w-3.5 text-neon" />
-            <span>Today's <span className="text-neon">Matches</span></span>
             {todayMatches.length > 0 && (
               <span className="rounded-full bg-neon/10 px-2.5 py-0.5 text-[10px] font-bold text-neon tracking-normal normal-case">
                 {todayMatches.length}
               </span>
             )}
+            <span>Today's <span className="text-neon">Matches</span></span>
           </h3>
 
           {/* Navigation buttons */}
@@ -252,79 +275,11 @@ export function Hero() {
             <CarouselContent className="-ml-3">
               {todayMatches.map((match) => (
                 <CarouselItem key={match.match_no} className="pl-3 basis-[85%] sm:basis-[48%] md:basis-[32%] lg:basis-[24%]">
-                  <div
+                  <HeroMatchCard
+                    match={match}
+                    isFirstUpcoming={firstUpcoming ? match.match_no === firstUpcoming.match_no : false}
                     onClick={handleMatchCardClick}
-                    className="glass hover:bg-white/10 hover:border-neon/40 hover:scale-[1.01] transition-all duration-300 rounded-2xl p-3.5 cursor-pointer relative overflow-hidden group select-none border border-white/5"
-                  >
-                    {/* Shimmer effect on hover */}
-                    <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-
-                    <div className="flex items-center justify-between text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-2">
-                      <span className="text-neon font-extrabold">Match #{match.match_no}</span>
-                      <span className="text-neon bg-neon/10 px-2 py-0.5 rounded-full font-extrabold">
-                        {match.group ? `Group ${match.group}` : match.stageName}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2.5 my-1.5">
-                      {/* Home Team */}
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <div className="shrink-0 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 rounded-md border border-white/5">
-                          <CountryFlag
-                            code={match.homeTeamObj.code}
-                            flag={match.homeTeamObj.flag}
-                            name={match.homeTeamObj.name}
-                            className="h-4.5 w-6 shrink-0"
-                            emojiClassName="text-base leading-none"
-                          />
-                        </div>
-                        <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
-                          {match.homeTeamObj.code || match.homeTeamObj.name.slice(0, 3)}
-                        </span>
-                      </div>
-
-                      {/* Score / VS display */}
-                      <div className="shrink-0 px-2 py-1 rounded-lg bg-black/10 dark:bg-black/40 border border-white/5 text-center min-w-[65px] flex flex-col justify-center items-center">
-                        {match.status === "LIVE" ? (
-                          <span className="text-[10px] font-black text-red-500 flex items-center gap-1.5 uppercase tracking-wider animate-pulse">
-                            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                            LIVE
-                          </span>
-                        ) : match.status === "COMPLETED" ? (
-                          <>
-                            <span className="font-mono text-xs font-bold text-muted-foreground">{match.homeScore} - {match.awayScore}</span>
-                            <span className="text-[7px] text-muted-foreground/80 uppercase font-extrabold mt-0.5">FT</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="font-mono text-[10px] font-black text-neon">{match.kickoffTime || "VS"}</span>
-                            <span className="text-[7px] text-neon/80 uppercase font-extrabold mt-0.5">UPCOMING</span>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Away Team */}
-                      <div className="flex items-center gap-1.5 justify-end min-w-0 flex-1 text-right">
-                        <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
-                          {match.awayTeamObj.code || match.awayTeamObj.name.slice(0, 3)}
-                        </span>
-                        <div className="shrink-0 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 rounded-md border border-white/5">
-                          <CountryFlag
-                            code={match.awayTeamObj.code}
-                            flag={match.awayTeamObj.flag}
-                            name={match.awayTeamObj.name}
-                            className="h-4.5 w-6 shrink-0"
-                            emojiClassName="text-base leading-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-[9px] text-center text-muted-foreground/80 mt-2.5 pt-1.5 border-t border-white/5 flex items-center justify-center gap-1 font-medium truncate">
-                      <MapPin className="h-2.5 w-2.5 text-neon shrink-0" />
-                      <span className="truncate">{match.stageName} · {match.city}</span>
-                    </div>
-                  </div>
+                  />
                 </CarouselItem>
               ))}
             </CarouselContent>
@@ -342,8 +297,157 @@ export function Hero() {
             <p className="text-[11px] text-muted-foreground mt-1 max-w-xs mx-auto">Click to browse full schedules, venues, and stage filters.</p>
           </div>
         )}
-      </div>
-      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
-    </section>
-  );
-}
+          </div>
+          <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+        </section>
+      );
+    }
+
+    function HeroMatchCard({ 
+      match, 
+      isFirstUpcoming, 
+      onClick 
+    }: { 
+      match: any; 
+      isFirstUpcoming: boolean; 
+      onClick: () => void; 
+    }) {
+      const [nowTime, setNowTime] = useState<number>(Date.now());
+
+      useEffect(() => {
+        const timer = setInterval(() => {
+          setNowTime(Date.now());
+        }, 1000);
+        return () => clearInterval(timer);
+      }, []);
+
+      const kickoffMs = new Date(match.kickoffAtIso).getTime();
+      const diffMs = kickoffMs - nowTime;
+      const isLive = match.status === "LIVE" || (match.status === "UPCOMING" && diffMs <= 0);
+      const isCompleted = match.status === "COMPLETED";
+
+      const getCountdownString = (diff: number) => {
+        if (diff <= 0) return "00:00:00";
+        const totalSec = Math.floor(diff / 1000);
+        const hrs = Math.floor(totalSec / 3600);
+        const mins = Math.floor((totalSec % 3600) / 60);
+        const secs = totalSec % 60;
+        const pad = (num: number) => String(num).padStart(2, "0");
+        if (hrs > 0) {
+          return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+        }
+        return `${pad(mins)}:${pad(secs)}`;
+      };
+
+      // Card styles
+      let cardClass = "glass hover:bg-white/10 hover:border-neon/40 hover:scale-[1.01] transition-all duration-300 rounded-2xl p-3.5 cursor-pointer relative overflow-hidden group select-none border";
+      if (isLive) {
+        cardClass += " border-red-500/80 bg-red-500/[0.04] dark:bg-red-500/[0.08] shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-[pulse_3s_infinite]";
+      } else if (isFirstUpcoming) {
+        cardClass += " border-red-500/40 bg-red-500/[0.01] dark:bg-red-500/[0.02]";
+      } else {
+        cardClass += " border-white/5";
+      }
+      if (isCompleted) {
+        cardClass += " opacity-70";
+      }
+
+      // Center pill styles
+      let pillClass = "shrink-0 px-2 py-1 rounded-lg border text-center min-w-[85px] flex flex-col justify-center items-center transition-all duration-300";
+      if (isLive) {
+        pillClass += " bg-red-500/10 border-red-500/25 text-red-500";
+      } else if (isFirstUpcoming) {
+        pillClass += " bg-red-500/5 border-red-500/10 text-red-400";
+      } else {
+        pillClass += " bg-black/10 dark:bg-black/40 border-white/5 text-muted-foreground";
+      }
+
+      return (
+        <div onClick={onClick} className={cardClass}>
+          {/* Shimmer effect on hover */}
+          <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+
+          <div className="flex items-center justify-between text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-2">
+            <span className={isLive || isFirstUpcoming ? "text-red-500 font-extrabold" : "text-neon font-extrabold"}>
+              Match #{match.match_no}
+            </span>
+            <span className={isLive || isFirstUpcoming ? "text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full font-extrabold" : "text-neon bg-neon/10 px-2 py-0.5 rounded-full font-extrabold"}>
+              {match.group ? `Group ${match.group}` : match.stageName}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between gap-2.5 my-1.5">
+            {/* Home Team */}
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <div className="shrink-0 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 rounded-md border border-white/5">
+                <CountryFlag
+                  code={match.homeTeamObj.code}
+                  flag={match.homeTeamObj.flag}
+                  name={match.homeTeamObj.name}
+                  className="h-4.5 w-6 shrink-0"
+                  emojiClassName="text-base leading-none"
+                />
+              </div>
+              <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
+                {match.homeTeamObj.code || match.homeTeamObj.name.slice(0, 3)}
+              </span>
+            </div>
+
+            {/* Score / VS / Countdown display */}
+            <div className={pillClass}>
+              {isLive ? (
+                <>
+                  <span className="font-mono text-xs font-bold text-red-500 tracking-wider">
+                    {match.homeScore !== "-" ? match.homeScore : "0"} - {match.awayScore !== "-" ? match.awayScore : "0"}
+                  </span>
+                  <span className="text-[7px] font-black text-red-500 tracking-widest uppercase flex items-center gap-1 mt-0.5">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
+                    </span>
+                    LIVE
+                  </span>
+                </>
+              ) : isCompleted ? (
+                <>
+                  <span className="font-mono text-xs font-bold text-muted-foreground">{match.homeScore} - {match.awayScore}</span>
+                  <span className="text-[7px] text-muted-foreground/80 uppercase font-extrabold mt-0.5">FT</span>
+                </>
+              ) : (
+                <>
+                  <span className={`font-mono text-[10px] font-bold ${isFirstUpcoming ? "text-red-500" : "text-neon"}`}>
+                    {getCountdownString(diffMs)}
+                  </span>
+                  <span className={`text-[7px] ${isFirstUpcoming ? "text-red-400/80" : "text-neon/80"} uppercase font-extrabold mt-0.5`}>
+                    {isFirstUpcoming ? "NEXT UP" : "COUNTDOWN"}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Away Team */}
+            <div className="flex items-center gap-1.5 justify-end min-w-0 flex-1 text-right">
+              <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
+                {match.awayTeamObj.code || match.awayTeamObj.name.slice(0, 3)}
+              </span>
+              <div className="shrink-0 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 rounded-md border border-white/5">
+                <CountryFlag
+                  code={match.awayTeamObj.code}
+                  flag={match.awayTeamObj.flag}
+                  name={match.awayTeamObj.name}
+                  className="h-4.5 w-6 shrink-0"
+                  emojiClassName="text-base leading-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="text-[9px] text-center text-muted-foreground/80 mt-2.5 pt-1.5 border-t border-white/5 flex items-center justify-center gap-1.5 font-medium truncate">
+            <MapPin className={`h-2.5 w-2.5 shrink-0 ${isLive || isFirstUpcoming ? "text-red-500" : "text-neon"}`} />
+            <span className="truncate">
+              {match.kickoffTime} {match.timezoneLabel} · {match.venue}, {match.city}
+            </span>
+          </div>
+        </div>
+      );
+    }

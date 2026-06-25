@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, Fragment } from "react";
+import Link from "next/link";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ProbabilityExplorer } from "@/components/site/ProbabilityExplorer";
 import { WildcardCountrySection } from "@/components/site/WildcardCountrySection";
@@ -117,13 +118,16 @@ export function HomeSectionsAccordion() {
 
             {/* Banner element between Team Probability Explorer and Dream Route */}
             {section.value === "probability" && (
-              <div className="my-20 overflow-hidden rounded-2xl border border-black/8 dark:border-white/10 shadow-lg hover:opacity-95 transition-opacity duration-300">
+              <Link
+                href="/predictions/country"
+                className="my-20 block overflow-hidden rounded-2xl border border-black/8 shadow-lg transition-opacity duration-300 hover:opacity-95 dark:border-white/10"
+              >
                 <img
                   src="/banner.png"
                   alt="FIFA World Cup 2026 Banner"
-                  className="w-full h-auto"
+                  className="h-auto w-full"
                 />
-              </div>
+              </Link>
             )}
           </Fragment>
         );
