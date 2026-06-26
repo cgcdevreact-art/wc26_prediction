@@ -170,6 +170,14 @@ function getGroupMatchDetails(
   };
 
   const getCode = (id: string | number, nameEn: string) => {
+    // 1. Static API ID mapping (highly reliable)
+    const liveTeamIdMap: Record<string, string> = {
+      "1":"MEX","2":"RSA","3":"KOR","4":"CZE","5":"CAN","6":"BIH","7":"QAT","8":"SUI","9":"BRA","10":"MAR","11":"HAI","12":"SCO","13":"USA","14":"PAR","15":"AUS","16":"TUR","17":"GER","18":"CUW","19":"CIV","20":"ECU","21":"NED","22":"JPN","23":"SWE","24":"TUN","25":"BEL","26":"EGY","27":"IRN","28":"NZL","29":"ESP","30":"CPV","31":"KSA","32":"URU","33":"FRA","34":"SEN","35":"IRQ","36":"NOR","37":"ARG","38":"ALG","39":"AUT","40":"JOR","41":"POR","42":"COD","43":"UZB","44":"COL","45":"ENG","46":"CRO","47":"GHA","48":"PAN"
+    };
+    const mappedCode = liveTeamIdMap[String(id)];
+    if (mappedCode) return normalizeCode(mappedCode);
+
+    // 2. Fallback Name / ID matching
     const normalizeName = (n: string) => {
       if (!n) return "";
       const lower = n.toLowerCase().trim();
@@ -195,8 +203,8 @@ function getGroupMatchDetails(
     const aCode = getCode(g.away_team_id, g.away_team_name_en || "");
     const targetH = normalizeCode(homeCode);
     const targetA = normalizeCode(awayCode);
-    return (hCode === targetH && aCode === targetA) ||
-           (hCode === targetA && aCode === targetH);
+    
+    return (hCode === targetH && aCode === targetA) || (hCode === targetA && aCode === targetH);
   });
 
   // Fallback to suffix-to-sorted-index if not found
@@ -215,16 +223,27 @@ function getGroupMatchDetails(
   }
 
   if (!game) {
-    return { date: "TBD", time, matchNumber: 0, venue: "TBD" };
+    return { date: "TBD", time, matchNumber: 0, venue: "TBD", isSwapped: false };
   }
 
-  // Parse local_date: e.g. "06/13/2026 21:00"
+  // Once we have a game, compute isSwapped accurately based on team codes
+  const hCode = getCode(game.home_team_id, game.home_team_name_en || "");
+  const aCode = getCode(game.away_team_id, game.away_team_name_en || "");
+  const targetH = normalizeCode(homeCode);
+  const targetA = normalizeCode(awayCode);
+  const isSwapped = (hCode === targetA && aCode === targetH);
+
+  // Parse local_date: e.g. "06/13/2026 21:00" (timezone independent)
   let formattedDate = "TBD";
   try {
     if (game.local_date) {
       const datePart = game.local_date.split(" ")[0];
-      const dateObj = new Date(datePart);
-      formattedDate = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+      const dateParts = datePart.split("/");
+      if (dateParts.length === 3) {
+        const [month, day, year] = dateParts.map(Number);
+        const dateObj = new Date(Date.UTC(year, month - 1, day));
+        formattedDate = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+      }
 
       // Extract time from local_date if available
       const timePart = game.local_date.split(" ")[1];
@@ -246,7 +265,8 @@ function getGroupMatchDetails(
     date: formattedDate,
     time,
     matchNumber: parseInt(game.id),
-    venue: venueLabel
+    venue: venueLabel,
+    isSwapped
   };
 }
 
@@ -478,10 +498,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const [confirmSimType, setConfirmSimType] = useState<"all" | "group" | null>(null);
   const [confirmSimGroup, setConfirmSimGroup] = useState<string | null>(null);
   const [deleteGroupTarget, setDeleteGroupTarget] = useState<string | null>(null);
+  const [simScope, setSimScope] = useState<"whole" | "r32">("whole");
 
   const handleConfirmSimulation = () => {
     if (confirmSimType === "all") {
-      handleAiPredictWithCredits();
+      if (simScope === "whole") {
+        handleWholeTournamentSimulationWithCredits();
+      } else {
+        handleAiPredictWithCredits();
+      }
     } else if (confirmSimType === "group" && confirmSimGroup) {
       predictGroup(confirmSimGroup);
     }
@@ -679,6 +704,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       return null;
     }
 
+    if (details.isSwapped) {
+      return { homeScore: awayScore, awayScore: homeScore };
+    }
     return { homeScore, awayScore };
   }, [liveGames, liveStadiums, teams]);
 
@@ -714,6 +742,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       setMatches((prev) => applyRealScores(prev));
     }
   }, [liveGames, useRealScores, applyRealScores]);
+
+  const globalRealPercent = useMemo(() => {
+    const realCount = matches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
+    return matches.length > 0 ? Math.round((realCount / matches.length) * 100) : 0;
+  }, [matches, getAssignedLiveScoreForMatch]);
 
   const simulatePendingMatches = useCallback(() => {
     const updatedMatches = matches.map((m) => {
@@ -1983,6 +2016,247 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     }
   };
 
+  const simulateKoMatch = (home: string, away: string) => {
+    const homeTeam = getTeam(home);
+    const awayTeam = getTeam(away);
+    const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, players, selectedModel);
+    let hs = getPoisson(homeLambda);
+    let as = getPoisson(awayLambda);
+
+    // Knockouts cannot end in a draw!
+    if (hs === as) {
+      if (Math.random() > 0.5) hs += 1;
+      else as += 1;
+    }
+    return { hs, as, winner: hs > as ? home : away };
+  };
+
+  const handleWholeTournamentSimulation = () => {
+    disableRealScoresState();
+    const targetGroups = selectedGroups.length > 0 ? selectedGroups : Object.keys(GROUPS_CONFIG);
+    const predictedMatches = matches.map((m) => {
+      if (!targetGroups.includes(m.group)) return m;
+      const homeTeam = getTeam(m.homeCode);
+      const awayTeam = getTeam(m.awayCode);
+      const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, players, selectedModel);
+      return {
+        ...m,
+        homeScore: getPoisson(homeLambda),
+        awayScore: getPoisson(awayLambda),
+      };
+    });
+
+    const computeStandingsSync = (currentMatches: PredictorMatch[]) => {
+      const data: Record<string, Record<string, TeamStanding>> = {};
+
+      Object.entries(GROUPS_CONFIG).forEach(([group, codes]) => {
+        data[group] = {};
+        codes.forEach((code) => {
+          data[group][code] = {
+            code,
+            team: getTeam(code),
+            played: 0,
+            won: 0,
+            drawn: 0,
+            lost: 0,
+            gf: 0,
+            ga: 0,
+            gd: 0,
+            pts: 0,
+          };
+        });
+      });
+
+      currentMatches.forEach((m) => {
+        const g = m.group;
+        const h = m.homeCode;
+        const a = m.awayCode;
+
+        if (hasAssignedMatchScores(m)) {
+          const hs = Number(m.homeScore);
+          const as = Number(m.awayScore);
+
+          data[g][h].played += 1;
+          data[g][a].played += 1;
+          data[g][h].gf += hs;
+          data[g][h].ga += as;
+          data[g][a].gf += as;
+          data[g][a].ga += hs;
+          data[g][h].gd = data[g][h].gf - data[g][h].ga;
+          data[g][a].gd = data[g][a].gf - data[g][a].ga;
+
+          if (hs > as) {
+            data[g][h].won += 1;
+            data[g][h].pts += 3;
+            data[g][a].lost += 1;
+          } else if (hs < as) {
+            data[g][a].won += 1;
+            data[g][a].pts += 3;
+            data[g][h].lost += 1;
+          } else {
+            data[g][h].drawn += 1;
+            data[g][h].pts += 1;
+            data[g][a].drawn += 1;
+            data[g][a].pts += 1;
+          }
+        }
+      });
+
+      const sorted: Record<string, TeamStanding[]> = {};
+      Object.entries(data).forEach(([group, groupTeams]) => {
+        sorted[group] = Object.values(groupTeams).sort((a, b) => {
+          if (b.pts !== a.pts) return b.pts - a.pts;
+          if (b.gd !== a.gd) return b.gd - a.gd;
+          if (b.gf !== a.gf) return b.gf - a.gf;
+          return (b.team.elo || 0) - (a.team.elo || 0);
+        });
+      });
+
+      return sorted;
+    };
+
+    const computeThirdPlaceStandingsSync = (currentStandings: Record<string, TeamStanding[]>) => {
+      const list: TeamStanding[] = [];
+      Object.keys(currentStandings).forEach((g) => {
+        list.push(currentStandings[g][2]);
+      });
+      return list.sort((a, b) => {
+        if (b.pts !== a.pts) return b.pts - a.pts;
+        if (b.gd !== a.gd) return b.gd - a.gd;
+        if (b.gf !== a.gf) return b.gf - a.gf;
+        return (b.team.elo || 0) - (a.team.elo || 0);
+      });
+    };
+
+    const computeR32TeamsSync = (currentStandings: Record<string, TeamStanding[]>, thirdPlaces: TeamStanding[]) => {
+      const bestThirdPlaces = thirdPlaces.slice(0, 8).map((t) => t.code);
+
+      const getWinner = (grp: string) => currentStandings[grp][0].code;
+      const getRunner = (grp: string) => currentStandings[grp][1].code;
+      const getThird = (idx: number) => bestThirdPlaces[idx] || "ARG";
+
+      return [
+        { home: getWinner("A"), away: getThird(7) },
+        { home: getRunner("B"), away: getRunner("C") },
+        { home: getWinner("C"), away: getThird(6) },
+        { home: getRunner("D"), away: getRunner("E") },
+        { home: getWinner("E"), away: getThird(5) },
+        { home: getRunner("F"), away: getRunner("G") },
+        { home: getWinner("G"), away: getThird(4) },
+        { home: getRunner("H"), away: getRunner("I") },
+        { home: getWinner("B"), away: getThird(3) },
+        { home: getRunner("A"), away: getRunner("J") },
+        { home: getWinner("D"), away: getThird(2) },
+        { home: getRunner("K"), away: getRunner("L") },
+        { home: getWinner("F"), away: getThird(1) },
+        { home: getWinner("H"), away: getThird(0) },
+        { home: getWinner("I"), away: getWinner("J") },
+        { home: getWinner("K"), away: getWinner("L") },
+      ];
+    };
+
+    const currentStandings = computeStandingsSync(predictedMatches);
+    const thirdPlaces = computeThirdPlaceStandingsSync(currentStandings);
+    const r32Pairs = computeR32TeamsSync(currentStandings, thirdPlaces);
+
+    const updatedWinners = {
+      r32: Array(16).fill(null),
+      r16: Array(8).fill(null),
+      qf: Array(4).fill(null),
+      sf: Array(2).fill(null),
+      final: Array(1).fill(null),
+    };
+    const updatedScores: Record<string, { home: number | ""; away: number | "" }> = {};
+
+    // Simulate R32
+    r32Pairs.forEach((m, idx) => {
+      if (!m.home || !m.away) return;
+      const { hs, as, winner } = simulateKoMatch(m.home, m.away);
+      updatedWinners.r32[idx] = winner;
+      updatedScores[`r32-${idx}`] = { home: hs, away: as };
+    });
+
+    // R16
+    for (let idx = 0; idx < 8; idx++) {
+      const home = updatedWinners.r32[2 * idx];
+      const away = updatedWinners.r32[2 * idx + 1];
+      if (!home || !away) continue;
+      const { hs, as, winner } = simulateKoMatch(home, away);
+      updatedWinners.r16[idx] = winner;
+      updatedScores[`r16-${idx}`] = { home: hs, away: as };
+    }
+
+    // QF
+    for (let idx = 0; idx < 4; idx++) {
+      const home = updatedWinners.r16[2 * idx];
+      const away = updatedWinners.r16[2 * idx + 1];
+      if (!home || !away) continue;
+      const { hs, as, winner } = simulateKoMatch(home, away);
+      updatedWinners.qf[idx] = winner;
+      updatedScores[`qf-${idx}`] = { home: hs, away: as };
+    }
+
+    // SF
+    for (let idx = 0; idx < 2; idx++) {
+      const home = updatedWinners.qf[2 * idx];
+      const away = updatedWinners.qf[2 * idx + 1];
+      if (!home || !away) continue;
+      const { hs, as, winner } = simulateKoMatch(home, away);
+      updatedWinners.sf[idx] = winner;
+      updatedScores[`sf-${idx}`] = { home: hs, away: as };
+    }
+
+    // Final
+    const homeFinal = updatedWinners.sf[0];
+    const awayFinal = updatedWinners.sf[1];
+    if (homeFinal && awayFinal) {
+      const { hs, as, winner } = simulateKoMatch(homeFinal, awayFinal);
+      updatedWinners.final[0] = winner;
+      updatedScores[`final-0`] = { home: hs, away: as };
+    }
+
+    // 3rd Place Match
+    const homeMatch = { home: updatedWinners.qf[0], away: updatedWinners.qf[1] };
+    const awayMatch = { home: updatedWinners.qf[2], away: updatedWinners.qf[3] };
+    const homeWinner = updatedWinners.sf[0];
+    const awayWinner = updatedWinners.sf[1];
+
+    let homeLoser: string | null = null;
+    let awayLoser: string | null = null;
+
+    if (homeMatch.home && homeMatch.away && homeWinner) {
+      homeLoser = homeWinner === homeMatch.home ? homeMatch.away : homeMatch.home;
+    }
+    if (awayMatch.home && awayMatch.away && awayWinner) {
+      awayLoser = awayWinner === awayMatch.home ? awayMatch.away : awayMatch.home;
+    }
+
+    let simulatedThirdWinner: string | null = null;
+    let simulatedThirdScores: { home: number | ""; away: number | "" } = { home: "", away: "" };
+
+    if (homeLoser && awayLoser) {
+      const { hs, as, winner } = simulateKoMatch(homeLoser, awayLoser);
+      simulatedThirdWinner = winner;
+      simulatedThirdScores = { home: hs, away: as };
+    }
+
+    setMatches(predictedMatches);
+    setKoWinners(updatedWinners);
+    setKoScores(updatedScores);
+    setThirdWinner(simulatedThirdWinner);
+    setThirdScores(simulatedThirdScores);
+
+    saveBulkToDb(predictedMatches, updatedWinners, updatedScores, simulatedThirdWinner, simulatedThirdScores);
+    setSelectedGroups([]);
+  };
+
+  const handleWholeTournamentSimulationWithCredits = async () => {
+    const allowed = await consumeCredit();
+    if (allowed) {
+      handleWholeTournamentSimulation();
+    }
+  };
+
   // AI Poisson Predict
   const handleAiPredict = () => {
     disableRealScoresState();
@@ -2066,20 +2340,6 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     saveBulkToDb(resetMatches, clearedWinners, {}, null, { home: "", away: "" });
   };
 
-  const simulateKoMatch = (home: string, away: string) => {
-    const homeTeam = getTeam(home);
-    const awayTeam = getTeam(away);
-    const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, players, selectedModel);
-    let hs = getPoisson(homeLambda);
-    let as = getPoisson(awayLambda);
-
-    // Knockouts cannot end in a draw!
-    if (hs === as) {
-      if (Math.random() > 0.5) hs += 1;
-      else as += 1;
-    }
-    return { hs, as, winner: hs > as ? home : away };
-  };
 
   const handleSimulateRound = (round: "r32" | "r16" | "qf" | "sf" | "final") => {
     const updatedWinners = { ...koWinners };
@@ -2336,6 +2596,18 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               </div>
             )
           )}
+          <button
+            onClick={() => handleToggleRealScores(!useRealScores)}
+            className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
+              useRealScores
+                ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)] animate-pulse"
+                : "border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5"
+            }`}
+          >
+            <Zap className={`h-4 w-4 ${useRealScores ? "text-cyan-500 fill-cyan-500" : ""}`} />
+            {useRealScores ? `Real-Time Data: ${globalRealPercent}% Active` : `Include Real-Time Data (${globalRealPercent}%)`}
+          </button>
+
           {session?.user?.id && (
             <button
               onClick={() => setIsSavesModalOpen(true)}
@@ -2481,6 +2753,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       {activeTab === "group" && (
         <ScoreTrendGraph
           matches={matches}
+          predictionMatches={useRealScores && preRealScoresMatches ? preRealScoresMatches : matches}
           teams={teams}
           liveGames={liveGames}
           liveStadiums={liveStadiums}
@@ -2584,7 +2857,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                         {isGroupPredicted ? (
                           <>
                             <span className="text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 shadow-sm flex items-center gap-1">
-                              <Check className="h-3 w-3" /> {realDataPercent > 0 ? `${realDataPercent}% Real Data` : "Simulated"}
+                              <Check className="h-3 w-3" /> {useRealScores && realDataPercent > 0 ? `${realDataPercent}% Real Data` : "Simulated"}
                             </span>
                             <button
                               onClick={() => setDeleteGroupTarget(groupName)}
@@ -3583,7 +3856,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       </span>
                     </div>
                     <span className="text-[9px] uppercase font-bold tracking-wider text-neon mt-1 bg-neon/10 px-2 py-0.5 rounded-full border border-neon/20">
-                      {simHomeGoals !== "" ? (simMatch && getAssignedLiveScoreForMatch({ id: simMatch.id || "", group: "", homeCode: simMatch.homeCode, awayCode: simMatch.awayCode, homeScore: "", awayScore: "" }) ? "Real Data" : "Simulated") : "Not Simulated"}
+                      {simHomeGoals !== "" ? (useRealScores && simMatch && getAssignedLiveScoreForMatch({ id: simMatch.id || "", group: "", homeCode: simMatch.homeCode, awayCode: simMatch.awayCode, homeScore: "", awayScore: "" }) ? "Real Data" : "Simulated") : "Not Simulated"}
                     </span>
                   </div>
 
@@ -4098,10 +4371,56 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               <AlertCircle className="w-5 h-5 text-cyan-500" />
               <span>Confirm Simulation</span>
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-500 dark:text-slate-400 mt-2 text-sm leading-relaxed">
-              {confirmSimType === "all"
-                ? "Are you sure you want to simulate all group stage matches? This will use your model configuration to predict and overwrite current scores for all groups."
-                : `Are you sure you want to simulate matches for Group ${confirmSimGroup}? This will predict and overwrite current scores for this group.`}
+            <AlertDialogDescription asChild>
+              <div className="text-slate-500 dark:text-slate-400 mt-2 text-sm leading-relaxed">
+                {confirmSimType === "all" ? (
+                  <>
+                    <p className="mb-3">Choose the simulation scope. This will use your model configuration to predict scores.</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setSimScope("whole")}
+                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${
+                          simScope === "whole"
+                            ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+                            : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Trophy className={`h-4 w-4 ${simScope === "whole" ? "text-cyan-500" : "text-slate-400"}`} />
+                          <span className={`font-bold text-xs uppercase tracking-wider ${simScope === "whole" ? "text-cyan-600 dark:text-cyan-400" : "text-slate-600 dark:text-slate-300"}`}>
+                            Whole Tournament
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
+                          Simulate all 48 group matches + knockout bracket through the Final
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSimScope("r32")}
+                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${
+                          simScope === "r32"
+                            ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+                            : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Sparkles className={`h-4 w-4 ${simScope === "r32" ? "text-cyan-500" : "text-slate-400"}`} />
+                          <span className={`font-bold text-xs uppercase tracking-wider ${simScope === "r32" ? "text-cyan-600 dark:text-cyan-400" : "text-slate-600 dark:text-slate-300"}`}>
+                            Groups Only
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
+                          Simulate group stage only, then build your own knockout bracket
+                        </p>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <span>{`Are you sure you want to simulate matches for Group ${confirmSimGroup}? This will predict and overwrite current scores for this group.`}</span>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-4 flex gap-2">
