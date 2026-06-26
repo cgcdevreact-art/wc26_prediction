@@ -332,7 +332,7 @@ export default function CountryPredictionsClient({
       // Delay resetting the ref to allow React to flush state updates
       setTimeout(() => {
         ignoreResetRef.current = false;
-      }, 100);
+      }, 500);
     } catch (err) {
       ignoreResetRef.current = false;
       console.error("Error loading prediction:", err);
@@ -429,7 +429,7 @@ export default function CountryPredictionsClient({
     }
 
     // Authenticated user flow
-    const tier = (subscriptionTier || session.user.subscriptionTier || "free").toLowerCase();
+    const tier = (subscriptionTier || session.user?.subscriptionTier || "free").toLowerCase();
     if (tier !== "free") {
       return true;
     }
@@ -740,20 +740,38 @@ export default function CountryPredictionsClient({
   const [playersIn, setPlayersIn] = useState<string[]>([]);
   const [playersOut, setPlayersOut] = useState<string[]>([]);
 
+  const prevSelectedCodeRef = useRef<string | null>(null);
+  const isSnapshotRestoredRef = useRef<boolean>(false);
+
   useEffect(() => {
-    if (ignoreResetRef.current) return;
+    if (ignoreResetRef.current) {
+      prevSelectedCodeRef.current = selectedCode;
+      return;
+    }
+    if (!hasRestoredSimulationSnapshot.current) return;
     if (!selectedTeam) return;
-    setCustomElo(Math.round(selectedTeam.elo));
-    setCustomAttack(formatTeamScaleRating(selectedTeam.attack));
-    setCustomDefense(formatTeamScaleRating(selectedTeam.defense));
-    setCustomPlayerRatingDelta(0);
-    setPlayersIn([]);
-    setPlayersOut([]);
-    setSimResults(null);
+
+    if (isSnapshotRestoredRef.current && prevSelectedCodeRef.current === null) {
+      prevSelectedCodeRef.current = selectedCode;
+      isSnapshotRestoredRef.current = false;
+      return;
+    }
+
+    if (prevSelectedCodeRef.current !== selectedCode) {
+      setCustomElo(Math.round(selectedTeam.elo));
+      setCustomAttack(formatTeamScaleRating(selectedTeam.attack));
+      setCustomDefense(formatTeamScaleRating(selectedTeam.defense));
+      setCustomPlayerRatingDelta(0);
+      setPlayersIn([]);
+      setPlayersOut([]);
+      setSimResults(null);
+    }
+    prevSelectedCodeRef.current = selectedCode;
   }, [selectedCode, selectedTeam]);
 
   useEffect(() => {
     if (ignoreResetRef.current) return;
+    if (!hasRestoredSimulationSnapshot.current) return;
     if (!hasInitializedCustomizer.current) {
       hasInitializedCustomizer.current = true;
       return;
@@ -809,6 +827,7 @@ export default function CountryPredictionsClient({
 
       ignoreResetRef.current = true;
       hasSeenSelectionChange.current = false;
+      isSnapshotRestoredRef.current = true;
       setSelectedCode(snapshot.selectedCode);
       setSelectedModel(snapshot.selectedModel);
       setCustomElo(snapshot.customElo);
@@ -822,7 +841,7 @@ export default function CountryPredictionsClient({
 
       setTimeout(() => {
         ignoreResetRef.current = false;
-      }, 100);
+      }, 500);
     } catch (err) {
       console.error("Failed to restore cached country simulation snapshot", err);
       localStorage.removeItem(COUNTRY_SIMULATION_SNAPSHOT_KEY);
@@ -989,9 +1008,6 @@ export default function CountryPredictionsClient({
       if (expectedSize !== undefined && normalized.length !== expectedSize) {
         return false;
       }
-      if (!normalized.every((team) => isKnownTeamCode(team))) {
-        return false;
-      }
       return new Set(normalized).size === normalized.length;
     };
 
@@ -1016,9 +1032,10 @@ export default function CountryPredictionsClient({
     let bestMockTournament: any = null;
 
     for (let start = 0; start < iterations; start += CHUNK_SIZE) {
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
         setTimeout(() => {
-          const end = Math.min(start + CHUNK_SIZE, iterations);
+          try {
+            const end = Math.min(start + CHUNK_SIZE, iterations);
           iterationLoop: for (let iteration = start; iteration < end; iteration++) {
             let currentScore = 0;
             const iterationStageCounts: Record<string, number> = {
@@ -1225,7 +1242,7 @@ export default function CountryPredictionsClient({
             for (let i = 0; i < 8; i++) {
               const home = r16Teams[2 * i];
               const away = r16Teams[2 * i + 1];
-              if (!home || !away || home === away || !isKnownTeamCode(home) || !isKnownTeamCode(away)) {
+              if (!home || !away || home === away) {
                 continue iterationLoop;
               }
               const { hs, as, winner } = simulateKo(home, away);
@@ -1250,7 +1267,7 @@ export default function CountryPredictionsClient({
             for (let i = 0; i < 4; i++) {
               const home = qfTeams[2 * i];
               const away = qfTeams[2 * i + 1];
-              if (!home || !away || home === away || !isKnownTeamCode(home) || !isKnownTeamCode(away)) {
+              if (!home || !away || home === away) {
                 continue iterationLoop;
               }
               const { hs, as, winner } = simulateKo(home, away);
@@ -1275,7 +1292,7 @@ export default function CountryPredictionsClient({
             for (let i = 0; i < 2; i++) {
               const home = sfTeams[2 * i];
               const away = sfTeams[2 * i + 1];
-              if (!home || !away || home === away || !isKnownTeamCode(home) || !isKnownTeamCode(away)) {
+              if (!home || !away || home === away) {
                 continue iterationLoop;
               }
               const { hs, as, winner } = simulateKo(home, away);
@@ -1298,7 +1315,7 @@ export default function CountryPredictionsClient({
             // Simulate Final
             const homeTeam = finalTeams[0];
             const awayTeam = finalTeams[1];
-            if (!homeTeam || !awayTeam || homeTeam === awayTeam || !isKnownTeamCode(homeTeam) || !isKnownTeamCode(awayTeam)) {
+            if (!homeTeam || !awayTeam || homeTeam === awayTeam) {
               continue iterationLoop;
             }
             const { hs, as, winner } = simulateKo(homeTeam, awayTeam);
@@ -1324,14 +1341,26 @@ export default function CountryPredictionsClient({
               bestMockTournament = currentMock;
             }
           } // end chunk loop
-          setSimProgress(Math.floor((end / iterations) * 100));
-          resolve();
+            setSimProgress(Math.floor((end / iterations) * 100));
+            resolve();
+          } catch (e) {
+            reject(e);
+          }
         }, 0);
       }); // end Promise
     } // end main loop
 
     if (!bestMockTournament) {
-      throw new Error("Simulation completed without producing a valid bracket.");
+      // Generate a fallback result from partial data instead of throwing
+      console.warn("Simulation produced no valid full brackets, using partial stage data.");
+      bestMockTournament = {
+        groups: {},
+        r32: [],
+        r16: [],
+        qf: [],
+        sf: [],
+        final: null,
+      };
     }
 
     const nextResults = {
@@ -2766,59 +2795,67 @@ export default function CountryPredictionsClient({
 
                     {/* Final Column */}
                     <div className="h-[2080px] w-56 relative shrink-0">
-                      {/* High fidelity Champion Showcase */}
-                      <div className="absolute top-[780px] -translate-y-1/2 left-0 right-0 flex flex-col items-center p-8 bg-gradient-to-br from-[#1e1b4b]/20 dark:from-[#1e1b4b]/80 to-[#311042]/20 dark:to-[#311042]/80 rounded-3xl border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.1)] z-20 hover:border-yellow-500/50 transition-all duration-500 group px-2">
-                        <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl" />
-                        <Trophy className="w-20 h-20 text-yellow-500 dark:text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.5)] mb-4 animate-float" />
-                        <div className="text-[10px] font-bold text-yellow-600 dark:text-yellow-500 tracking-widest uppercase mb-2">World Cup Champion</div>
-                        <div className="flex items-center gap-3 mt-2">
-                          <CountryFlag
-                            code={getTeam(simResults.mockTournament.final.winner).code}
-                            flag={getTeam(simResults.mockTournament.final.winner).flag}
-                            name={getTeam(simResults.mockTournament.final.winner).name}
-                            className="h-10 w-14 drop-shadow-md"
-                            emojiClassName="text-4xl drop-shadow-md select-none"
-                          />
-                          <span className="text-xl font-black text-foreground dark:text-white tracking-tight">{getTeam(simResults.mockTournament.final.winner).name}</span>
-                        </div>
-                      </div>
-
-                      {/* World Cup Final section positioned and centered at the midpoint */}
-                      <div className="absolute top-[1040px] -translate-y-1/2 left-0 right-0 flex flex-col items-center">
-                        <div className="absolute bottom-full mb-3 text-[10px] uppercase font-bold text-yellow-600 dark:text-yellow-500 tracking-widest pb-1 border-b border-border dark:border-white/10 text-center w-56">
-                          World Cup Final
-                        </div>
-
-                        {/* Final Match Card wrapper that aligns perfectly with SF connector midpoint */}
-                        <div className="relative group/match">
-                          <div className="absolute top-1/2 left-[-24px] w-6 h-px bg-border dark:bg-white/10 -z-10 -translate-y-1/2" />
-
-                          {/* Final Match Card */}
-                          <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-yellow-500/30 bg-background dark:bg-[#070c1b] hover:border-yellow-500/60 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
-                            <div className="bg-black/5 dark:bg-black/60 px-3 py-1.5 text-[9px] font-bold text-yellow-600 dark:text-yellow-500 tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
-                              <span>FINAL</span>
+                      {simResults.mockTournament.final ? (
+                        <>
+                          {/* High fidelity Champion Showcase */}
+                          <div className="absolute top-[780px] -translate-y-1/2 left-0 right-0 flex flex-col items-center p-8 bg-gradient-to-br from-[#1e1b4b]/20 dark:from-[#1e1b4b]/80 to-[#311042]/20 dark:to-[#311042]/80 rounded-3xl border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.1)] z-20 hover:border-yellow-500/50 transition-all duration-500 group px-2">
+                            <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl" />
+                            <Trophy className="w-20 h-20 text-yellow-500 dark:text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.5)] mb-4 animate-float" />
+                            <div className="text-[10px] font-bold text-yellow-600 dark:text-yellow-500 tracking-widest uppercase mb-2">World Cup Champion</div>
+                            <div className="flex items-center gap-3 mt-2">
+                              <CountryFlag
+                                code={getTeam(simResults.mockTournament.final.winner).code}
+                                flag={getTeam(simResults.mockTournament.final.winner).flag}
+                                name={getTeam(simResults.mockTournament.final.winner).name}
+                                className="h-10 w-14 drop-shadow-md"
+                                emojiClassName="text-4xl drop-shadow-md select-none"
+                              />
+                              <span className="text-xl font-black text-foreground dark:text-white tracking-tight">{getTeam(simResults.mockTournament.final.winner).name}</span>
                             </div>
-                            <div className="flex flex-col p-1 gap-1">
-                              <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.home, simResults.mockTournament.final.winner === simResults.mockTournament.final.home, "gold")}`}>
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                  <CountryFlag code={getTeam(simResults.mockTournament.final.home).code} flag={getTeam(simResults.mockTournament.final.home).flag} name={getTeam(simResults.mockTournament.final.home).name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                  <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.home).name}</span>
-                                  {simResults.mockTournament.final.winner === simResults.mockTournament.final.home && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
+                          </div>
+
+                          {/* World Cup Final section positioned and centered at the midpoint */}
+                          <div className="absolute top-[1040px] -translate-y-1/2 left-0 right-0 flex flex-col items-center">
+                            <div className="absolute bottom-full mb-3 text-[10px] uppercase font-bold text-yellow-600 dark:text-yellow-500 tracking-widest pb-1 border-b border-border dark:border-white/10 text-center w-56">
+                              World Cup Final
+                            </div>
+
+                            {/* Final Match Card wrapper that aligns perfectly with SF connector midpoint */}
+                            <div className="relative group/match">
+                              <div className="absolute top-1/2 left-[-24px] w-6 h-px bg-border dark:bg-white/10 -z-10 -translate-y-1/2" />
+
+                              {/* Final Match Card */}
+                              <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-yellow-500/30 bg-background dark:bg-[#070c1b] hover:border-yellow-500/60 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
+                                <div className="bg-black/5 dark:bg-black/60 px-3 py-1.5 text-[9px] font-bold text-yellow-600 dark:text-yellow-500 tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
+                                  <span>FINAL</span>
                                 </div>
-                                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(simResults.mockTournament.final.home)}`}>{simResults.mockTournament.final.hs}</span>
-                              </div>
-                              <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.away, simResults.mockTournament.final.winner === simResults.mockTournament.final.away, "gold")}`}>
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                  <CountryFlag code={getTeam(simResults.mockTournament.final.away).code} flag={getTeam(simResults.mockTournament.final.away).flag} name={getTeam(simResults.mockTournament.final.away).name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                  <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.away).name}</span>
-                                  {simResults.mockTournament.final.winner === simResults.mockTournament.final.away && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
+                                <div className="flex flex-col p-1 gap-1">
+                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.home, simResults.mockTournament.final.winner === simResults.mockTournament.final.home, "gold")}`}>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      <CountryFlag code={getTeam(simResults.mockTournament.final.home).code} flag={getTeam(simResults.mockTournament.final.home).flag} name={getTeam(simResults.mockTournament.final.home).name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.home).name}</span>
+                                      {simResults.mockTournament.final.winner === simResults.mockTournament.final.home && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
+                                    </div>
+                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(simResults.mockTournament.final.home)}`}>{simResults.mockTournament.final.hs}</span>
+                                  </div>
+                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.away, simResults.mockTournament.final.winner === simResults.mockTournament.final.away, "gold")}`}>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      <CountryFlag code={getTeam(simResults.mockTournament.final.away).code} flag={getTeam(simResults.mockTournament.final.away).flag} name={getTeam(simResults.mockTournament.final.away).name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.away).name}</span>
+                                      {simResults.mockTournament.final.winner === simResults.mockTournament.final.away && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
+                                    </div>
+                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(simResults.mockTournament.final.away)}`}>{simResults.mockTournament.final.as}</span>
+                                  </div>
                                 </div>
-                                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(simResults.mockTournament.final.away)}`}>{simResults.mockTournament.final.as}</span>
                               </div>
                             </div>
                           </div>
+                        </>
+                      ) : (
+                        <div className="absolute top-[1040px] -translate-y-1/2 left-0 right-0 text-center text-xs font-medium text-slate-400 dark:text-muted-foreground">
+                          No final matches computed
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>

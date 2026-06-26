@@ -12,6 +12,8 @@ import { useSession } from "next-auth/react";
 import { AuthModal } from "./AuthModal";
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
 
+const FIXTURES_REFRESH_INTERVAL_MS = 120000;
+
 export function Hero() {
   const teams = useTeams();
   const top = [...teams].sort((a, b) => b.prob.champion - a.prob.champion).slice(0, 8);
@@ -45,7 +47,7 @@ export function Hero() {
     let active = true;
     const fetchFixtures = async () => {
       try {
-        const res = await fetch("/api/fixtures");
+        const res = await fetch("/api/fixtures", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           if (active && data.success && Array.isArray(data.fixtures)) {
@@ -59,8 +61,10 @@ export function Hero() {
       }
     };
     fetchFixtures();
+    const interval = setInterval(fetchFixtures, FIXTURES_REFRESH_INTERVAL_MS);
     return () => {
       active = false;
+      clearInterval(interval);
     };
   }, []);
 
@@ -87,8 +91,26 @@ export function Hero() {
   };
 
   const activeDate = getActiveDate(fixtures);
-  const todayMatches = fixtures.filter((f) => f.date === activeDate);
-  const firstUpcoming = todayMatches.find((m) => m.status === "UPCOMING");
+  const todayMatches = fixtures
+    .filter((f) => f.date === activeDate)
+    .sort((a, b) => {
+      const getMatchPriority = (match: any) => {
+        if (match.status === "LIVE") return 0;
+        if (match.status === "UPCOMING") return 1;
+        if (match.status === "COMPLETED") return 2;
+        return 3;
+      };
+
+      const priorityDiff = getMatchPriority(a) - getMatchPriority(b);
+      if (priorityDiff !== 0) return priorityDiff;
+
+      const kickoffDiff = new Date(a.kickoffAtIso).getTime() - new Date(b.kickoffAtIso).getTime();
+      if (kickoffDiff !== 0) {
+        return a.status === "COMPLETED" ? -kickoffDiff : kickoffDiff;
+      }
+
+      return a.match_no - b.match_no;
+    });
 
   const handleSimulationClick = () => {
     if (session) {
@@ -278,7 +300,6 @@ export function Hero() {
                 <CarouselItem key={match.match_no} className="pl-3 basis-[85%] sm:basis-[48%] md:basis-[32%] lg:basis-[24%]">
                   <HeroMatchCard
                     match={match}
-                    isFirstUpcoming={firstUpcoming ? match.match_no === firstUpcoming.match_no : false}
                     onClick={handleMatchCardClick}
                   />
                 </CarouselItem>
@@ -304,25 +325,29 @@ export function Hero() {
       );
     }
 
-    function HeroMatchCard({ 
-      match, 
-      isFirstUpcoming, 
-      onClick 
-    }: { 
-      match: any; 
-      isFirstUpcoming: boolean; 
-      onClick: () => void; 
+    function HeroMatchCard({
+      match,
+      onClick,
+    }: {
+      match: any;
+      onClick: () => void;
     }) {
-      const [nowTime, setNowTime] = useState<number>(Date.now());
+      const kickoffMs = new Date(match.kickoffAtIso).getTime();
+      const [nowTime, setNowTime] = useState<number>(kickoffMs);
 
       useEffect(() => {
+        const syncTimer = window.setTimeout(() => {
+          setNowTime(Date.now());
+        }, 0);
         const timer = setInterval(() => {
           setNowTime(Date.now());
         }, 1000);
-        return () => clearInterval(timer);
+        return () => {
+          window.clearTimeout(syncTimer);
+          clearInterval(timer);
+        };
       }, []);
 
-      const kickoffMs = new Date(match.kickoffAtIso).getTime();
       const diffMs = kickoffMs - nowTime;
       const isLive = match.status === "LIVE" || (match.status === "UPCOMING" && diffMs <= 0);
       const isCompleted = match.status === "COMPLETED";

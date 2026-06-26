@@ -113,8 +113,8 @@ export default function SubscriptionPage() {
     {
       name: "Advanced Predictor",
       id: "plus",
-      price: "$4.99",
-      period: "/month",
+      price: "$0.99",
+      period: "/day",
       description: "Unlock advanced squad metrics and unlimited simulations.",
       icon: <Brain className="h-6 w-6 text-blue-500 dark:text-blue-400" />,
       themeColor: "blue",
@@ -152,8 +152,8 @@ export default function SubscriptionPage() {
     {
       name: "Expert Predictor",
       id: "pro",
-      price: "$9.99",
-      period: "/month",
+      price: "$4.99",
+      period: "/day",
       description: "Ultimate simulation engine with tactical variables.",
       icon: <Trophy className="h-6 w-6 text-purple-500" />,
       themeColor: "purple",
@@ -223,13 +223,12 @@ export default function SubscriptionPage() {
   const renderComparisonCell = (value: boolean | string, tierId: "free" | "plus" | "pro") => {
     if (typeof value === "string") {
       return (
-        <span className={`text-xs md:text-sm font-semibold ${
-          tierId === "pro"
-            ? "text-purple-600 dark:text-purple-400"
-            : tierId === "plus"
+        <span className={`text-xs md:text-sm font-semibold ${tierId === "pro"
+          ? "text-purple-600 dark:text-purple-400"
+          : tierId === "plus"
             ? "text-blue-600 dark:text-blue-400"
             : "text-slate-600 dark:text-slate-400"
-        }`}>
+          }`}>
           {value}
         </span>
       );
@@ -251,7 +250,7 @@ export default function SubscriptionPage() {
   return (
     <div className="min-h-screen bg-hero text-foreground">
       <Header />
-      
+
       <main className="container mx-auto px-4 py-16 md:py-24">
         {/* Page Header */}
         <div className="text-center max-w-3xl mx-auto mb-20">
@@ -272,13 +271,12 @@ export default function SubscriptionPage() {
             <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Logged in as {session.user.name}</span>
             <div className="flex items-center gap-2 mt-2">
               <span className="text-sm font-semibold">Your current tier:</span>
-              <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full uppercase tracking-wider ${
-                currentTier === "pro"
-                  ? "bg-purple-500/10 dark:bg-purple-500/20 border border-purple-500/20 dark:border-purple-500/40 text-purple-600 dark:text-purple-400"
-                  : currentTier === "plus"
+              <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full uppercase tracking-wider ${currentTier === "pro"
+                ? "bg-purple-500/10 dark:bg-purple-500/20 border border-purple-500/20 dark:border-purple-500/40 text-purple-600 dark:text-purple-400"
+                : currentTier === "plus"
                   ? "bg-blue-500/10 dark:bg-blue-500/20 border border-blue-500/20 dark:border-blue-500/40 text-blue-600 dark:text-blue-400"
                   : "bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/20 dark:border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
-              }`}>
+                }`}>
                 {tierLabels[currentTier as keyof typeof tierLabels] || currentTier}
               </span>
             </div>
@@ -295,7 +293,7 @@ export default function SubscriptionPage() {
           {tiers.map((tier) => {
             const isCurrent = currentTier === tier.id;
             const isFree = tier.id === "free";
-            const isUpgraded = 
+            const isUpgraded =
               (currentTier === "plus" && tier.id === "free") ||
               (currentTier === "pro" && (tier.id === "free" || tier.id === "plus"));
 
@@ -325,7 +323,7 @@ export default function SubscriptionPage() {
                       {tier.icon}
                     </div>
                   </div>
-                  
+
                   <div className="flex items-baseline mb-2">
                     <span className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">{tier.price}</span>
                     {tier.period && (
@@ -356,9 +354,9 @@ export default function SubscriptionPage() {
                           bullet: "text-purple-500/70 dark:text-purple-400/85"
                         }
                       };
-                      
+
                       const theme = colorMap[tier.themeColor as keyof typeof colorMap] || colorMap.blue;
-                      
+
                       return (
                         <div key={catIdx} className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-500/[0.015] dark:bg-white/[0.01] border border-slate-200/20 dark:border-white/5">
                           <div className="flex items-center gap-3">
@@ -395,13 +393,12 @@ export default function SubscriptionPage() {
                     <button
                       disabled={loadingTier !== null}
                       onClick={() => !isFree && handleSubscribe(tier.id as any)}
-                      className={`w-full rounded-xl py-3 text-sm font-bold text-center transition duration-200 active:scale-95 flex items-center justify-center gap-2 cursor-pointer ${
-                        tier.id === "plus"
-                          ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20 hover:opacity-90"
-                          : tier.id === "pro"
+                      className={`w-full rounded-xl py-3 text-sm font-bold text-center transition duration-200 active:scale-95 flex items-center justify-center gap-2 cursor-pointer ${tier.id === "plus"
+                        ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20 hover:opacity-90"
+                        : tier.id === "pro"
                           ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/20 hover:opacity-90"
                           : "bg-muted hover:bg-muted/80 text-foreground dark:bg-white/10 dark:hover:bg-white/20 dark:text-white"
-                      } disabled:opacity-50`}
+                        } disabled:opacity-50`}
                     >
                       {loadingTier === tier.id ? (
                         <>
@@ -465,7 +462,7 @@ export default function SubscriptionPage() {
 
                   const isLastRow = idx === comparisonRows.length - 1;
                   const borderClass = isLastRow ? "" : "border-b border-slate-200/50 dark:border-white/5";
-                  
+
                   return (
                     <tr
                       key={row.feature}
