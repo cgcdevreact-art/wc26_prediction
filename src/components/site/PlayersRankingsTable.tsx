@@ -223,6 +223,17 @@ export function PlayersRankingsTable({
 
   return (
     <div className="space-y-6">
+      <div className="rounded-[1.75rem] border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-fuchsia-50/50 p-5 shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-[linear-gradient(120deg,rgba(255,255,255,0.04),rgba(217,70,239,0.08),rgba(255,255,255,0.03))]">
+        <span className="inline-flex items-center rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-fuchsia-700 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10 dark:text-fuchsia-300">
+          Rankings Hub
+        </span>
+        <h2 className="mt-3 font-display text-2xl font-black tracking-tight text-slate-950 dark:text-white sm:text-3xl">
+          Player Rankings
+        </h2>
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+          Compare player quality, form, role impact, and tier signals with a clearer section title up front.
+        </p>
+      </div>
       <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 dark:border-white/10 dark:bg-slate-950">
         <div className="relative md:col-span-2 lg:col-span-2 xl:col-span-2">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
