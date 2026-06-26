@@ -2745,7 +2745,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           {onlyKnockout ? (
             <>
               <button
-                onClick={handleAiPredictKnockoutsWithCredits}
+                onClick={() => handleAiPredictKnockoutsWithCredits()}
                 className={primaryToolbarButtonClass}
               >
                 <Sparkles className="h-4 w-4" />
@@ -3369,7 +3369,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                   <>
                     <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                       <button
-                        onClick={handleAiPredictKnockoutsWithCredits}
+                        onClick={() => handleAiPredictKnockoutsWithCredits()}
                         className="flex items-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-6 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-neon shadow-neon"
                       >
                         <Sparkles className="h-4 w-4" />
