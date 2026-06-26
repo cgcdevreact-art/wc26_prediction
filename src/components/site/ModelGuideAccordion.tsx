@@ -20,7 +20,7 @@ export function ModelGuideAccordion() {
                   Model Guide
                 </div>
                 <h2 className="mt-1 max-w-[12ch] font-display text-3xl font-black tracking-tight text-slate-900 dark:text-white sm:max-w-none">
-                  How to use the bracket models
+                  How to use the simulation models
                 </h2>
               </div>
 

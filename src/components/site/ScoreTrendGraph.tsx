@@ -3,12 +3,13 @@
 import React, { useState, useMemo } from "react";
 import {
   ResponsiveContainer,
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
 } from "recharts";
 import { Plus, X, Search, TrendingUp } from "lucide-react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
@@ -33,6 +34,7 @@ interface Team {
 
 interface ScoreTrendGraphProps {
   matches: PredictorMatch[];
+  predictionMatches: PredictorMatch[];
   teams: Team[];
   liveGames: any[];
   liveStadiums: any[];
@@ -47,8 +49,6 @@ interface ScoreTrendGraphProps {
   ) => any;
 }
 
-// 4 distinct vibrant colors for selected lines
-const LINE_COLORS = ["#06b6d4", "#a855f7", "#10b981", "#f59e0b"];
 const PILL_STYLES = [
   "bg-cyan-500/12 text-cyan-700 border-cyan-500/35 dark:bg-cyan-500/18 dark:text-cyan-300 dark:border-cyan-400/30",
   "bg-fuchsia-500/12 text-fuchsia-700 border-fuchsia-500/35 dark:bg-fuchsia-500/18 dark:text-fuchsia-300 dark:border-fuchsia-400/30",
@@ -56,8 +56,43 @@ const PILL_STYLES = [
   "bg-amber-500/12 text-amber-700 border-amber-500/35 dark:bg-amber-500/18 dark:text-amber-300 dark:border-amber-400/30",
 ];
 
+function hasStartedLiveGame(game: any): boolean {
+  const progress = String(game?.time_elapsed ?? game?.status ?? "").toLowerCase().trim();
+  if (!progress) return false;
+  if (progress.includes("notstarted")) return false;
+  if (/^\d+$/.test(progress)) return true;
+
+  return [
+    "live",
+    "finished",
+    "ft",
+    "fulltime",
+    "halftime",
+    "half-time",
+    "1h",
+    "2h",
+    "extra",
+    "pen",
+    "playing",
+    "inprogress",
+  ].some((keyword) => progress.includes(keyword));
+}
+
+function getMatchPoints(match: PredictorMatch, code: string) {
+  if (match.homeScore === "" || match.awayScore === "") return 0;
+
+  const hs = Number(match.homeScore);
+  const as = Number(match.awayScore);
+  const isHome = match.homeCode === code;
+
+  if (hs === as) return 1;
+  if ((hs > as && isHome) || (as > hs && !isHome)) return 3;
+  return 0;
+}
+
 export function ScoreTrendGraph({
   matches,
+  predictionMatches,
   teams,
   liveGames,
   liveStadiums,
@@ -99,71 +134,65 @@ export function ScoreTrendGraph({
     );
   }, [teams, searchQuery]);
 
-  // Calculate cumulative points history for selected teams
+  // Calculate actual vs predicted points totals for selected teams
   const chartData = useMemo(() => {
-    const data = [
-      { name: "Start" },
-      { name: "Match 1" },
-      { name: "Match 2" },
-      { name: "Match 3" },
-    ];
+    return selectedTeamCodes.map((code) => {
+      const team = teams.find((entry) => entry.code === code) || { code, name: code };
 
-    selectedTeamCodes.forEach((code, idx) => {
-      // Apply a tiny offset based on team index to prevent overlapping lines
-      const offset = 0.05 * (idx - (selectedTeamCodes.length - 1) / 2);
+      const predictedPoints = predictionMatches
+        .filter((match) => match.homeCode === code || match.awayCode === code)
+        .reduce((sum, match) => sum + getMatchPoints(match, code), 0);
 
-      // 1. Get the team's matches in group stage
-      const teamMatches = matches
-        .filter((m) => m.homeCode === code || m.awayCode === code)
-        .map((m) => {
-          const suffix = parseInt(m.id.split("-")[1], 10);
+      const realDataPoints = matches
+        .filter((match) => match.homeCode === code || match.awayCode === code)
+        .reduce((sum, match) => {
+          const suffix = parseInt(match.id.split("-")[1], 10);
           const details = getGroupMatchDetails(
-            m.group,
+            match.group,
             suffix,
             liveGames,
             liveStadiums,
-            m.homeCode,
-            m.awayCode,
+            match.homeCode,
+            match.awayCode,
             teams
           );
-          return {
-            match: m,
-            matchNo: details ? details.matchNumber : suffix,
-          };
-        })
-        // Sort chronologically by actual match ID
-        .sort((a, b) => a.matchNo - b.matchNo);
 
-      // 2. Accumulate points
-      let pts = 0;
-      const pointsHistory = [0]; // Step 0 points is 0
+          if (!details || details.matchNumber <= 0) return sum;
 
-      teamMatches.forEach(({ match }) => {
-        if (match.homeScore !== "" && match.awayScore !== "") {
-          const hs = Number(match.homeScore);
-          const as = Number(match.awayScore);
-          const isHome = match.homeCode === code;
+          const game = liveGames.find((g: any) => parseInt(g.id, 10) === details.matchNumber);
+          if (!game) return sum;
+          if (!hasStartedLiveGame(game)) return sum;
 
-          if (hs === as) {
-            pts += 1;
-          } else if ((hs > as && isHome) || (as > hs && !isHome)) {
-            pts += 3;
+          const homeScoreRaw = Number(game.home_score);
+          const awayScoreRaw = Number(game.away_score);
+
+          if (!Number.isFinite(homeScoreRaw) || !Number.isFinite(awayScoreRaw)) {
+            return sum;
           }
-        }
-        pointsHistory.push(pts);
-      });
 
-      const getVal = (val: number) => val + offset;
+          const liveBackedMatch: PredictorMatch = details.isSwapped
+            ? { ...match, homeScore: awayScoreRaw, awayScore: homeScoreRaw }
+            : { ...match, homeScore: homeScoreRaw, awayScore: awayScoreRaw };
 
-      // 3. Populate chart data steps, carrying forward if missing
-      data[0] = { ...data[0], [code]: getVal(pointsHistory[0] ?? 0) };
-      data[1] = { ...data[1], [code]: getVal(pointsHistory[1] ?? pointsHistory[0] ?? 0) };
-      data[2] = { ...data[2], [code]: getVal(pointsHistory[2] ?? pointsHistory[1] ?? pointsHistory[0] ?? 0) };
-      data[3] = { ...data[3], [code]: getVal(pointsHistory[3] ?? pointsHistory[2] ?? pointsHistory[1] ?? pointsHistory[0] ?? 0) };
+          return sum + getMatchPoints(liveBackedMatch, code);
+        }, 0);
+
+      return {
+        code,
+        country: team.name,
+        realDataPoints,
+        predictedPoints,
+      };
     });
-
-    return data;
-  }, [matches, selectedTeamCodes, liveGames, liveStadiums, getGroupMatchDetails, teams]);
+  }, [
+    selectedTeamCodes,
+    predictionMatches,
+    matches,
+    liveGames,
+    liveStadiums,
+    getGroupMatchDetails,
+    teams,
+  ]);
 
   return (
     <div className="glass-strong mb-6 rounded-2xl border border-border/40 p-6 shadow-glass space-y-6">
@@ -175,7 +204,7 @@ export function ScoreTrendGraph({
             Points Progression Trend
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Compare cumulative points trajectory across group stage matchdays.
+            Compare real match points against simulated or predicted totals by country.
           </p>
         </div>
 
@@ -268,16 +297,17 @@ export function ScoreTrendGraph({
           })}
         </div>
       ) : (
-        <p className="text-xs italic text-muted-foreground">Select up to 4 countries to display the points trend.</p>
+        <p className="text-xs italic text-muted-foreground">Select up to 4 countries to compare actual and predicted points.</p>
       )}
 
-      {/* Line Chart */}
+      {/* Grouped Bar Chart */}
       {selectedTeamCodes.length > 0 && (
         <div className="h-64 sm:h-80 w-full bg-card dark:bg-black/25 border border-border/60 p-4 rounded-2xl">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart
+            <BarChart
               data={chartData}
-              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              margin={{ top: 10, right: 24, left: 0, bottom: 24 }}
+              barCategoryGap="24%"
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -285,12 +315,13 @@ export function ScoreTrendGraph({
                 vertical={false}
               />
               <XAxis
-                dataKey="name"
+                dataKey="country"
                 stroke="var(--muted-foreground)"
                 fontSize={10}
                 tickLine={false}
                 axisLine={false}
                 dy={10}
+                interval={0}
               />
               <YAxis
                 stroke="var(--muted-foreground)"
@@ -300,6 +331,12 @@ export function ScoreTrendGraph({
                 dx={-10}
                 domain={[0, 9]}
                 ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}
+              />
+              <Legend
+                verticalAlign="top"
+                align="right"
+                iconType="circle"
+                wrapperStyle={{ fontSize: "11px", paddingBottom: "12px" }}
               />
               <Tooltip
                 contentStyle={{
@@ -312,34 +349,26 @@ export function ScoreTrendGraph({
                 labelStyle={{ fontWeight: "bold", color: "var(--foreground)", marginBottom: "4px" }}
                 itemStyle={{ color: "var(--foreground)" }}
                 formatter={(value: any, name: any) => {
-                  const team = getTeam(String(name));
-                  return [`${Math.round(Number(value))} Pts`, team.name];
+                  const label =
+                    name === "realDataPoints" ? "Real Data Points" : "Simulated/Predicted Points";
+                  return [`${Math.round(Number(value))} Pts`, label];
                 }}
               />
-              {selectedTeamCodes.map((code, idx) => {
-                return (
-                  <Line
-                    key={code}
-                    type="monotone"
-                    dataKey={code}
-                    stroke={LINE_COLORS[idx]}
-                    strokeWidth={3}
-                    dot={{
-                      r: 5,
-                      fill: LINE_COLORS[idx],
-                      stroke: "#0f172a",
-                      strokeWidth: 2,
-                    }}
-                    activeDot={{
-                      r: 7,
-                      fill: LINE_COLORS[idx],
-                      stroke: "#fff",
-                      strokeWidth: 2,
-                    }}
-                  />
-                );
-              })}
-            </LineChart>
+              <Bar
+                dataKey="realDataPoints"
+                name="Real Data Points"
+                fill="#0ea5e9"
+                radius={[8, 8, 0, 0]}
+                maxBarSize={28}
+              />
+              <Bar
+                dataKey="predictedPoints"
+                name="Simulated/Predicted Points"
+                fill="#f59e0b"
+                radius={[8, 8, 0, 0]}
+                maxBarSize={28}
+              />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       )}
