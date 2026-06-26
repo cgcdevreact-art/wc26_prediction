@@ -94,6 +94,8 @@ interface TeamStanding {
   pts: number;
 }
 
+const TOTAL_TOURNAMENT_MATCHES = 104;
+
 // Generate the 6 fixtures for a group of 4 teams
 function generateGroupMatches(groupName: string, teams: string[]): PredictorMatch[] {
   const [t1, t2, t3, t4] = teams;
@@ -820,7 +822,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   const globalRealPercent = useMemo(() => {
     const realCount = matches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
-    return matches.length > 0 ? Math.round((realCount / matches.length) * 100) : 0;
+    return Math.round((realCount / TOTAL_TOURNAMENT_MATCHES) * 100);
   }, [matches, getAssignedLiveScoreForMatch]);
 
   const simulatePendingMatches = useCallback(() => {
