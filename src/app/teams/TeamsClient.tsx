@@ -961,6 +961,17 @@ export default function TeamsClient({
 
         <TabsContent value="rankings" className="space-y-6">
           <div className="space-y-5">
+            <div className="rounded-[1.75rem] border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/60 p-5 shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-[linear-gradient(120deg,rgba(255,255,255,0.04),rgba(6,182,212,0.07),rgba(255,255,255,0.03))]">
+              <span className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-700 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-300">
+                Rankings Hub
+              </span>
+              <h2 className="mt-3 font-display text-2xl font-black tracking-tight text-slate-950 dark:text-white sm:text-3xl">
+                Team Rankings
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                Scan team strength, FIFA rank, Elo, squad quality, and prediction metrics in one place.
+              </p>
+            </div>
             <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 dark:border-white/10 dark:bg-slate-950">
               <div className="relative md:col-span-2 lg:col-span-2 xl:col-span-3">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">

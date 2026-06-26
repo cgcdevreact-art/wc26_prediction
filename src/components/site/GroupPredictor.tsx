@@ -505,7 +505,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       if (simScope === "whole") {
         handleWholeTournamentSimulationWithCredits();
       } else {
-        handleAiPredictWithCredits();
+        handleAiPredictKnockoutsWithCredits(true);
       }
     } else if (confirmSimType === "group" && confirmSimGroup) {
       predictGroup(confirmSimGroup);
@@ -585,10 +585,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     }
   };
 
-  const handleAiPredictKnockoutsWithCredits = async () => {
+  const handleAiPredictKnockoutsWithCredits = async (forceOverwrite = false) => {
     const allowed = await consumeCredit();
     if (allowed) {
-      handleAiPredictKnockouts();
+      handleAiPredictKnockouts(forceOverwrite);
     }
   };
 
@@ -710,6 +710,74 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     return { homeScore, awayScore };
   }, [liveGames, liveStadiums, teams]);
 
+  const getAssignedLiveScoreForKoMatch = useCallback((home: string, away: string) => {
+    if (!useRealScores || liveGames.length === 0) return null;
+
+    const targetH = home.toUpperCase().trim();
+    const targetA = away.toUpperCase().trim();
+    const normalizeCode = (c: string) => (c === "KSA" ? "SAU" : c);
+    const predH = normalizeCode(targetH);
+    const predA = normalizeCode(targetA);
+
+    const game = liveGames.find((g: any) => {
+      const gType = String(g.type || "").toLowerCase();
+      if (gType === "group") return false; // only search knockout games
+
+      const getCode = (id: string | number, nameEn: string) => {
+        const liveTeamIdMap: Record<string, string> = {
+          "1":"MEX","2":"RSA","3":"KOR","4":"CZE","5":"CAN","6":"BIH","7":"QAT","8":"SUI","9":"BRA","10":"MAR","11":"HAI","12":"SCO","13":"USA","14":"PAR","15":"AUS","16":"TUR","17":"GER","18":"CUW","19":"CIV","20":"ECU","21":"NED","22":"JPN","23":"SWE","24":"TUN","25":"BEL","26":"EGY","27":"IRN","28":"NZL","29":"ESP","30":"CPV","31":"KSA","32":"URU","33":"FRA","34":"SEN","35":"IRQ","36":"NOR","37":"ARG","38":"ALG","39":"AUT","40":"JOR","41":"POR","42":"COD","43":"UZB","44":"COL","45":"ENG","46":"CRO","47":"GHA","48":"PAN"
+        };
+        const mappedCode = liveTeamIdMap[String(id)];
+        if (mappedCode) return mappedCode.toUpperCase().trim();
+        const targetName = nameEn.toLowerCase().trim();
+        const t = teams.find((x: any) => 
+          (x.id !== undefined && x.id !== null && String(x.id) === String(id)) ||
+          (x.name && targetName && x.name.toLowerCase().trim() === targetName)
+        );
+        return t ? t.code.toUpperCase().trim() : "";
+      };
+
+      const hCode = getCode(g.home_team_id, g.home_team_name_en || "");
+      const aCode = getCode(g.away_team_id, g.away_team_name_en || "");
+
+      const apiH = normalizeCode(hCode);
+      const apiA = normalizeCode(aCode);
+
+      return (apiH === predH && apiA === predA) || (apiH === predA && apiA === predH);
+    });
+
+    if (!game) return null;
+    if (!hasStartedLiveGame(game)) return null;
+
+    const homeScore = normalizePredictorScore(game.home_score);
+    const awayScore = normalizePredictorScore(game.away_score);
+
+    if (!hasValidPredictorScore(homeScore) || !hasValidPredictorScore(awayScore)) {
+      return null;
+    }
+
+    const getCode = (id: string | number, nameEn: string) => {
+      const liveTeamIdMap: Record<string, string> = {
+        "1":"MEX","2":"RSA","3":"KOR","4":"CZE","5":"CAN","6":"BIH","7":"QAT","8":"SUI","9":"BRA","10":"MAR","11":"HAI","12":"SCO","13":"USA","14":"PAR","15":"AUS","16":"TUR","17":"GER","18":"CUW","19":"CIV","20":"ECU","21":"NED","22":"JPN","23":"SWE","24":"TUN","25":"BEL","26":"EGY","27":"IRN","28":"NZL","29":"ESP","30":"CPV","31":"KSA","32":"URU","33":"FRA","34":"SEN","35":"IRQ","36":"NOR","37":"ARG","38":"ALG","39":"AUT","40":"JOR","41":"POR","42":"COD","43":"UZB","44":"COL","45":"ENG","46":"CRO","47":"GHA","48":"PAN"
+      };
+      const mappedCode = liveTeamIdMap[String(id)];
+      if (mappedCode) return mappedCode.toUpperCase().trim();
+      const targetName = nameEn.toLowerCase().trim();
+      const t = teams.find((x: any) => 
+        (x.id !== undefined && x.id !== null && String(x.id) === String(id)) ||
+        (x.name && targetName && x.name.toLowerCase().trim() === targetName)
+      );
+      return t ? t.code.toUpperCase().trim() : "";
+    };
+    const hCode = getCode(game.home_team_id, game.home_team_name_en || "");
+    const isSwapped = (normalizeCode(hCode) === predA);
+
+    if (isSwapped) {
+      return { homeScore: awayScore, awayScore: homeScore };
+    }
+    return { homeScore, awayScore };
+  }, [useRealScores, liveGames, teams]);
+
   const applyRealScores = useCallback((currentMatches: PredictorMatch[]) => {
     return currentMatches.map((m) => {
       const liveScore = getAssignedLiveScoreForMatch(m);
@@ -720,9 +788,16 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           awayScore: liveScore.awayScore,
         };
       }
-      return clearPredictorMatchScores(m);
+      const homeTeam = teams.find((t) => t.code === m.homeCode) || teams[0];
+      const awayTeam = teams.find((t) => t.code === m.awayCode) || teams[0];
+      const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, players, selectedModel);
+      return {
+        ...m,
+        homeScore: getPoisson(homeLambda),
+        awayScore: getPoisson(awayLambda),
+      };
     });
-  }, [getAssignedLiveScoreForMatch]);
+  }, [getAssignedLiveScoreForMatch, teams, players, selectedModel]);
 
   const handleToggleRealScores = (checked: boolean) => {
     setUseRealScores(checked);
@@ -2017,6 +2092,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   };
 
   const simulateKoMatch = (home: string, away: string) => {
+    const liveScore = getAssignedLiveScoreForKoMatch(home, away);
+    if (liveScore) {
+      const hs = liveScore.homeScore;
+      const as = liveScore.awayScore;
+      return { hs, as, winner: hs > as ? home : away };
+    }
+
     const homeTeam = getTeam(home);
     const awayTeam = getTeam(away);
     const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, players, selectedModel);
@@ -2029,6 +2111,115 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       else as += 1;
     }
     return { hs, as, winner: hs > as ? home : away };
+  };
+
+  const computeStandingsSync = (currentMatches: PredictorMatch[]) => {
+    const data: Record<string, Record<string, TeamStanding>> = {};
+
+    Object.entries(GROUPS_CONFIG).forEach(([group, codes]) => {
+      data[group] = {};
+      codes.forEach((code) => {
+        data[group][code] = {
+          code,
+          team: getTeam(code),
+          played: 0,
+          won: 0,
+          drawn: 0,
+          lost: 0,
+          gf: 0,
+          ga: 0,
+          gd: 0,
+          pts: 0,
+        };
+      });
+    });
+
+    currentMatches.forEach((m) => {
+      const g = m.group;
+      const h = m.homeCode;
+      const a = m.awayCode;
+
+      if (hasAssignedMatchScores(m)) {
+        const hs = Number(m.homeScore);
+        const as = Number(m.awayScore);
+
+        data[g][h].played += 1;
+        data[g][a].played += 1;
+        data[g][h].gf += hs;
+        data[g][h].ga += as;
+        data[g][a].gf += as;
+        data[g][a].ga += hs;
+        data[g][h].gd = data[g][h].gf - data[g][h].ga;
+        data[g][a].gd = data[g][a].gf - data[g][a].ga;
+
+        if (hs > as) {
+          data[g][h].won += 1;
+          data[g][h].pts += 3;
+          data[g][a].lost += 1;
+        } else if (hs < as) {
+          data[g][a].won += 1;
+          data[g][a].pts += 3;
+          data[g][h].lost += 1;
+        } else {
+          data[g][h].drawn += 1;
+          data[g][h].pts += 1;
+          data[g][a].drawn += 1;
+          data[g][a].pts += 1;
+        }
+      }
+    });
+
+    const sorted: Record<string, TeamStanding[]> = {};
+    Object.entries(data).forEach(([group, groupTeams]) => {
+      sorted[group] = Object.values(groupTeams).sort((a, b) => {
+        if (b.pts !== a.pts) return b.pts - a.pts;
+        if (b.gd !== a.gd) return b.gd - a.gd;
+        if (b.gf !== a.gf) return b.gf - a.gf;
+        return (b.team.elo || 0) - (a.team.elo || 0);
+      });
+    });
+
+    return sorted;
+  };
+
+  const computeThirdPlaceStandingsSync = (currentStandings: Record<string, TeamStanding[]>) => {
+    const list: TeamStanding[] = [];
+    Object.keys(currentStandings).forEach((g) => {
+      list.push(currentStandings[g][2]);
+    });
+    return list.sort((a, b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (b.gd !== a.gd) return b.gd - a.gd;
+      if (b.gf !== a.gf) return b.gf - a.gf;
+      return (b.team.elo || 0) - (a.team.elo || 0);
+    });
+  };
+
+  const computeR32TeamsSync = (currentStandings: Record<string, TeamStanding[]>, thirdPlaces: TeamStanding[]) => {
+    const bestThirdPlaces = thirdPlaces.slice(0, 8).map((t) => t.code);
+
+    const getWinner = (grp: string) => currentStandings[grp][0].code;
+    const getRunner = (grp: string) => currentStandings[grp][1].code;
+    const getThird = (idx: number) => bestThirdPlaces[idx] || "ARG";
+
+    return [
+      { home: getWinner("A"), away: getThird(7) },
+      { home: getRunner("B"), away: getRunner("C") },
+      { home: getWinner("C"), away: getThird(6) },
+      { home: getRunner("D"), away: getRunner("E") },
+      { home: getWinner("E"), away: getThird(5) },
+      { home: getRunner("F"), away: getRunner("G") },
+      { home: getWinner("G"), away: getThird(4) },
+      { home: getRunner("H"), away: getRunner("I") },
+      { home: getWinner("B"), away: getThird(3) },
+      { home: getRunner("A"), away: getRunner("J") },
+      { home: getWinner("D"), away: getThird(2) },
+      { home: getRunner("K"), away: getRunner("L") },
+      { home: getWinner("F"), away: getThird(1) },
+      { home: getWinner("H"), away: getThird(0) },
+      { home: getWinner("I"), away: getWinner("J") },
+      { home: getWinner("K"), away: getWinner("L") },
+    ];
   };
 
   const handleWholeTournamentSimulation = () => {
@@ -2045,115 +2236,6 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         awayScore: getPoisson(awayLambda),
       };
     });
-
-    const computeStandingsSync = (currentMatches: PredictorMatch[]) => {
-      const data: Record<string, Record<string, TeamStanding>> = {};
-
-      Object.entries(GROUPS_CONFIG).forEach(([group, codes]) => {
-        data[group] = {};
-        codes.forEach((code) => {
-          data[group][code] = {
-            code,
-            team: getTeam(code),
-            played: 0,
-            won: 0,
-            drawn: 0,
-            lost: 0,
-            gf: 0,
-            ga: 0,
-            gd: 0,
-            pts: 0,
-          };
-        });
-      });
-
-      currentMatches.forEach((m) => {
-        const g = m.group;
-        const h = m.homeCode;
-        const a = m.awayCode;
-
-        if (hasAssignedMatchScores(m)) {
-          const hs = Number(m.homeScore);
-          const as = Number(m.awayScore);
-
-          data[g][h].played += 1;
-          data[g][a].played += 1;
-          data[g][h].gf += hs;
-          data[g][h].ga += as;
-          data[g][a].gf += as;
-          data[g][a].ga += hs;
-          data[g][h].gd = data[g][h].gf - data[g][h].ga;
-          data[g][a].gd = data[g][a].gf - data[g][a].ga;
-
-          if (hs > as) {
-            data[g][h].won += 1;
-            data[g][h].pts += 3;
-            data[g][a].lost += 1;
-          } else if (hs < as) {
-            data[g][a].won += 1;
-            data[g][a].pts += 3;
-            data[g][h].lost += 1;
-          } else {
-            data[g][h].drawn += 1;
-            data[g][h].pts += 1;
-            data[g][a].drawn += 1;
-            data[g][a].pts += 1;
-          }
-        }
-      });
-
-      const sorted: Record<string, TeamStanding[]> = {};
-      Object.entries(data).forEach(([group, groupTeams]) => {
-        sorted[group] = Object.values(groupTeams).sort((a, b) => {
-          if (b.pts !== a.pts) return b.pts - a.pts;
-          if (b.gd !== a.gd) return b.gd - a.gd;
-          if (b.gf !== a.gf) return b.gf - a.gf;
-          return (b.team.elo || 0) - (a.team.elo || 0);
-        });
-      });
-
-      return sorted;
-    };
-
-    const computeThirdPlaceStandingsSync = (currentStandings: Record<string, TeamStanding[]>) => {
-      const list: TeamStanding[] = [];
-      Object.keys(currentStandings).forEach((g) => {
-        list.push(currentStandings[g][2]);
-      });
-      return list.sort((a, b) => {
-        if (b.pts !== a.pts) return b.pts - a.pts;
-        if (b.gd !== a.gd) return b.gd - a.gd;
-        if (b.gf !== a.gf) return b.gf - a.gf;
-        return (b.team.elo || 0) - (a.team.elo || 0);
-      });
-    };
-
-    const computeR32TeamsSync = (currentStandings: Record<string, TeamStanding[]>, thirdPlaces: TeamStanding[]) => {
-      const bestThirdPlaces = thirdPlaces.slice(0, 8).map((t) => t.code);
-
-      const getWinner = (grp: string) => currentStandings[grp][0].code;
-      const getRunner = (grp: string) => currentStandings[grp][1].code;
-      const getThird = (idx: number) => bestThirdPlaces[idx] || "ARG";
-
-      return [
-        { home: getWinner("A"), away: getThird(7) },
-        { home: getRunner("B"), away: getRunner("C") },
-        { home: getWinner("C"), away: getThird(6) },
-        { home: getRunner("D"), away: getRunner("E") },
-        { home: getWinner("E"), away: getThird(5) },
-        { home: getRunner("F"), away: getRunner("G") },
-        { home: getWinner("G"), away: getThird(4) },
-        { home: getRunner("H"), away: getRunner("I") },
-        { home: getWinner("B"), away: getThird(3) },
-        { home: getRunner("A"), away: getRunner("J") },
-        { home: getWinner("D"), away: getThird(2) },
-        { home: getRunner("K"), away: getRunner("L") },
-        { home: getWinner("F"), away: getThird(1) },
-        { home: getWinner("H"), away: getThird(0) },
-        { home: getWinner("I"), away: getWinner("J") },
-        { home: getWinner("K"), away: getWinner("L") },
-      ];
-    };
 
     const currentStandings = computeStandingsSync(predictedMatches);
     const thirdPlaces = computeThirdPlaceStandingsSync(currentStandings);
@@ -2411,6 +2493,37 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   // AI Predict knockouts
   const handleAiPredictKnockouts = (forceOverwrite = false) => {
+    let finalMatches = matches;
+    if (forceOverwrite) {
+      setUseRealScores(true);
+      finalMatches = matches.map((m) => {
+        const liveScore = getAssignedLiveScoreForMatch(m);
+        if (liveScore) {
+          return {
+            ...m,
+            homeScore: liveScore.homeScore,
+            awayScore: liveScore.awayScore,
+          };
+        }
+        if (hasAssignedMatchScores(m)) {
+          return m;
+        }
+        const homeTeam = getTeam(m.homeCode);
+        const awayTeam = getTeam(m.awayCode);
+        const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, players, selectedModel);
+        return {
+          ...m,
+          homeScore: getPoisson(homeLambda),
+          awayScore: getPoisson(awayLambda),
+        };
+      });
+      setMatches(finalMatches);
+    }
+
+    const currentStandings = forceOverwrite ? computeStandingsSync(finalMatches) : standings;
+    const currentThirdPlaces = forceOverwrite ? computeThirdPlaceStandingsSync(currentStandings) : thirdPlaceStandings;
+    const r32Pairs = forceOverwrite ? computeR32TeamsSync(currentStandings, currentThirdPlaces) : r32Teams;
+
     const updatedWinners = forceOverwrite ? {
       r32: Array(16).fill(null),
       r16: Array(8).fill(null),
@@ -2421,7 +2534,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     const updatedScores = forceOverwrite ? {} : { ...koScores };
 
     // Simulate R32 if needed
-    koMatchups.r32.forEach((m, idx) => {
+    const pairs = forceOverwrite ? r32Pairs : koMatchups.r32;
+    pairs.forEach((m, idx) => {
       if (!m.home || !m.away) return;
       if (!updatedWinners.r32[idx]) {
         const { hs, as, winner } = simulateKoMatch(m.home, m.away);
@@ -2481,8 +2595,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     let simulatedThirdWinner = forceOverwrite ? null : thirdWinner;
     let simulatedThirdScores: { home: number | ""; away: number | ""; } = forceOverwrite ? { home: "", away: "" } : { ...thirdScores };
 
-    const homeMatch = koMatchups.sf[0];
-    const awayMatch = koMatchups.sf[1];
+    const homeMatch = { home: updatedWinners.qf[0], away: updatedWinners.qf[1] };
+    const awayMatch = { home: updatedWinners.qf[2], away: updatedWinners.qf[3] };
     const homeWinner = updatedWinners.sf[0];
     const awayWinner = updatedWinners.sf[1];
 
@@ -2508,7 +2622,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setThirdScores(simulatedThirdScores);
     setKoScores(updatedScores);
     setKoWinners(updatedWinners);
-    saveBulkToDb(matches, updatedWinners, updatedScores, simulatedThirdWinner, simulatedThirdScores);
+    saveBulkToDb(finalMatches, updatedWinners, updatedScores, simulatedThirdWinner, simulatedThirdScores);
   };
 
   const [isSaving, setIsSaving] = useState(false);
@@ -2596,17 +2710,27 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               </div>
             )
           )}
-          <button
-            onClick={() => handleToggleRealScores(!useRealScores)}
-            className={`px-4 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
+          <label
+            className={`inline-flex min-h-[56px] w-full items-center justify-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto sm:min-w-[180px] ${
               useRealScores
-                ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)] animate-pulse"
-                : "border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5"
+                ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+                : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-700 dark:text-slate-300 dark:hover:bg-white/5"
             }`}
           >
-            <Zap className={`h-4 w-4 ${useRealScores ? "text-cyan-500 fill-cyan-500" : ""}`} />
-            {useRealScores ? `Real-Time Data: ${globalRealPercent}% Active` : `Include Real-Time Data (${globalRealPercent}%)`}
-          </button>
+            <input
+              type="checkbox"
+              id="toolbar-real-time-data"
+              checked={useRealScores}
+              onChange={(e) => handleToggleRealScores(e.target.checked)}
+              className="h-5 w-5 rounded-md border-slate-300 dark:border-white/20 bg-slate-100 dark:bg-slate-800 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-background cursor-pointer accent-cyan-500 transition-all duration-200 hover:scale-105"
+            />
+            <div className="flex items-center gap-1.5">
+              <Zap className={`h-4 w-4 transition-all duration-300 ${useRealScores ? "text-cyan-500 fill-cyan-500 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)] animate-pulse" : "text-slate-400 dark:text-slate-500"}`} />
+              <span className="text-xs font-bold leading-none select-none">
+                Include Real-Time Data ({globalRealPercent}%)
+              </span>
+            </div>
+          </label>
 
           {session?.user?.id && (
             <button
@@ -2738,11 +2862,6 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 <span className="text-[10px] font-bold text-muted-foreground uppercase">{team.code}</span>
                 <span className="text-sm font-bold text-emerald-600 dark:text-[#6EE7B7] mt-1 flex items-center gap-1.5">
                   <span>{team.winProb.toFixed(1)}%</span>
-                  {team.isEliminated && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400 font-medium font-sans uppercase tracking-wider scale-90">
-                      Out
-                    </span>
-                  )}
                 </span>
               </div>
             ))}
@@ -3002,12 +3121,26 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       const matchSuffix = parseInt(m.id.split("-")[1]);
                       const details = getGroupMatchDetails(groupName, matchSuffix, liveGames, liveStadiums, m.homeCode, m.awayCode, teams);
 
+                      const isReal = getAssignedLiveScoreForMatch(m);
+                      const isSimulated = useRealScores && hasAssignedMatchScores(m) && !isReal;
+
                       return (
                         <div key={m.id} className="flex items-center justify-between text-xs py-2 border-b border-border last:border-0 hover:bg-black/5 dark:hover:bg-white/5 px-2 rounded-xl transition duration-200 gap-2">
                           {/* Match Info Column */}
-                          <div className="flex flex-col text-[10px] text-muted-foreground w-16 shrink-0 leading-tight">
+                          <div className="flex flex-col text-[9px] text-muted-foreground w-16 shrink-0 leading-tight gap-0.5">
                             <span className="font-semibold text-foreground/75">{details.date}</span>
                             <span>{details.time}</span>
+                            {isSimulated ? (
+                              <span className="inline-block text-[8px] font-sans px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 w-fit font-bold uppercase tracking-wide">
+                                Simulated
+                              </span>
+                            ) : (
+                              useRealScores && isReal && (
+                                <span className="inline-block text-[8px] font-sans px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 w-fit font-bold uppercase tracking-wide">
+                                  Real
+                                </span>
+                              )
+                            )}
                             <span className="opacity-40">#{details.matchNumber}</span>
                           </div>
 
@@ -4408,11 +4541,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                         <div className="flex items-center gap-2 mb-1">
                           <Sparkles className={`h-4 w-4 ${simScope === "r32" ? "text-cyan-500" : "text-slate-400"}`} />
                           <span className={`font-bold text-xs uppercase tracking-wider ${simScope === "r32" ? "text-cyan-600 dark:text-cyan-400" : "text-slate-600 dark:text-slate-300"}`}>
-                            Groups Only
+                            Round of 32
                           </span>
                         </div>
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
-                          Simulate group stage only, then build your own knockout bracket
+                          Simulate knockout bracket starting from Round of 32 through the Final
                         </p>
                       </button>
                     </div>
