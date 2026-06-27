@@ -135,6 +135,7 @@ export async function getTeams() {
               power: override.elo / 20,
               attack: override.attack,
               defense: override.defense,
+              isCustom: true,
             };
           }
           return t;
@@ -166,6 +167,7 @@ export async function getTeams() {
         squadValueM: staticData.squadValueM,
         avgAge: staticData.avgAge,
         goalsPerMatch: staticData.goalsPerMatch,
+        isCustom: !!override,
         
         // Dynamic Strengths
         power: powerVal,
@@ -204,6 +206,7 @@ export async function getTeams() {
                 power: override.elo / 20,
                 attack: override.attack,
                 defense: override.defense,
+                isCustom: true,
               };
             }
             return t;
@@ -285,6 +288,7 @@ export async function getPlayers() {
               "Match Importance": override.matchImportance,
               "Rating Tier": override.ratingTier,
               "ImageUrl": override.imageUrl || undefined,
+              isCustom: true,
             };
           }
           return p;
