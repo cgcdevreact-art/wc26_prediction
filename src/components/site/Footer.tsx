@@ -53,7 +53,7 @@ export function Footer() {
             { label: "Terms & Conditions", href: "/terms" },
             { label: "Disclaimer", href: "/disclaimer" },
             { label: "Privacy Policy", href: "/privacy" },
-            { label: "Data Deletion", href: "/data-deletion" }
+            // { label: "Data Deletion", href: "/data-deletion" }
           ]}
         />
       </div>
