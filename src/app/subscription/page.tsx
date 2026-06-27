@@ -186,7 +186,7 @@ export default function SubscriptionPage() {
     {
       name: "Expert Predictor",
       id: "pro",
-      price: "$4.99",
+      price: "$7.77",
       period: "/day",
       description: "Ultimate simulation engine with tactical variables.",
       icon: <Trophy className="h-6 w-6 text-purple-500" />,

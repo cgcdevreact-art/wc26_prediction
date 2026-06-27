@@ -145,7 +145,8 @@ export async function getTeams() {
 
     return dbTeams.map((dbTeam) => {
       const staticData = resolveStaticTeam(dbTeam.tla, dbTeam.name, dbTeam.shortName) || staticTeams[0];
-      const teamCode = dbTeam.tla || staticData.code;
+      const rawCode = dbTeam.tla || staticData.code;
+      const teamCode = TEAM_CODE_ALIASES[rawCode] ?? rawCode;
       const override = overridesMap.get(teamCode);
       
       const eloVal = override ? override.elo : (dbTeam.teamStrength?.overallRating ? (dbTeam.teamStrength.overallRating * 20) : staticData.elo);
