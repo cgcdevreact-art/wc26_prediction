@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
@@ -8,6 +9,16 @@ import { Check, Trophy, Shield, RefreshCw, Brain, ChevronRight } from "lucide-re
 import { toast } from "sonner";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ComparisonHeader {
   isHeader: true;
@@ -23,6 +34,11 @@ interface ComparisonFeature {
 }
 
 type ComparisonRow = ComparisonHeader | ComparisonFeature;
+type PaidTier = "plus" | "pro";
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 export default function SubscriptionPage() {
   const { data: session } = useSession();
@@ -30,6 +46,8 @@ export default function SubscriptionPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [pendingTier, setPendingTier] = useState<PaidTier | null>(null);
 
   const currentTier = session?.user?.subscriptionTier || "free";
   const tierLabels = {
@@ -38,7 +56,7 @@ export default function SubscriptionPage() {
     pro: "Expert Predictor",
   } as const;
 
-  const handleSubscribe = async (tier: "plus" | "pro") => {
+  const handleSubscribe = async (tier: PaidTier) => {
     if (!session) {
       toast.error("Please sign in to choose a subscription plan");
       router.push(buildAuthModalHref({
@@ -50,26 +68,42 @@ export default function SubscriptionPage() {
       return;
     }
 
+    if (!acceptedTerms) {
+      toast.error("Please agree to the Terms & Conditions before continuing to payment.");
+      return;
+    }
+
     try {
       setLoadingTier(tier);
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier }),
+        body: JSON.stringify({ tier, agreedToTerms: true }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
 
       if (data.url) {
-        window.location.href = data.url;
+        window.location.assign(data.url);
       } else {
         throw new Error("No checkout URL returned from server");
       }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to initiate Stripe Checkout");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to initiate Stripe Checkout"));
       setLoadingTier(null);
     }
+  };
+
+  const openUpgradePopup = (tier: PaidTier) => {
+    setAcceptedTerms(false);
+    setPendingTier(tier);
+  };
+
+  const closeUpgradePopup = () => {
+    if (loadingTier !== null) return;
+    setPendingTier(null);
+    setAcceptedTerms(false);
   };
 
   const tiers = [
@@ -152,7 +186,7 @@ export default function SubscriptionPage() {
     {
       name: "Expert Predictor",
       id: "pro",
-      price: "$4.99",
+      price: "$7.77",
       period: "/day",
       description: "Ultimate simulation engine with tactical variables.",
       icon: <Trophy className="h-6 w-6 text-purple-500" />,
@@ -292,7 +326,6 @@ export default function SubscriptionPage() {
         <div className="mx-auto mb-24 grid max-w-6xl items-stretch gap-8 pt-4 md:grid-cols-2 xl:grid-cols-3">
           {tiers.map((tier) => {
             const isCurrent = currentTier === tier.id;
-            const isFree = tier.id === "free";
             const isUpgraded =
               (currentTier === "plus" && tier.id === "free") ||
               (currentTier === "pro" && (tier.id === "free" || tier.id === "plus"));
@@ -392,7 +425,11 @@ export default function SubscriptionPage() {
                   ) : (
                     <button
                       disabled={loadingTier !== null}
-                      onClick={() => !isFree && handleSubscribe(tier.id as any)}
+                      onClick={() => {
+                        if (tier.id === "plus" || tier.id === "pro") {
+                          openUpgradePopup(tier.id);
+                        }
+                      }}
                       className={`w-full rounded-xl py-3 text-sm font-bold text-center transition duration-200 active:scale-95 flex items-center justify-center gap-2 cursor-pointer ${tier.id === "plus"
                         ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20 hover:opacity-90"
                         : tier.id === "pro"
@@ -415,6 +452,79 @@ export default function SubscriptionPage() {
             );
           })}
         </div>
+
+        <Dialog open={pendingTier !== null} onOpenChange={(open) => { if (!open) closeUpgradePopup(); }}>
+          <DialogContent className="overflow-hidden rounded-[2rem] border border-border bg-card/95 p-0 shadow-2xl dark:border-white/10 dark:bg-[#0f172a]/95">
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-blue-500/12 via-emerald-500/10 to-purple-500/12" />
+              <div className="pointer-events-none absolute -left-10 top-6 h-28 w-28 rounded-full bg-blue-500/12 blur-2xl" />
+              <div className="pointer-events-none absolute -right-10 bottom-6 h-28 w-28 rounded-full bg-emerald-500/12 blur-2xl" />
+
+              <div className="relative p-6 md:p-8">
+                <DialogHeader className="space-y-3 text-left">
+                  <div className="inline-flex w-fit items-center rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                    Checkout Confirmation
+                  </div>
+                  <DialogTitle className="font-display text-2xl font-bold tracking-tight text-foreground dark:text-white">
+                    Confirm your {pendingTier === "pro" ? "Expert" : "Advanced"} upgrade
+                  </DialogTitle>
+                  <DialogDescription className="max-w-md text-sm leading-relaxed text-muted-foreground">
+                    Before we send you to payment, please confirm that you agree to the plan terms and recurring billing details.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="mt-6 rounded-2xl border border-slate-200/60 bg-white/70 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] backdrop-blur-sm dark:border-white/5 dark:bg-slate-900/20">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="accept-terms-modal"
+                      checked={acceptedTerms}
+                      onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                      className="mt-1"
+                    />
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="accept-terms-modal"
+                        className="cursor-pointer text-sm leading-relaxed text-slate-700 dark:text-slate-200"
+                      >
+                        I agree to the{" "}
+                        <Link href="/terms" className="font-semibold text-primary hover:underline">
+                          Terms & Conditions
+                        </Link>{" "}
+                        and understand that subscription payments may be recurring and subject to the plan terms.
+                      </Label>
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        This confirmation is required before checkout for Advanced or Expert plans.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter className="mt-6 gap-3 sm:justify-start sm:space-x-0">
+                  <button
+                    type="button"
+                    disabled={pendingTier === null || loadingTier !== null || !acceptedTerms}
+                    onClick={() => {
+                      if (pendingTier) {
+                        void handleSubscribe(pendingTier);
+                      }
+                    }}
+                    className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition duration-200 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  >
+                    {loadingTier === pendingTier ? "Processing..." : "Agree & Continue to Payment"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeUpgradePopup}
+                    disabled={loadingTier !== null}
+                    className="w-full rounded-xl bg-muted px-5 py-3 text-sm font-medium text-muted-foreground transition duration-200 hover:bg-muted/80 hover:text-foreground disabled:opacity-50 sm:w-auto"
+                  >
+                    Cancel
+                  </button>
+                </DialogFooter>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Compare Plans Section */}
         <section id="compare-plans" className="mx-auto max-w-6xl scroll-mt-28">

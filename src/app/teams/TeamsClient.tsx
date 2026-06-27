@@ -77,7 +77,7 @@ export default function TeamsClient({
   initialPlayers: PlayerStats[];
   flagMap: Record<string, string>;
 }) {
-  const { isInitialized, initializeData, teams, players, selectedModel } = useSimulationStore();
+  const { isInitialized, initializeData, teams, players, selectedModel, updateTeam } = useSimulationStore();
   const appTeams = useTeams();
   const groupsConfig = useGroupsConfig();
   const router = useRouter();
@@ -319,6 +319,10 @@ export default function TeamsClient({
       if (!response.ok) {
         throw new Error(data.error || "Failed to save team progress");
       }
+      updateTeam(editingTeam.code, "elo" as any, String(editingTeam.elo));
+      updateTeam(editingTeam.code, "attack" as any, String(editingTeam.attack));
+      updateTeam(editingTeam.code, "defense" as any, String(editingTeam.defense));
+      updateTeam(editingTeam.code, "isCustom" as any, true as any);
 
       toast.success(`${editingTeam.name} ratings saved successfully!`);
       setEditStatsModalOpen(false);

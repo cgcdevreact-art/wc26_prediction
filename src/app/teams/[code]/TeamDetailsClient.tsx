@@ -125,6 +125,10 @@ export default function TeamDetailsClient({
       if (!response.ok) {
         throw new Error(data.error || "Failed to save team progress");
       }
+      updateTeam(teamCode, "elo" as any, String(elo));
+      updateTeam(teamCode, "attack" as any, String(attack));
+      updateTeam(teamCode, "defense" as any, String(defense));
+      updateTeam(teamCode, "isCustom" as any, true as any);
 
       toast.success("Team ratings saved successfully!");
       router.refresh();

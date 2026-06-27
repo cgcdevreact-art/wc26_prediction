@@ -12,6 +12,10 @@ export interface TeamStats {
   "Avg Base Quality": string;
   "Avg Recent Form": string;
   "Avg Intl Exp": string;
+  isCustom?: boolean;
+  elo?: number;
+  attack?: number;
+  defense?: number;
 }
 
 export interface PlayerStats {
@@ -44,6 +48,7 @@ export interface PlayerStats {
   "Overall Rating": string;
   "Rating Tier": string;
   "ImageUrl"?: string; // For user-added real images
+  isCustom?: boolean;
 }
 
 export type SimulationModel = "base" | "advanced" | "pro";
@@ -56,6 +61,7 @@ interface SimulationState {
   
   // Actions
   initializeData: (defaultTeams: TeamStats[], defaultPlayers: PlayerStats[]) => void;
+  syncData: (defaultTeams: TeamStats[], defaultPlayers: PlayerStats[]) => void;
   updateTeam: (teamCode: string, field: keyof TeamStats, value: string) => void;
   updatePlayer: (playerId: string, field: keyof PlayerStats, value: string) => void;
   resetToDefaults: () => void;
@@ -70,13 +76,50 @@ export const useSimulationStore = create<SimulationState>()(
       isInitialized: false,
       selectedModel: "base",
 
-      initializeData: (defaultTeams, defaultPlayers) => set((state) => {
+       initializeData: (defaultTeams, defaultPlayers) => set((state) => {
         // Only initialize if it hasn't been initialized yet, or if the state is missing teams
         if (state.isInitialized && Object.keys(state.teams).length >= defaultTeams.length) return state;
 
         const teamsMap: Record<string, TeamStats> = {};
         defaultTeams.forEach((t) => {
-          teamsMap[t['Team Code']] = t;
+          const code = t['Team Code'] || (t as any).code;
+          const name = t['Team'] || (t as any).name;
+          const isCustom = t.isCustom || (t as any).isCustom || false;
+
+          teamsMap[code] = {
+            ...t,
+            'Team Code': code,
+            'Team': name,
+            isCustom,
+          };
+        });
+
+        const playersMap: Record<string, PlayerStats> = {};
+        defaultPlayers.forEach((p) => {
+          const id = `${p['Team Code']}-${p['Player Name']}`;
+          playersMap[id] = p;
+        });
+
+        return {
+          teams: teamsMap,
+          players: playersMap,
+          isInitialized: true,
+        };
+      }),
+
+      syncData: (defaultTeams, defaultPlayers) => set((state) => {
+        const teamsMap: Record<string, TeamStats> = {};
+        defaultTeams.forEach((t) => {
+          const code = t['Team Code'] || (t as any).code;
+          const name = t['Team'] || (t as any).name;
+          const isCustom = t.isCustom || (t as any).isCustom || false;
+
+          teamsMap[code] = {
+            ...t,
+            'Team Code': code,
+            'Team': name,
+            isCustom,
+          };
         });
 
         const playersMap: Record<string, PlayerStats> = {};
@@ -98,6 +141,7 @@ export const useSimulationStore = create<SimulationState>()(
           [teamCode]: {
             ...state.teams[teamCode],
             [field]: value,
+            isCustom: true,
           }
         }
       })),
@@ -108,11 +152,12 @@ export const useSimulationStore = create<SimulationState>()(
           [playerId]: {
             ...state.players[playerId],
             [field]: value,
+            isCustom: true,
           }
         }
       })),
 
-      resetToDefaults: () => set({ isInitialized: false }), // Will re-trigger initialization
+      resetToDefaults: () => set({ isInitialized: false, teams: {}, players: {} }), // Will re-trigger initialization
       setSelectedModel: (model) => set({ selectedModel: model }),
     }),
     {

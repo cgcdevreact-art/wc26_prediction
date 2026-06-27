@@ -135,6 +135,7 @@ export async function getTeams() {
               power: override.elo / 20,
               attack: override.attack,
               defense: override.defense,
+              isCustom: true,
             };
           }
           return t;
@@ -145,7 +146,8 @@ export async function getTeams() {
 
     return dbTeams.map((dbTeam) => {
       const staticData = resolveStaticTeam(dbTeam.tla, dbTeam.name, dbTeam.shortName) || staticTeams[0];
-      const teamCode = dbTeam.tla || staticData.code;
+      const rawCode = dbTeam.tla || staticData.code;
+      const teamCode = TEAM_CODE_ALIASES[rawCode] ?? rawCode;
       const override = overridesMap.get(teamCode);
       
       const eloVal = override ? override.elo : (dbTeam.teamStrength?.overallRating ? (dbTeam.teamStrength.overallRating * 20) : staticData.elo);
@@ -165,6 +167,7 @@ export async function getTeams() {
         squadValueM: staticData.squadValueM,
         avgAge: staticData.avgAge,
         goalsPerMatch: staticData.goalsPerMatch,
+        isCustom: !!override,
         
         // Dynamic Strengths
         power: powerVal,
@@ -203,6 +206,7 @@ export async function getTeams() {
                 power: override.elo / 20,
                 attack: override.attack,
                 defense: override.defense,
+                isCustom: true,
               };
             }
             return t;
@@ -284,6 +288,7 @@ export async function getPlayers() {
               "Match Importance": override.matchImportance,
               "Rating Tier": override.ratingTier,
               "ImageUrl": override.imageUrl || undefined,
+              isCustom: true,
             };
           }
           return p;

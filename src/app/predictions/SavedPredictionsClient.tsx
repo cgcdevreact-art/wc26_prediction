@@ -208,18 +208,30 @@ export default function SavedPredictionsClient() {
         } catch (e) {
           console.error(e);
         }
+        if (data) {
+          const modelName = (data.modelName || "base").toUpperCase();
+          data.displayName = `${data.name} (${modelName})`;
+        }
         return { id: p.id, raw: p, data, color: lineColors[idx % lineColors.length] };
       })
       .filter(item => item.data !== null);
 
+    const selectedCountryNames = Array.from(new Set(parsedCompareData.map(item => item.data.name)));
+    const countryCounts: Record<string, number> = {};
+    parsedCompareData.forEach(item => {
+      const name = item.data.name;
+      countryCounts[name] = (countryCounts[name] || 0) + 1;
+    });
+    const hasDuplicateCountrySelected = Object.values(countryCounts).some(count => count >= 2);
+
     const progressionChartData = [
-      { stage: "Group Stage", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: 100 }), {}) },
-      { stage: "Round of 32", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.r32 ?? 0) / 10).toFixed(1)) }), {}) },
-      { stage: "Round of 16", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.r16 ?? 0) / 10).toFixed(1)) }), {}) },
-      { stage: "Quarter Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.qf ?? 0) / 10).toFixed(1)) }), {}) },
-      { stage: "Semi Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.sf ?? 0) / 10).toFixed(1)) }), {}) },
-      { stage: "Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.final ?? 0) / 10).toFixed(1)) }), {}) },
-      { stage: "Champion", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.name]: parseFloat(((c.data.stages?.champion ?? (c.data.championProb * 10 || 0)) / 10).toFixed(1)) }), {}) }
+      { stage: "Group Stage", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.displayName]: 100 }), {}) },
+      { stage: "Round of 32", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.displayName]: parseFloat(((c.data.stages?.r32 ?? 0) / 10).toFixed(1)) }), {}) },
+      { stage: "Round of 16", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.displayName]: parseFloat(((c.data.stages?.r16 ?? 0) / 10).toFixed(1)) }), {}) },
+      { stage: "Quarter Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.displayName]: parseFloat(((c.data.stages?.qf ?? 0) / 10).toFixed(1)) }), {}) },
+      { stage: "Semi Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.displayName]: parseFloat(((c.data.stages?.sf ?? 0) / 10).toFixed(1)) }), {}) },
+      { stage: "Final", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.displayName]: parseFloat(((c.data.stages?.final ?? 0) / 10).toFixed(1)) }), {}) },
+      { stage: "Champion", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.displayName]: parseFloat(((c.data.stages?.champion ?? (c.data.championProb * 10 || 0)) / 10).toFixed(1)) }), {}) }
     ];
 
     const attributesChartData = [
@@ -230,8 +242,8 @@ export default function SavedPredictionsClient() {
           const scaledElo = Math.round((rawElo - 1300) / 6);
           return {
             ...acc,
-            [c.data.name]: Math.max(0, Math.min(100, scaledElo)),
-            [`${c.data.name}_raw`]: rawElo
+            [c.data.displayName]: Math.max(0, Math.min(100, scaledElo)),
+            [`${c.data.displayName}_raw`]: rawElo
           };
         }, {})
       },
@@ -241,8 +253,8 @@ export default function SavedPredictionsClient() {
           const rawAttack = c.data.customAttack ?? 75;
           return {
             ...acc,
-            [c.data.name]: rawAttack,
-            [`${c.data.name}_raw`]: rawAttack
+            [c.data.displayName]: rawAttack,
+            [`${c.data.displayName}_raw`]: rawAttack
           };
         }, {})
       },
@@ -252,8 +264,8 @@ export default function SavedPredictionsClient() {
           const rawDefense = c.data.customDefense ?? 75;
           return {
             ...acc,
-            [c.data.name]: rawDefense,
-            [`${c.data.name}_raw`]: rawDefense
+            [c.data.displayName]: rawDefense,
+            [`${c.data.displayName}_raw`]: rawDefense
           };
         }, {})
       },
@@ -264,8 +276,8 @@ export default function SavedPredictionsClient() {
           const scaledSquad = Math.round(rawSquadValue / 15);
           return {
             ...acc,
-            [c.data.name]: Math.max(0, Math.min(100, scaledSquad)),
-            [`${c.data.name}_raw`]: `€${rawSquadValue}M`
+            [c.data.displayName]: Math.max(0, Math.min(100, scaledSquad)),
+            [`${c.data.displayName}_raw`]: `€${rawSquadValue}M`
           };
         }, {})
       },
@@ -276,8 +288,8 @@ export default function SavedPredictionsClient() {
           const rawChamp = parseFloat((ch / 10).toFixed(1));
           return {
             ...acc,
-            [c.data.name]: rawChamp,
-            [`${c.data.name}_raw`]: `${rawChamp}%`
+            [c.data.displayName]: rawChamp,
+            [`${c.data.displayName}_raw`]: `${rawChamp}%`
           };
         }, {})
       }
@@ -353,7 +365,11 @@ export default function SavedPredictionsClient() {
 
                         if (!data) return null;
                         const isChecked = selectedIds.includes(p.id);
-                        const isDisableCompare = !isChecked && selectedIds.length >= 4;
+                        const hasDifferentCountrySelected = selectedCountryNames.length > 0 && !selectedCountryNames.includes(data.name);
+                        const isDisableCompare = !isChecked && (
+                           selectedIds.length >= 4 || 
+                           (hasDuplicateCountrySelected && hasDifferentCountrySelected)
+                         );
                         const d = new Date(p.updatedAt);
                         const dateStr = d.toLocaleDateString(undefined, {
                           month: "short",
@@ -491,7 +507,7 @@ export default function SavedPredictionsClient() {
                                 <Line
                                   key={c.id}
                                   type="monotone"
-                                  dataKey={c.data.name}
+                                  dataKey={c.data.displayName}
                                   stroke={c.color}
                                   strokeWidth={3}
                                   dot={{ r: 5, strokeWidth: 2 }}
@@ -512,7 +528,7 @@ export default function SavedPredictionsClient() {
                                 <Line
                                   key={c.id}
                                   type="monotone"
-                                  dataKey={c.data.name}
+                                  dataKey={c.data.displayName}
                                   stroke={c.color}
                                   strokeWidth={3}
                                   dot={{ r: 5, strokeWidth: 2 }}
@@ -541,7 +557,7 @@ export default function SavedPredictionsClient() {
                                 <th key={c.id} className="py-4 px-5 min-w-[150px]" style={{ color: c.color }}>
                                   <div className="flex items-center gap-2 font-black">
                                     <CountryFlag code={c.data.code} flag={c.data.flag} name={c.data.name} className="h-4.5 w-6 rounded shrink-0" emojiClassName="text-base leading-none" />
-                                    <span className="truncate">{c.data.name}</span>
+                                    <span className="truncate">{c.data.displayName}</span>
                                   </div>
                                 </th>
                               ))}
@@ -722,9 +738,9 @@ export default function SavedPredictionsClient() {
                                       </div>
                                     </td>
                                     {parsedCompareData.map((c) => {
-                                      const modelLower = (c.raw.predictedModel || "free").toLowerCase();
-                                      const model = modelLower === "expert" ? "Expert" : modelLower === "advanced" ? "Advanced" : "Free";
-                                      const badgeClass = model === "Expert" 
+                                      const modelLower = (c.data?.modelName || "base").toLowerCase();
+                                      const model = modelLower === "pro" || modelLower === "expert" ? "Pro" : modelLower === "advanced" ? "Advanced" : "Base";
+                                      const badgeClass = model === "Pro" 
                                         ? "bg-purple-500/10 text-purple-700 border-purple-500/20" 
                                         : model === "Advanced" 
                                         ? "bg-cyan-500/10 text-cyan-700 border-cyan-500/20" 
