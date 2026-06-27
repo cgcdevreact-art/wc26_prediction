@@ -217,6 +217,12 @@ export default function SavedPredictionsClient() {
       .filter(item => item.data !== null);
 
     const selectedCountryNames = Array.from(new Set(parsedCompareData.map(item => item.data.name)));
+    const countryCounts: Record<string, number> = {};
+    parsedCompareData.forEach(item => {
+      const name = item.data.name;
+      countryCounts[name] = (countryCounts[name] || 0) + 1;
+    });
+    const hasDuplicateCountrySelected = Object.values(countryCounts).some(count => count >= 2);
 
     const progressionChartData = [
       { stage: "Group Stage", ...parsedCompareData.reduce((acc, c) => ({ ...acc, [c.data.displayName]: 100 }), {}) },
@@ -360,7 +366,10 @@ export default function SavedPredictionsClient() {
                         if (!data) return null;
                         const isChecked = selectedIds.includes(p.id);
                         const hasDifferentCountrySelected = selectedCountryNames.length > 0 && !selectedCountryNames.includes(data.name);
-                        const isDisableCompare = !isChecked && (selectedIds.length >= 4 || hasDifferentCountrySelected);
+                        const isDisableCompare = !isChecked && (
+                           selectedIds.length >= 4 || 
+                           (hasDuplicateCountrySelected && hasDifferentCountrySelected)
+                         );
                         const d = new Date(p.updatedAt);
                         const dateStr = d.toLocaleDateString(undefined, {
                           month: "short",
