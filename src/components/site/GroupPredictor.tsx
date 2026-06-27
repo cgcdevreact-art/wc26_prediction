@@ -3456,7 +3456,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               )
                             )}
                             <span className="opacity-40">#{details.matchNumber}</span>
-                            {((tHome.isCustom || tAway.isCustom) && !bypassOverrides) && (
+                            {((storeTeams[m.homeCode]?.isCustom || storeTeams[m.awayCode]?.isCustom) && !bypassOverrides) && (
                               <span className="inline-block text-[7px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 w-fit font-black uppercase tracking-widest leading-none mt-0.5" title="Simulation includes overridden players/stats">
                                 Adjusted
                               </span>
