@@ -83,6 +83,7 @@ function clearPredictorMatchScores(match: PredictorMatch): PredictorMatch {
 
 interface TeamStanding {
   code: string;
+  group: string;
   team: any;
   played: number;
   won: number;
@@ -801,11 +802,25 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     });
   }, [getAssignedLiveScoreForMatch, teams, players, selectedModel]);
 
+  const matchesRef = useRef(matches);
+  useEffect(() => {
+    matchesRef.current = matches;
+  }, [matches]);
+
+  const syncKnockoutBracketRef = useRef<((currentMatches: PredictorMatch[]) => void) | null>(null);
+  useEffect(() => {
+    syncKnockoutBracketRef.current = syncKnockoutBracket;
+  });
+
   const handleToggleRealScores = (checked: boolean) => {
     setUseRealScores(checked);
     if (checked) {
       setPreRealScoresMatches(matches);
-      setMatches((prev) => applyRealScores(prev));
+      const updatedMatches = applyRealScores(matches);
+      setMatches(updatedMatches);
+      if (syncKnockoutBracketRef.current) {
+        syncKnockoutBracketRef.current(updatedMatches);
+      }
     } else {
       if (preRealScoresMatches) {
         setMatches(preRealScoresMatches);
@@ -816,7 +831,18 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   useEffect(() => {
     if (useRealScores && liveGames.length > 0) {
-      setMatches((prev) => applyRealScores(prev));
+      const currentMatches = matchesRef.current;
+      const updatedMatches = applyRealScores(currentMatches);
+      const hasChanged = updatedMatches.some((m, idx) => {
+        const prev = currentMatches[idx];
+        return prev.homeScore !== m.homeScore || prev.awayScore !== m.awayScore;
+      });
+      if (hasChanged) {
+        setMatches(updatedMatches);
+        if (syncKnockoutBracketRef.current) {
+          syncKnockoutBracketRef.current(updatedMatches);
+        }
+      }
     }
   }, [liveGames, useRealScores, applyRealScores]);
 
@@ -1678,6 +1704,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       codes.forEach((code) => {
         data[group][code] = {
           code,
+          group,
           team: getTeam(code),
           played: 0,
           won: 0,
@@ -1847,8 +1874,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     return [...teams]
       .map(t => {
         const eliminated = isTeamEliminated(t.code);
-        // Normalized probability for alive teams, base probability for eliminated teams
-        const winProb = eliminated ? t.prob.champion : (t.prob.champion / totalAliveProb) * 100;
+        // Normalized probability for alive teams, 0 for eliminated teams
+        const winProb = eliminated ? 0 : (t.prob.champion / totalAliveProb) * 100;
         return {
           name: t.name,
           code: t.code,
@@ -2123,6 +2150,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       codes.forEach((code) => {
         data[group][code] = {
           code,
+          group,
           team: getTeam(code),
           played: 0,
           won: 0,
@@ -2222,6 +2250,100 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       { home: getWinner("I"), away: getWinner("J") },
       { home: getWinner("K"), away: getWinner("L") },
     ];
+  };
+
+  const syncKnockoutBracket = (currentMatches: PredictorMatch[]) => {
+    const currentStandings = computeStandingsSync(currentMatches);
+    const currentThirdPlaces = computeThirdPlaceStandingsSync(currentStandings);
+    const r32Pairs = computeR32TeamsSync(currentStandings, currentThirdPlaces);
+
+    const updatedWinners = {
+      r32: Array(16).fill(null),
+      r16: Array(8).fill(null),
+      qf: Array(4).fill(null),
+      sf: Array(2).fill(null),
+      final: Array(1).fill(null),
+    };
+    const updatedScores: Record<string, { home: number | ""; away: number | "" }> = {};
+
+    // Simulate R32
+    r32Pairs.forEach((pair, idx) => {
+      if (!pair.home || !pair.away) return;
+      const { hs, as, winner } = simulateKoMatch(pair.home, pair.away);
+      updatedWinners.r32[idx] = winner;
+      updatedScores[`r32-${idx}`] = { home: hs, away: as };
+    });
+
+    // R16
+    for (let idx = 0; idx < 8; idx++) {
+      const home = updatedWinners.r32[2 * idx];
+      const away = updatedWinners.r32[2 * idx + 1];
+      if (!home || !away) continue;
+      const { hs, as, winner } = simulateKoMatch(home, away);
+      updatedWinners.r16[idx] = winner;
+      updatedScores[`r16-${idx}`] = { home: hs, away: as };
+    }
+
+    // QF
+    for (let idx = 0; idx < 4; idx++) {
+      const home = updatedWinners.r16[2 * idx];
+      const away = updatedWinners.r16[2 * idx + 1];
+      if (!home || !away) continue;
+      const { hs, as, winner } = simulateKoMatch(home, away);
+      updatedWinners.qf[idx] = winner;
+      updatedScores[`qf-${idx}`] = { home: hs, away: as };
+    }
+
+    // SF
+    for (let idx = 0; idx < 2; idx++) {
+      const home = updatedWinners.qf[2 * idx];
+      const away = updatedWinners.qf[2 * idx + 1];
+      if (!home || !away) continue;
+      const { hs, as, winner } = simulateKoMatch(home, away);
+      updatedWinners.sf[idx] = winner;
+      updatedScores[`sf-${idx}`] = { home: hs, away: as };
+    }
+
+    // Final
+    const homeFinal = updatedWinners.sf[0];
+    const awayFinal = updatedWinners.sf[1];
+    if (homeFinal && awayFinal) {
+      const { hs, as, winner } = simulateKoMatch(homeFinal, awayFinal);
+      updatedWinners.final[0] = winner;
+      updatedScores[`final-0`] = { home: hs, away: as };
+    }
+
+    // 3rd Place Match
+    const homeMatch = { home: updatedWinners.qf[0], away: updatedWinners.qf[1] };
+    const awayMatch = { home: updatedWinners.qf[2], away: updatedWinners.qf[3] };
+    const homeWinner = updatedWinners.sf[0];
+    const awayWinner = updatedWinners.sf[1];
+
+    let homeLoser: string | null = null;
+    let awayLoser: string | null = null;
+
+    if (homeMatch.home && homeMatch.away && homeWinner) {
+      homeLoser = homeWinner === homeMatch.home ? homeMatch.away : homeMatch.home;
+    }
+    if (awayMatch.home && awayMatch.away && awayWinner) {
+      awayLoser = awayWinner === awayMatch.home ? awayMatch.away : awayMatch.home;
+    }
+
+    let simulatedThirdWinner: string | null = null;
+    let simulatedThirdScores: { home: number | ""; away: number | "" } = { home: "", away: "" };
+
+    if (homeLoser && awayLoser) {
+      const { hs, as, winner } = simulateKoMatch(homeLoser, awayLoser);
+      simulatedThirdWinner = winner;
+      simulatedThirdScores = { home: hs, away: as };
+    }
+
+    setKoWinners(updatedWinners);
+    setKoScores(updatedScores);
+    setThirdWinner(simulatedThirdWinner);
+    setThirdScores(simulatedThirdScores);
+
+    saveBulkToDb(currentMatches, updatedWinners, updatedScores, simulatedThirdWinner, simulatedThirdScores);
   };
 
   const handleWholeTournamentSimulation = () => {
@@ -3257,7 +3379,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                         className={`border-b border-white/5 hover:bg-white/5 last:border-0 transition ${borderClass}`}
                       >
                         <td className="py-2.5 pl-3 font-semibold">{idx + 1}</td>
-                        <td className="py-2.5 text-center font-bold text-gradient">Group {row.code.charAt(0)}</td>
+                        <td className="py-2.5 text-center font-bold text-gradient">Group {row.group}</td>
                         <td className="py-2.5 flex items-center gap-2">
                           <CountryFlag
                             code={row.team.code}
