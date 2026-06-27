@@ -50,6 +50,8 @@ export function Footer() {
         <FooterCol
           title="Legal"
           items={[
+            { label: "Terms & Conditions", href: "/terms" },
+            { label: "Disclaimer", href: "/disclaimer" },
             { label: "Privacy Policy", href: "/privacy" },
             { label: "Data Deletion", href: "/data-deletion" }
           ]}

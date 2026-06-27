@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export async function POST(request: Request) {
   try {
     const session = await auth();
@@ -9,9 +13,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { tier } = await request.json();
+    const { tier, agreedToTerms } = await request.json();
     if (tier !== "plus" && tier !== "pro") {
       return NextResponse.json({ error: "Invalid subscription tier selection" }, { status: 400 });
+    }
+    if (agreedToTerms !== true) {
+      return NextResponse.json({ error: "You must agree to the Terms & Conditions before checkout" }, { status: 400 });
     }
 
     const priceId =
@@ -57,8 +64,11 @@ export async function POST(request: Request) {
       });
 
       return NextResponse.json({ url: stripeSession.url });
-    } catch (error: any) {
-      console.warn("Stripe Checkout failed, falling back to mock checkout upgrade:", error.message);
+    } catch (error: unknown) {
+      console.warn(
+        "Stripe Checkout failed, falling back to mock checkout upgrade:",
+        getErrorMessage(error, "Unknown Stripe error"),
+      );
       const { prisma: prismaDb } = await import("@/lib/prisma");
       await prismaDb.user.update({
         where: { id: session.user.id },
@@ -69,8 +79,11 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({ url: `${appUrl}/subscription/thank-you?tier=${tier}` });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating Stripe Checkout Session:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: getErrorMessage(error, "Internal Server Error") },
+      { status: 500 },
+    );
   }
 }

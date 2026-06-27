@@ -111,6 +111,8 @@ export function Hero() {
 
       return a.match_no - b.match_no;
     });
+  const hasLiveMatch = todayMatches.some((match) => match.status === "LIVE");
+  const matchesHeadingLabel = hasLiveMatch ? "Today's" : "Upcoming";
 
   const handleSimulationClick = () => {
     if (session) {
@@ -258,10 +260,10 @@ export function Hero() {
             <Calendar className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
             {todayMatches.length > 0 ? (
               <span>
-                Today&apos;s <span className="text-red-500">{todayMatches.length}</span> Matches
+                {matchesHeadingLabel} <span className="text-red-500">{todayMatches.length}</span> Matches
               </span>
             ) : (
-              <span>Today&apos;s Matches</span>
+              <span>{matchesHeadingLabel} Matches</span>
             )}
           </h3>
 
