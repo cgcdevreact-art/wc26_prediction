@@ -13,6 +13,9 @@ export interface TeamStats {
   "Avg Recent Form": string;
   "Avg Intl Exp": string;
   isCustom?: boolean;
+  elo?: number;
+  attack?: number;
+  defense?: number;
 }
 
 export interface PlayerStats {
