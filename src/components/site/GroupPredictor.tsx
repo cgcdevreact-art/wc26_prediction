@@ -3366,7 +3366,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 <span className="truncate flex items-center gap-1">
                                   {row.team.name}
                                   {row.team.isCustom && !bypassOverrides && (
-                                    <Sparkles className="h-3 w-3 text-purple-500 fill-purple-500/20 shrink-0 animate-pulse" title="Custom team stats active" />
+                                    <span title="Custom team stats active" className="inline-flex shrink-0">
+                                      <Sparkles className="h-3 w-3 text-purple-500 fill-purple-500/20 animate-pulse" />
+                                    </span>
                                   )}
                                 </span>
                               </td>
@@ -3413,7 +3415,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 </span>
                                 {topPlayerRating && <span className="text-[10px] ml-1 text-foreground/50 dark:text-white/40">({topPlayerRating})</span>}
                                 {topPlayer?.isCustom && !bypassOverrides && (
-                                  <Sparkles className="h-2.5 w-2.5 text-purple-500 fill-purple-500/20 shrink-0" title="Player stats edited" />
+                                  <span title="Player stats edited" className="inline-flex shrink-0">
+                                    <Sparkles className="h-2.5 w-2.5 text-purple-500 fill-purple-500/20" />
+                                  </span>
                                 )}
                               </td>
                             </tr>
