@@ -410,9 +410,154 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const teams = useTeams();
   const GROUPS_CONFIG = useGroupsConfig();
   const cupResults = useCupResults();
-  const getTeam = (code: string) => teams.find(t => t.code === code) || teams[0];
   const { data: session } = useSession();
-  const { players, isInitialized, initializeData, selectedModel } = useSimulationStore();
+  const { players: storePlayers, teams: storeTeams, isInitialized, initializeData, syncData, selectedModel, resetToDefaults, updatePlayer, updateTeam } = useSimulationStore();
+
+  const [bypassOverrides, setBypassOverrides] = useState(false);
+  const [isOverridesModalOpen, setIsOverridesModalOpen] = useState(false);
+  const [staticDefaultPlayers, setStaticDefaultPlayers] = useState<Record<string, any>>({});
+  const [staticDefaultTeams, setStaticDefaultTeams] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch("/players.json")
+      .then(res => res.json())
+      .then(data => {
+        const map: Record<string, any> = {};
+        data.forEach((p: any) => {
+          const id = `${p['Team Code']}-${p['Player Name']}`;
+          map[id] = p;
+        });
+        setStaticDefaultPlayers(map);
+      }).catch(err => console.error("Error loading default players", err));
+
+    fetch("/cup.json")
+      .then(res => res.json())
+      .then(data => {
+        setStaticDefaultTeams(data.teams || []);
+      }).catch(err => console.error("Error loading default cup data", err));
+  }, []);
+
+  const getTeam = (code: string) => {
+    const t = teams.find(t => t.code === code) || teams[0];
+    if (bypassOverrides && staticDefaultTeams.length > 0) {
+      const defaultTeamData = staticDefaultTeams.find(dt => dt.name === t.name);
+      if (defaultTeamData) {
+        const minElo = 1276.66;
+        const maxElo = 1874.81;
+        const power = Math.max(15, Math.min(99, Math.round(((defaultTeamData.elo - minElo) / (maxElo - minElo)) * 80 + 15)));
+        return {
+          ...t,
+          elo: defaultTeamData.elo,
+          attack: defaultTeamData.attack,
+          defense: defaultTeamData.defense,
+          power: power,
+        };
+      }
+    }
+    return t;
+  };
+
+  const players = useMemo(() => {
+    return bypassOverrides && Object.keys(staticDefaultPlayers).length > 0
+      ? staticDefaultPlayers
+      : storePlayers;
+  }, [bypassOverrides, staticDefaultPlayers, storePlayers]);
+
+  const customPlayersCount = useMemo(() => {
+    return Object.values(storePlayers || {}).filter(p => p.isCustom).length;
+  }, [storePlayers]);
+
+  const customTeamsCount = useMemo(() => {
+    return Object.values(storeTeams || {}).filter(t => t.isCustom).length;
+  }, [storeTeams]);
+
+  const totalOverrides = customPlayersCount + customTeamsCount;
+
+  const handleResetAllOverrides = async () => {
+    if (session?.user?.id) {
+      try {
+        const response = await fetch("/api/user/reset-overrides", {
+          method: "POST",
+        });
+        if (!response.ok) {
+          throw new Error("Failed to delete overrides on database.");
+        }
+      } catch (err) {
+        console.error("Database overrides reset failed", err);
+        toast.error("Failed to delete server overrides. Resetting locally.");
+      }
+    }
+    resetToDefaults();
+    setIsOverridesModalOpen(false);
+    toast.success("All custom player and team stats have been reset to defaults!");
+  };
+
+  const handleResetSinglePlayer = async (playerKey: string, playerName: string) => {
+    const staticDefault = staticDefaultPlayers[playerKey];
+    if (!staticDefault) return;
+
+    if (session?.user?.id) {
+      try {
+        await fetch("/api/user/save-player", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            playerKey,
+            overallRating: staticDefault["Overall Rating"] || "0",
+            baseQuality: staticDefault["Base Quality"] || "0",
+            recentForm: staticDefault["Recent Form"] || "0",
+            intlExperience: staticDefault["International Experience"] || "0",
+            attackingImpact: staticDefault["Attacking Impact"] || "0",
+            defensiveImpact: staticDefault["Defensive Impact"] || "0",
+            passingCreativity: staticDefault["Passing / Creativity"] || "0",
+            fitnessAvailability: staticDefault["Fitness / Availability"] || "0",
+            disciplineRisk: staticDefault["Discipline Risk"] || "0",
+            matchImportance: staticDefault["Match Importance"] || "0",
+            ratingTier: staticDefault["Rating Tier"] || "0",
+            imageUrl: null,
+          }),
+        });
+      } catch (err) {
+        console.error("Failed to save default player value to database", err);
+      }
+    }
+    Object.keys(staticDefault).forEach((field) => {
+      updatePlayer(playerKey, field as any, staticDefault[field]);
+    });
+    updatePlayer(playerKey, "isCustom" as any, false as any);
+    toast.success(`Reset ${playerName} to defaults!`);
+  };
+
+  const handleResetSingleTeam = async (teamCode: string, teamName: string) => {
+    const defaultTeamData = staticDefaultTeams.find(dt => dt.name === teamName);
+    if (!defaultTeamData) return;
+
+    if (session?.user?.id) {
+      try {
+        await fetch("/api/user/save-team", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            teamCode,
+            elo: defaultTeamData.elo,
+            attack: defaultTeamData.attack,
+            defense: defaultTeamData.defense,
+          }),
+        });
+      } catch (err) {
+        console.error("Failed to save default team ELO to database", err);
+      }
+    }
+    updateTeam(teamCode, "elo" as any, String(defaultTeamData.elo));
+    updateTeam(teamCode, "attack" as any, String(defaultTeamData.attack));
+    updateTeam(teamCode, "defense" as any, String(defaultTeamData.defense));
+    updateTeam(teamCode, "isCustom" as any, false as any);
+    toast.success(`Reset ${teamName} ELO and stats to defaults!`);
+  };
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -462,17 +607,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   }, []);
 
   useEffect(() => {
-    if (!isInitialized) {
-      Promise.all([
-        fetch("/api/teams").then((res) => res.json()),
-        fetch("/api/players").then((res) => res.json()),
-      ]).then(([teamsData, playersData]) => {
-        initializeData(teamsData, playersData);
-      }).catch((err) => {
-        console.error("Failed to load teams/players in simulator", err);
-      });
-    }
-  }, [isInitialized, initializeData]);
+    Promise.all([
+      fetch("/api/teams").then((res) => res.json()),
+      fetch("/api/players").then((res) => res.json()),
+    ]).then(([teamsData, playersData]) => {
+      syncData(teamsData, playersData);
+    }).catch((err) => {
+      console.error("Failed to sync teams/players in simulator", err);
+    });
+  }, [syncData]);
 
   const getTeamPlayers = (teamCode: string) => {
     return Object.values(players)
@@ -853,7 +996,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   const groupRealPercent = useMemo(() => {
     const realCount = matches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
-    return Math.round((realCount / 72) * 100);
+    return Math.round((realCount / 104) * 100);
   }, [matches, getAssignedLiveScoreForMatch]);
 
   const simulatePendingMatches = useCallback(() => {
@@ -2861,6 +3004,34 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             </div>
           </label>
 
+          {totalOverrides > 0 && (
+            <label
+              className={`inline-flex min-h-[56px] items-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${
+                bypassOverrides
+                  ? "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
+                  : "bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.15)] animate-pulse"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={!bypassOverrides}
+                onChange={(e) => setBypassOverrides(!e.target.checked)}
+                className="h-5 w-5 rounded-md border-slate-300 dark:border-white/20 bg-slate-100 dark:bg-slate-800 text-purple-600 focus:ring-purple-500 cursor-pointer accent-purple-500"
+              />
+              <div className="flex items-center gap-1.5" onClick={(e) => {
+                if ((e.target as HTMLElement).tagName !== "INPUT") {
+                  e.preventDefault();
+                  setIsOverridesModalOpen(true);
+                }
+              }}>
+                <Award className={`h-4 w-4 ${bypassOverrides ? "text-slate-400" : "text-purple-500 fill-purple-500/20"}`} />
+                <span className="text-xs font-bold leading-none select-none hover:underline">
+                  {!bypassOverrides ? "Custom Stats Applied" : "Custom Stats Bypassed"} ({totalOverrides})
+                </span>
+              </div>
+            </label>
+          )}
+
           {session?.user?.id && (
             <button
               onClick={() => setIsSavesModalOpen(true)}
@@ -3192,7 +3363,12 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
                                   emojiClassName="text-base shrink-0 leading-none"
                                 />
-                                <span className="truncate">{row.team.name}</span>
+                                <span className="truncate flex items-center gap-1">
+                                  {row.team.name}
+                                  {row.team.isCustom && !bypassOverrides && (
+                                    <Sparkles className="h-3 w-3 text-purple-500 fill-purple-500/20 shrink-0 animate-pulse" title="Custom team stats active" />
+                                  )}
+                                </span>
                               </td>
                               <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
                                 {row.team.elo && Number.isFinite(row.team.elo) ? Math.round(row.team.elo) : "-"}
@@ -3231,9 +3407,14 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   return Number.isFinite(rounded) ? rounded : "-";
                                 })()}
                               </td>
-                              <td className="py-1 text-right text-muted-foreground truncate max-w-[100px]" title={topPlayerDisp}>
-                                <span className="text-neon/90 font-medium">{topPlayerName || "N/A"}</span>
+                              <td className="py-1 text-right text-muted-foreground truncate max-w-[100px] flex items-center justify-end gap-1" title={topPlayerDisp}>
+                                <span className={`${topPlayer?.isCustom && !bypassOverrides ? "text-purple-400 font-bold" : "text-neon/90"} font-medium`}>
+                                  {topPlayerName || "N/A"}
+                                </span>
                                 {topPlayerRating && <span className="text-[10px] ml-1 text-foreground/50 dark:text-white/40">({topPlayerRating})</span>}
+                                {topPlayer?.isCustom && !bypassOverrides && (
+                                  <Sparkles className="h-2.5 w-2.5 text-purple-500 fill-purple-500/20 shrink-0" title="Player stats edited" />
+                                )}
                               </td>
                             </tr>
                           );
@@ -3271,6 +3452,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               )
                             )}
                             <span className="opacity-40">#{details.matchNumber}</span>
+                            {((tHome.isCustom || tAway.isCustom) && !bypassOverrides) && (
+                              <span className="inline-block text-[7px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 w-fit font-black uppercase tracking-widest leading-none mt-0.5" title="Simulation includes overridden players/stats">
+                                Adjusted
+                              </span>
+                            )}
                           </div>
 
                           {/* Match Core (Teams & Score) */}
@@ -4737,6 +4923,149 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {isOverridesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-6 shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-white/5 mb-4">
+              <div className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <h3 className="font-display font-bold text-xl text-slate-900 dark:text-white">Active Squad & Stats Overrides</h3>
+              </div>
+              <button
+                onClick={() => setIsOverridesModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-white/5 text-slate-400 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-white transition cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2 scrollbar-custom">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400 mb-2.5">Customized Teams</h4>
+                {Object.values(storeTeams || {}).filter(t => t.isCustom).length === 0 ? (
+                  <div className="text-sm text-slate-500 dark:text-muted-foreground/60 italic py-2 pl-2">No team info overridden</div>
+                ) : (
+                  <div className="space-y-2">
+                    {Object.values(storeTeams || {}).filter(t => t.isCustom).map((t) => {
+                      const staticDefault = staticDefaultTeams.find(dt => dt.name === t.Team);
+                      return (
+                        <div key={t["Team Code"]} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <CountryFlag
+                              code={t["Team Code"]}
+                              flag={getTeam(t["Team Code"])?.flag}
+                              name={t.Team}
+                              className="h-5 w-7 shrink-0 rounded object-cover"
+                              emojiClassName="text-xl leading-none"
+                            />
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-900 dark:text-white text-sm truncate">{t.Team}</div>
+                              <div className="text-xs text-slate-500 dark:text-muted-foreground flex flex-wrap gap-x-2 gap-y-0.5">
+                                {staticDefault ? (
+                                  <>
+                                    {Math.round(Number(t.elo || 1500)) !== Math.round(Number(staticDefault.elo)) && (
+                                      <span>Elo: {Math.round(Number(t.elo || 1500))} (was {Math.round(staticDefault.elo)})</span>
+                                    )}
+                                    {Number(t.attack || 1) !== Number(staticDefault.attack) && (
+                                      <span>Attack: {Number(t.attack || 1) < 10 ? Number(t.attack || 1).toFixed(2) : Math.round(Number(t.attack || 1))} (was {Number(staticDefault.attack) < 10 ? Number(staticDefault.attack).toFixed(2) : Math.round(Number(staticDefault.attack))})</span>
+                                    )}
+                                    {Number(t.defense || 1) !== Number(staticDefault.defense) && (
+                                      <span>Defense: {Number(t.defense || 1) < 10 ? Number(t.defense || 1).toFixed(2) : Math.round(Number(t.defense || 1))} (was {Number(staticDefault.defense) < 10 ? Number(staticDefault.defense).toFixed(2) : Math.round(Number(staticDefault.defense))})</span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span>Elo: {Math.round(Number(t["Avg Overall Rating"] || t.elo || 1500))}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleResetSingleTeam(t["Team Code"], t.Team)}
+                            className="p-2 text-rose-600 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
+                            title="Reset Team defaults"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400 mb-2.5">Customized Players</h4>
+                {Object.values(storePlayers || {}).filter(p => p.isCustom).length === 0 ? (
+                  <div className="text-sm text-slate-500 dark:text-muted-foreground/60 italic py-2 pl-2">No player statistics overridden</div>
+                ) : (
+                  <div className="space-y-2">
+                    {Object.values(storePlayers || {}).filter(p => p.isCustom).map((p) => {
+                      const key = `${p["Team Code"]}-${p["Player Name"]}`;
+                      const staticDefault = staticDefaultPlayers[key];
+                      return (
+                        <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <CountryFlag
+                              code={p["Team Code"]}
+                              flag={getTeam(p["Team Code"])?.flag}
+                              name={p.Team}
+                              className="h-5 w-7 shrink-0 rounded object-cover"
+                              emojiClassName="text-xl leading-none"
+                            />
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-900 dark:text-white text-sm truncate">{p["Player Name"]}</div>
+                              <div className="text-xs text-slate-500 dark:text-muted-foreground flex flex-wrap gap-x-2 gap-y-0.5">
+                                {staticDefault ? (
+                                  <>
+                                    {p["Overall Rating"] !== staticDefault["Overall Rating"] && (
+                                      <span>Rating: {p["Overall Rating"]} (was {staticDefault["Overall Rating"]})</span>
+                                    )}
+                                    {p["Base Quality"] !== staticDefault["Base Quality"] && (
+                                      <span>Quality: {p["Base Quality"]} (was {staticDefault["Base Quality"]})</span>
+                                    )}
+                                    {p["Recent Form"] !== staticDefault["Recent Form"] && (
+                                      <span>Form: {p["Recent Form"]} (was {staticDefault["Recent Form"]})</span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span>Rating: {p["Overall Rating"]}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleResetSinglePlayer(key, p["Player Name"])}
+                            className="p-2 text-rose-600 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
+                            title="Reset Player defaults"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 dark:border-white/5 mt-4 flex items-center justify-between gap-3">
+              <button
+                onClick={handleResetAllOverrides}
+                className="px-4 py-2.5 text-xs font-black uppercase tracking-wider text-rose-600 hover:bg-rose-500/5 hover:text-rose-500 dark:text-rose-500 dark:hover:bg-rose-500/10 rounded-xl transition border border-rose-200 dark:border-rose-500/20 cursor-pointer"
+              >
+                Reset All Overrides
+              </button>
+              <button
+                onClick={() => setIsOverridesModalOpen(false)}
+                className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-900 dark:text-white transition border border-slate-200 dark:border-white/10 cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
