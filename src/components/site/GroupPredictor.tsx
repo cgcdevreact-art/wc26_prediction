@@ -851,6 +851,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     return Math.round((realCount / TOTAL_TOURNAMENT_MATCHES) * 100);
   }, [matches, getAssignedLiveScoreForMatch]);
 
+  const groupRealPercent = useMemo(() => {
+    const realCount = matches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
+    return Math.round((realCount / 72) * 100);
+  }, [matches, getAssignedLiveScoreForMatch]);
+
   const simulatePendingMatches = useCallback(() => {
     const updatedMatches = matches.map((m) => {
       if (hasAssignedMatchScores(m)) return m;
@@ -1874,8 +1879,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     return [...teams]
       .map(t => {
         const eliminated = isTeamEliminated(t.code);
-        // Normalized probability for alive teams, 0 for eliminated teams
-        const winProb = eliminated ? 0 : (t.prob.champion / totalAliveProb) * 100;
+        // ELO/rating-based win probability
+        const winProb = t.prob.champion;
         return {
           name: t.name,
           code: t.code,
@@ -2851,7 +2856,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             <div className="flex items-center gap-1.5">
               <Zap className={`h-4 w-4 transition-all duration-300 ${useRealScores ? "text-cyan-500 fill-cyan-500 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)] animate-pulse" : "text-slate-400 dark:text-slate-500"}`} />
               <span className="text-xs font-bold leading-none select-none">
-                Include Real-Time Data ({globalRealPercent}%)
+                Include Real-Time Data ({groupRealPercent}%)
               </span>
             </div>
           </label>
@@ -3050,7 +3055,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 className="h-5 w-5 rounded-md border-border bg-black/10 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-background cursor-pointer accent-cyan-500"
               />
               <label htmlFor="use-actual-scores" className="text-sm font-semibold text-foreground/90 select-none cursor-pointer">
-                Use actual / real-life scores for group stage matches
+                Use actual / real-life scores for group stage matches ({groupRealPercent}%)
               </label>
             </div>
             <div className="flex items-center gap-2">
@@ -3492,13 +3497,21 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 return (
                   <>
                     <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                      <button
-                        onClick={() => handleAiPredictKnockoutsWithCredits()}
-                        className="flex items-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-6 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-neon shadow-neon"
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        Simulate Remaining Bracket
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => handleAiPredictKnockoutsWithCredits()}
+                          className="flex items-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-6 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-neon shadow-neon"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Simulate Remaining Bracket
+                        </button>
+                        {useRealScores && (
+                          <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1.5 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse flex items-center gap-1.5">
+                            <Zap className="h-3.5 w-3.5 fill-cyan-500/20 text-cyan-500" />
+                            {groupRealPercent}% Real-Time Data Included
+                          </span>
+                        )}
+                      </div>
 
                       {/* Zoom Controls */}
                       <div className="flex items-center gap-2 bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 rounded-xl p-1 shrink-0">
