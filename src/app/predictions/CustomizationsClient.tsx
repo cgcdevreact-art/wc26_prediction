@@ -20,7 +20,7 @@ export default function CustomizationsClient({
   rawPlayers,
 }: CustomizationsClientProps) {
   const [showAllTeams, setShowAllTeams] = useState(false);
-  const [showAllPlayers, setShowAllPlayers] = useState(false);
+
 
   // Re-create the maps for quick lookup in client side
   const teamsMap = useMemo(() => new Map(teams.map((t) => [t.code, t])), [teams]);
@@ -44,7 +44,7 @@ export default function CustomizationsClient({
   };
 
   const visibleTeams = showAllTeams ? teamOverrides : teamOverrides.slice(0, 3);
-  const visiblePlayers = showAllPlayers ? playerOverrides : playerOverrides.slice(0, 3);
+
 
   // States for player expanded stats dropdowns
   const [expandedPlayerIds, setExpandedPlayerIds] = useState<Record<string, boolean>>({});
@@ -162,8 +162,8 @@ export default function CustomizationsClient({
           {playerOverrides.length === 0 ? (
             <p className="text-xs text-slate-500 dark:text-slate-400 py-4 text-center italic">No player edits saved.</p>
           ) : (
-            <div className="space-y-3">
-              {visiblePlayers.map((override) => {
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {playerOverrides.map((override) => {
                 const [teamCode, ...nameParts] = override.playerKey.split("-");
                 const playerName = nameParts.join("-") || override.playerKey;
                 const teamInfo = teamsMap.get(teamCode);
@@ -345,15 +345,6 @@ export default function CustomizationsClient({
           )}
         </div>
 
-        {playerOverrides.length > 3 && (
-          <button
-            onClick={() => setShowAllPlayers(!showAllPlayers)}
-            className="mt-4 w-full py-2 rounded-xl glass border border-dashed border-slate-200 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-xs font-bold text-muted-foreground hover:text-foreground transition flex items-center justify-center gap-1 cursor-pointer"
-          >
-            <span>{showAllPlayers ? "Show Less" : `Show More (${playerOverrides.length - 3} more)`}</span>
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-350 ${showAllPlayers ? "rotate-180" : ""}`} />
-          </button>
-        )}
       </div>
     </div>
   );

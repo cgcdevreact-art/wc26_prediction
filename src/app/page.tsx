@@ -3,6 +3,7 @@ import { Footer } from "@/components/site/Footer";
 import { Hero } from "@/components/site/Hero";
 import { LiveStats } from "@/components/site/LiveStats";
 import { HomeSectionsAccordion } from "@/components/site/HomeSectionsAccordion";
+import { ScrollToTop } from "@/components/site/ScrollToTop";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -13,7 +14,7 @@ export const metadata = {
 
 export default function Page() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
       <Header />
       <main>
         <Hero />
@@ -35,6 +36,7 @@ export default function Page() {
         </div>
       </main>
       <Footer />
+      <ScrollToTop />
     </div>
   );
 }
