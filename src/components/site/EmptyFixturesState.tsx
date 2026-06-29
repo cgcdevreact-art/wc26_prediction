@@ -5,9 +5,13 @@ import { RefreshCw } from "lucide-react";
 
 interface EmptyFixturesStateProps {
   onReset: () => void;
+  title?: string;
 }
 
-export function EmptyFixturesState({ onReset }: EmptyFixturesStateProps) {
+export function EmptyFixturesState({
+  onReset,
+  title = "No Matchups Found",
+}: EmptyFixturesStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center select-none">
       {/* SVG Container holding the user-provided Footballer SVG */}
@@ -21,7 +25,7 @@ export function EmptyFixturesState({ onReset }: EmptyFixturesStateProps) {
 
       {/* Title */}
       <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white mb-2">
-        No Matchups Found
+        {title}
       </h3>
 
 

@@ -122,7 +122,7 @@ export default async function PredictionsPage(props: {
   // Load metadata to get slot names
   const metadataRows = predictions.filter(p => p.type === "SLOT_METADATA");
   const slotNames: Record<number, string> = {
-    0: "Official Active Prediction",
+    0: "User Active Prediction",
     1: "Save 1",
     2: "Save 2",
     3: "Save 3",

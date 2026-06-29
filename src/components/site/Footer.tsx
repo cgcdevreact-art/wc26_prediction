@@ -18,7 +18,7 @@ export function Footer() {
                 className="h-8 w-auto"
               />
             </span>
-            <div className="font-semibold">26WC <span className="text-gradient">PREDICTION</span></div>
+            <div className="font-semibold">2026 World Cup <span className="text-gradient">PREDICTION</span></div>
           </div>
           <p className="mt-3 max-w-md text-xs text-muted-foreground">The most intelligent way to predict World Cup 2026. <br /> Picks. Probabilities. Glory.</p>
         </div>

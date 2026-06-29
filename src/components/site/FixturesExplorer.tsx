@@ -9,17 +9,17 @@ import { EmptyFixturesState } from "./EmptyFixturesState";
 const isNumericString = (val: any) => /^\d+$/.test(String(val));
 
 export function FixturesExplorer() {
-  const [activeStage, setActiveStage] = useState<"group" | "knockout">("group");
-  const [selectedGroup, setSelectedGroup] = useState<string>("ALL");
-  const [search, setSearch] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [activeStage, setActiveStage]           = useState<"group" | "knockout">("knockout");
+  const [selectedGroup, setSelectedGroup]       = useState<string>("ALL");
+  const [search, setSearch]                     = useState("");
+  const [selectedDate, setSelectedDate]         = useState("");
+  const [selectedStatus, setSelectedStatus]     = useState<string>("ALL");
   const [selectedLocation, setSelectedLocation] = useState<string>("");
 
   const [fixtures, setFixtures] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [now, setNow] = useState(() => Date.now());
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState("");
+  const [now, setNow]           = useState(() => Date.now());
 
   const groups = ["ALL", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
 
@@ -199,10 +199,10 @@ export function FixturesExplorer() {
     if (diffMs <= 0) return "00s";
 
     const totalSeconds = Math.floor(diffMs / 1000);
-    const days = Math.floor(totalSeconds / 86400);
-    const hours = Math.floor((totalSeconds % 86400) / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+    const days         = Math.floor(totalSeconds / 86400);
+    const hours        = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes      = Math.floor((totalSeconds % 3600) / 60);
+    const seconds      = totalSeconds % 60;
 
     if (days > 0) return `${days}d ${hours}h ${minutes}m ${seconds}s`;
     if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
@@ -475,7 +475,10 @@ export function FixturesExplorer() {
                   {filteredFixtures.length === 0 && (
                     <tr>
                       <td colSpan={activeStage === "group" ? 5 : 4} className="p-0">
-                        <EmptyFixturesState onReset={handleReset} />
+                        <EmptyFixturesState
+                          onReset={handleReset}
+                          title={activeStage === "group" ? "No matches found for group stage" : undefined}
+                        />
                       </td>
                     </tr>
                   )}

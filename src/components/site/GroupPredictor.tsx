@@ -411,7 +411,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const GROUPS_CONFIG = useGroupsConfig();
   const cupResults = useCupResults();
   const { data: session } = useSession();
-  const { players: storePlayers, teams: storeTeams, isInitialized, initializeData, syncData, selectedModel, resetToDefaults, updatePlayer, updateTeam } = useSimulationStore();
+  const { players: storePlayers, teams: storeTeams, isInitialized, initializeData, syncData, selectedModel, resetToDefaults, updatePlayer, updateTeam, toggleTeamOverride, togglePlayerOverride } = useSimulationStore();
 
   const [bypassOverrides, setBypassOverrides] = useState(false);
   const [isOverridesModalOpen, setIsOverridesModalOpen] = useState(false);
@@ -439,7 +439,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   const getTeam = (code: string) => {
     const t = teams.find(t => t.code === code) || teams[0];
-    if (bypassOverrides && staticDefaultTeams.length > 0) {
+    const storeTeam = storeTeams[code];
+    const isTeamOverrideDisabled = storeTeam?.isCustom && storeTeam?.isOverrideDisabled;
+
+    if ((bypassOverrides || isTeamOverrideDisabled) && staticDefaultTeams.length > 0) {
       const defaultTeamData = staticDefaultTeams.find(dt => dt.name === t.name);
       if (defaultTeamData) {
         const minElo = 1276.66;
@@ -458,17 +461,33 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   };
 
   const players = useMemo(() => {
-    return bypassOverrides && Object.keys(staticDefaultPlayers).length > 0
-      ? staticDefaultPlayers
-      : storePlayers;
+    if (bypassOverrides && Object.keys(staticDefaultPlayers).length > 0) {
+      return staticDefaultPlayers;
+    }
+    const result: Record<string, PlayerStats> = { ...storePlayers };
+    if (Object.keys(staticDefaultPlayers).length > 0) {
+      Object.keys(result).forEach((key) => {
+        if (result[key]?.isCustom && result[key]?.isOverrideDisabled) {
+          const defaultPlayer = staticDefaultPlayers[key];
+          if (defaultPlayer) {
+            result[key] = {
+              ...defaultPlayer,
+              isCustom: true,
+              isOverrideDisabled: true,
+            };
+          }
+        }
+      });
+    }
+    return result;
   }, [bypassOverrides, staticDefaultPlayers, storePlayers]);
 
   const customPlayersCount = useMemo(() => {
-    return Object.values(storePlayers || {}).filter(p => p.isCustom).length;
+    return Object.values(storePlayers || {}).filter(p => p.isCustom && !p.isOverrideDisabled).length;
   }, [storePlayers]);
 
   const customTeamsCount = useMemo(() => {
-    return Object.values(storeTeams || {}).filter(t => t.isCustom).length;
+    return Object.values(storeTeams || {}).filter(t => t.isCustom && !t.isOverrideDisabled).length;
   }, [storeTeams]);
 
   const totalOverrides = customPlayersCount + customTeamsCount;
@@ -1077,7 +1096,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const [currentSlot, setCurrentSlot] = useState<number | null>(null);
   const [allPredictions, setAllPredictions] = useState<any[]>([]);
   const [slotNames, setSlotNames] = useState<Record<number, string>>({
-    0: "Official Prediction", 1: "Save 1", 2: "Save 2", 3: "Save 3", 4: "Save 4", 5: "Save 5"
+    0: "User Prediction", 1: "Save 1", 2: "Save 2", 3: "Save 3", 4: "Save 4", 5: "Save 5"
   });
   const [slotDates, setSlotDates] = useState<Record<number, string>>({
     0: "", 1: "", 2: "", 3: "", 4: "", 5: ""
@@ -1331,7 +1350,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   useEffect(() => {
     if (allPredictions.length === 0) return;
 
-    const names: Record<number, string> = { 0: "Official Prediction", 1: "Save 1", 2: "Save 2", 3: "Save 3", 4: "Save 4", 5: "Save 5" };
+    const names: Record<number, string> = { 0: "User Prediction", 1: "Save 1", 2: "Save 2", 3: "Save 3", 4: "Save 4", 5: "Save 5" };
     const dates: Record<number, string> = { 0: "", 1: "", 2: "", 3: "", 4: "", 5: "" };
     const summaries: Record<number, any> = {};
 
@@ -1509,7 +1528,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setThirdWinner(loadedThirdWinner);
     setThirdScores(loadedThirdScores);
     setCurrentSlot(slotId);
-    toast.success(slotId ? `Successfully loaded progress from Save Slot "${slotNames[slotId]}"!` : "Successfully loaded Official Prediction!");
+    toast.success(slotId ? `Successfully loaded progress from Save Slot "${slotNames[slotId]}"!` : "Successfully loaded User Prediction!");
   };
 
   const handleRenameSlot = async (slotId: number, newName: string) => {
@@ -1794,7 +1813,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     }
 
     const metadataSlot = targetSlot !== null ? targetSlot : 0;
-    const slotName = metadataSlot === 0 ? "Official Prediction" : (slotNames[metadataSlot] || `Save Slot ${metadataSlot}`);
+    const slotName = metadataSlot === 0 ? "User Prediction" : (slotNames[metadataSlot] || `Save Slot ${metadataSlot}`);
     const summary = getPredictionSummary(
       updatedMatches,
       activeWinners,
@@ -2033,13 +2052,16 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         };
       })
       .sort((a, b) => {
+        if (useRealScores) {
+          return b.winProb - a.winProb;
+        }
         if (a.isEliminated !== b.isEliminated) {
           return a.isEliminated ? 1 : -1;
         }
         return b.winProb - a.winProb;
       })
       .slice(0, 8);
-  }, [teams, koMatchups, koWinners, r32Teams, isGroupStageComplete]);
+  }, [teams, koMatchups, koWinners, r32Teams, isGroupStageComplete, useRealScores]);
 
   // Computed losers of SF for the 3rd place match
   const sfLosers = useMemo(() => {
@@ -2958,7 +2980,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             </h1>
             {session?.user?.id && (
               <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30 mt-1">
-                Active Slot: {currentSlot !== null ? slotNames[currentSlot] : "Official Prediction"}
+                Active Slot: {currentSlot !== null ? slotNames[currentSlot] : "User Prediction"}
               </span>
             )}
           </div>
@@ -2999,7 +3021,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             <div className="flex items-center gap-1.5">
               <Zap className={`h-4 w-4 transition-all duration-300 ${useRealScores ? "text-cyan-500 fill-cyan-500 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)] animate-pulse" : "text-slate-400 dark:text-slate-500"}`} />
               <span className="text-xs font-bold leading-none select-none">
-                Include Real-Time Data ({groupRealPercent}%)
+                Include Real-Time Results ({groupRealPercent}%)
               </span>
             </div>
           </label>
@@ -3026,7 +3048,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               }}>
                 <Award className={`h-4 w-4 ${bypassOverrides ? "text-slate-400" : "text-purple-500 fill-purple-500/20"}`} />
                 <span className="text-xs font-bold leading-none select-none hover:underline">
-                  {!bypassOverrides ? "Custom Stats Applied" : "Custom Stats Bypassed"} ({totalOverrides})
+                  {!bypassOverrides ? "My Customizations Applied" : "Apply my customizations"} ({totalOverrides})
                 </span>
               </div>
             </label>
@@ -3365,7 +3387,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 />
                                 <span className="truncate flex items-center gap-1">
                                   {row.team.name}
-                                  {row.team.isCustom && !bypassOverrides && (
+                                  {row.team.isCustom && !bypassOverrides && !storeTeams[row.team.code]?.isOverrideDisabled && (
                                     <span title="Custom team stats active" className="inline-flex shrink-0">
                                       <Sparkles className="h-3 w-3 text-purple-500 fill-purple-500/20 animate-pulse" />
                                     </span>
@@ -3410,11 +3432,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 })()}
                               </td>
                               <td className="py-1 text-right text-muted-foreground truncate max-w-[100px] flex items-center justify-end gap-1" title={topPlayerDisp}>
-                                <span className={`${topPlayer?.isCustom && !bypassOverrides ? "text-purple-400 font-bold" : "text-neon/90"} font-medium`}>
+                                <span className={`${topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled ? "text-purple-400 font-bold" : "text-neon/90"} font-medium`}>
                                   {topPlayerName || "N/A"}
                                 </span>
                                 {topPlayerRating && <span className="text-[10px] ml-1 text-foreground/50 dark:text-white/40">({topPlayerRating})</span>}
-                                {topPlayer?.isCustom && !bypassOverrides && (
+                                {topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled && (
                                   <span title="Player stats edited" className="inline-flex shrink-0">
                                     <Sparkles className="h-2.5 w-2.5 text-purple-500 fill-purple-500/20" />
                                   </span>
@@ -3456,11 +3478,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               )
                             )}
                             <span className="opacity-40">#{details.matchNumber}</span>
-                            {((storeTeams[m.homeCode]?.isCustom || storeTeams[m.awayCode]?.isCustom) && !bypassOverrides) && (
-                              <span className="inline-block text-[7px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 w-fit font-black uppercase tracking-widest leading-none mt-0.5" title="Simulation includes overridden players/stats">
-                                Adjusted
-                              </span>
-                            )}
+                             {(((storeTeams[m.homeCode]?.isCustom && !storeTeams[m.homeCode]?.isOverrideDisabled) || (storeTeams[m.awayCode]?.isCustom && !storeTeams[m.awayCode]?.isOverrideDisabled)) && !bypassOverrides) && (
+                               <span className="inline-block text-[7px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 w-fit font-black uppercase tracking-widest leading-none mt-0.5" title="Simulation includes overridden players/stats">
+                                 Adjusted
+                               </span>
+                             )}
                           </div>
 
                           {/* Match Core (Teams & Score) */}
@@ -4354,7 +4376,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                     </div>
 
                     {/* Player Out Dropdown */}
-                    <div className="pt-2">
+                    {/* <div className="pt-2">
                       <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-1">Missing Player Penalty</span>
                       <select
                         value={simHomePlayerOut}
@@ -4368,7 +4390,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </div> */}
                   </div>
 
                   {/* Away Team Modifiers */}
@@ -4389,7 +4411,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                     </div>
 
                     {/* Player Out Dropdown */}
-                    <div className="pt-2">
+                    {/* <div className="pt-2">
                       <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-1">Missing Player Penalty</span>
                       <select
                         value={simAwayPlayerOut}
@@ -4403,7 +4425,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
 
@@ -4630,7 +4652,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           ) : (
                             <div className="flex items-center gap-1.5 min-w-0">
                               <span className={`font-display font-extrabold text-sm truncate ${hasData ? "text-slate-800 dark:text-slate-100" : "text-slate-400 italic dark:text-slate-500"}`}>
-                                {isOfficial ? "Official Active Prediction" : slotNames[slotId]}
+                                {isOfficial ? "User Active Prediction" : slotNames[slotId]}
                               </span>
                               {!isOfficial && (
                                 <button
@@ -4689,7 +4711,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               setSlotToOverwriteConfirm(slotId);
                             } else {
                               saveBulkToDb(matches, koWinners, koScores, thirdWinner, thirdScores, true, isOfficial ? null : slotId);
-                              toast.success(isOfficial ? "Saved to Official Prediction!" : `Progress saved to Slot "${slotNames[slotId]}"!`);
+                              toast.success(isOfficial ? "Saved to User Prediction!" : `Progress saved to Slot "${slotNames[slotId]}"!`);
                             }
                           }}
                           className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 ${hasData
@@ -4717,7 +4739,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                         <div className="flex items-center gap-2">
                           <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 animate-bounce" />
                           <span className="text-xs text-slate-700 dark:text-slate-200 font-medium">
-                            Overwrite <strong className="text-amber-600 dark:text-amber-400">"{isOfficial ? "Official Active Prediction" : slotNames[slotId]}"</strong>? The existing save will be replaced.
+                            Overwrite <strong className="text-amber-600 dark:text-amber-400">"{isOfficial ? "User Active Prediction" : slotNames[slotId]}"</strong>? The existing save will be replaced.
                           </span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -4730,7 +4752,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           <button
                             onClick={async () => {
                               await saveBulkToDb(matches, koWinners, koScores, thirdWinner, thirdScores, true, isOfficial ? null : slotId);
-                              toast.success(isOfficial ? "Saved to Official Prediction!" : `Progress saved to Slot "${slotNames[slotId]}"!`);
+                              toast.success(isOfficial ? "Saved to User Prediction!" : `Progress saved to Slot "${slotNames[slotId]}"!`);
                               setSlotToOverwriteConfirm(null);
                             }}
                             className="px-3.5 py-1 text-[11px] font-black rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 transition hover:brightness-110 active:scale-95"
@@ -4810,7 +4832,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
             {/* Modal Footer */}
             <div className="mt-6 pt-4 border-t border-slate-200 dark:border-white/5 flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-              <span>Active Save Target: <strong className="text-cyan-500 dark:text-cyan-400">{currentSlot ? slotNames[currentSlot] : "Official Prediction"}</strong></span>
+              <span>Active Save Target: <strong className="text-cyan-500 dark:text-cyan-400">{currentSlot ? slotNames[currentSlot] : "User Prediction"}</strong></span>
               <button
                 onClick={() => setIsSavesModalOpen(false)}
                 className="px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-white transition"
@@ -4954,8 +4976,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                     {Object.values(storeTeams || {}).filter(t => t.isCustom).map((t) => {
                       const staticDefault = staticDefaultTeams.find(dt => dt.name === t.Team);
                       return (
-                        <div key={t["Team Code"]} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        <div key={t["Team Code"]} className={`flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 ${t.isOverrideDisabled ? "opacity-55" : ""}`}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={!t.isOverrideDisabled}
+                              onChange={() => toggleTeamOverride(t["Team Code"])}
+                              className="h-4 w-4 rounded border-slate-300 dark:border-white/20 text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0"
+                              title="Enable/Disable this override"
+                            />
                             <CountryFlag
                               code={t["Team Code"]}
                               flag={getTeam(t["Team Code"])?.flag}
@@ -5008,8 +5037,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       const key = `${p["Team Code"]}-${p["Player Name"]}`;
                       const staticDefault = staticDefaultPlayers[key];
                       return (
-                        <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        <div key={key} className={`flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 ${p.isOverrideDisabled ? "opacity-55" : ""}`}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={!p.isOverrideDisabled}
+                              onChange={() => togglePlayerOverride(key)}
+                              className="h-4 w-4 rounded border-slate-300 dark:border-white/20 text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0"
+                              title="Enable/Disable this override"
+                            />
                             <CountryFlag
                               code={p["Team Code"]}
                               flag={getTeam(p["Team Code"])?.flag}
