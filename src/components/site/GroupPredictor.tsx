@@ -845,7 +845,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   }, [GROUPS_CONFIG, cupResults]);
 
   const [matches, setMatches] = useState<PredictorMatch[]>(initialMatches);
-  const [useRealScores, setUseRealScores] = useState(false);
+  const [useRealScores, setUseRealScores] = useState(true);
   const [preRealScoresMatches, setPreRealScoresMatches] = useState<PredictorMatch[] | null>(null);
 
   const disableRealScoresState = () => {
@@ -1982,7 +1982,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       { home: getWinner("I"), away: getWinner("J") },
       { home: getWinner("K"), away: getWinner("L") },
     ];
-  }, [isGroupStageComplete, standings, thirdPlaceStandings]);
+  }, [isGroupStageComplete, standings, thirdPlaceStandings, useRealScores, liveGames, teams]);
 
   const koMatchups = useMemo(() => {
     const matchups: Record<string, { home: string | null; away: string | null }[]> = {
@@ -2398,11 +2398,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const computeR32TeamsSync = (currentStandings: Record<string, TeamStanding[]>, thirdPlaces: TeamStanding[]) => {
     const bestThirdPlaces = thirdPlaces.slice(0, 8).map((t) => t.code);
 
-    const getWinner = (grp: string) => currentStandings[grp][0].code;
-    const getRunner = (grp: string) => currentStandings[grp][1].code;
+    const getWinner = (grp: string) => currentStandings[grp]?.[0]?.code || "";
+    const getRunner = (grp: string) => currentStandings[grp]?.[1]?.code || "";
     const getThird = (idx: number) => bestThirdPlaces[idx] || "ARG";
 
-    return [
+    const fallbackPairs = [
       { home: getWinner("A"), away: getThird(7) },
       { home: getRunner("B"), away: getRunner("C") },
       { home: getWinner("C"), away: getThird(6) },
@@ -2420,6 +2420,32 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       { home: getWinner("I"), away: getWinner("J") },
       { home: getWinner("K"), away: getWinner("L") },
     ];
+
+    if (useRealScores && liveGames && liveGames.length > 0) {
+      const liveR32 = liveGames
+        .filter((f: any) => f.isKnockout && f.stageName === "Round of 32")
+        .sort((a, b) => a.match_no - b.match_no);
+
+      if (liveR32.length === 16) {
+        const isValidCode = (c: string) => c && c.length === 3 && !c.match(/Winner|Runner|3rd|TBC|TBD/i);
+
+        return fallbackPairs.map((pair, idx) => {
+          const match = liveR32[idx];
+          if (match) {
+            const liveHomeCode = (match.homeTeamObj?.code || "").trim().toUpperCase();
+            const liveAwayCode = (match.awayTeamObj?.code || "").trim().toUpperCase();
+
+            return {
+              home: isValidCode(liveHomeCode) ? liveHomeCode : pair.home,
+              away: isValidCode(liveAwayCode) ? liveAwayCode : pair.away
+            };
+          }
+          return pair;
+        });
+      }
+    }
+
+    return fallbackPairs;
   };
 
   const syncKnockoutBracket = (currentMatches: PredictorMatch[]) => {
