@@ -3,10 +3,11 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { StatsCard } from "@/components/admin/StatsCard";
 import { Users, Trophy, Target, CreditCard, Activity, Clock } from "lucide-react";
 import Link from "next/link";
+import { DashboardCharts } from "@/components/admin/DashboardCharts";
 
 export default async function AdminDashboard() {
   // Fetch stats
-  const [userCount, matchCount, predictionCount, paidUsers, recentUsers, recentPredictions] =
+  const [userCount, matchCount, predictionCount, paidUsers, recentUsers, allUsers, allMatches, allPredictions] =
     await Promise.all([
       prisma.user.count(),
       prisma.match.count(),
@@ -16,22 +17,59 @@ export default async function AdminDashboard() {
       }),
       prisma.user.findMany({
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 6,
       }),
-      prisma.prediction.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 5,
-        include: {
-          user: { select: { name: true, email: true } },
-          match: {
-            select: {
-              homeTeam: { select: { shortName: true } },
-              awayTeam: { select: { shortName: true } },
-            },
-          },
-        },
-      }),
+      prisma.user.findMany({ select: { createdAt: true, subscriptionTier: true } }),
+      prisma.match.findMany({ select: { createdAt: true } }),
+      prisma.prediction.findMany({ select: { createdAt: true } })
     ]);
+
+  const now = new Date();
+  
+  const getCountsUpTo = (dateEnd: Date) => {
+    return {
+      users: allUsers.filter(u => u.createdAt <= dateEnd).length,
+      subscribers: allUsers.filter(u => u.subscriptionTier !== 'free' && u.createdAt <= dateEnd).length,
+      matches: allMatches.filter(m => m.createdAt <= dateEnd).length,
+      predictions: allPredictions.filter(p => p.createdAt <= dateEnd).length,
+    }
+  }
+
+  const dataDays = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    d.setHours(23, 59, 59, 999);
+    dataDays.push({
+      date: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      ...getCountsUpTo(d)
+    });
+  }
+
+  const dataMonths = [];
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - (i * 7));
+    d.setHours(23, 59, 59, 999);
+    dataMonths.push({
+      date: `Week ${4-i}`,
+      ...getCountsUpTo(d)
+    });
+  }
+
+  const dataYears = [];
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(now);
+    d.setMonth(d.getMonth() - i);
+    d.setDate(0); 
+    d.setMonth(d.getMonth() + 1);
+    d.setDate(0);
+    d.setHours(23, 59, 59, 999);
+    dataYears.push({
+      date: d.toLocaleDateString('en-US', { month: 'short' }),
+      ...getCountsUpTo(d)
+    });
+  }
 
   return (
     <>
@@ -77,8 +115,15 @@ export default async function AdminDashboard() {
           />
         </div>
 
-        {/* Two-Column Content */}
-        <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        {/* Charts */}
+        <DashboardCharts 
+          dataDays={dataDays} 
+          dataMonths={dataMonths} 
+          dataYears={dataYears} 
+        />
+
+        {/* Content Blocks */}
+        <div className="mt-8 grid grid-cols-1 gap-6">
           {/* Recent Users */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6">
             <div className="flex items-center justify-between mb-5">
@@ -95,7 +140,7 @@ export default async function AdminDashboard() {
                 View all →
               </Link>
             </div>
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {recentUsers.map((user) => (
                 <div
                   key={user.id}
@@ -132,86 +177,20 @@ export default async function AdminDashboard() {
             </div>
           </div>
 
-          {/* Recent Predictions */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-emerald-500" />
-                <h2 className="text-sm font-semibold text-slate-800">
-                  Recent Predictions
-                </h2>
+          {/* Predictions In Progress Placeholder */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center p-6 min-h-[300px]">
+            <div className="text-center space-y-3">
+              <div className="mx-auto w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center mb-4">
+                <Target className="w-8 h-8 text-slate-400" />
               </div>
-              <Link
-                href="/admin/predictions"
-                className="text-xs text-violet-500 hover:text-violet-700 transition-colors"
-              >
-                View all →
-              </Link>
+              <h3 className="text-xl font-bold text-slate-700">Prediction Module</h3>
+              <p className="text-sm font-semibold text-violet-600 uppercase tracking-widest px-4 py-2 bg-violet-100 rounded-full inline-block">
+                In Progress
+              </p>
+              <p className="text-xs text-slate-500 mt-2 max-w-[250px] mx-auto">
+                The prediction features are currently being upgraded and will return shortly.
+              </p>
             </div>
-            <div className="space-y-3">
-              {recentPredictions.map((pred) => (
-                <div
-                  key={pred.id}
-                  className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3 transition-colors hover:bg-slate-50"
-                >
-                  <div>
-                    <div className="text-sm font-medium text-slate-700">
-                      {pred.user?.name || "Anonymous"}
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      {pred.match?.homeTeam?.shortName || "TBD"} vs{" "}
-                      {pred.match?.awayTeam?.shortName || "TBD"} ·{" "}
-                      {pred.predictedHomeScore ?? "?"} - {pred.predictedAwayScore ?? "?"}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="rounded-md bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 uppercase">
-                      {pred.type.replace("_", " ")}
-                    </span>
-                    <div className="mt-1 text-[10px] text-slate-300">
-                      {pred.createdAt.toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {recentPredictions.length === 0 && (
-                <p className="text-sm text-slate-400 text-center py-4">No predictions yet</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="text-sm font-semibold text-slate-800 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Link
-              href="/admin/users"
-              className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-5 text-center transition-all hover:bg-fuchsia-50 hover:border-fuchsia-200"
-            >
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-fuchsia-100 border border-fuchsia-200/50">
-                <Users className="h-5 w-5 text-fuchsia-600" />
-              </div>
-              <span className="text-xs font-medium text-slate-600">Manage Users</span>
-            </Link>
-            <Link
-              href="/admin/matches"
-              className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-5 text-center transition-all hover:bg-amber-50 hover:border-amber-200"
-            >
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-100 border border-amber-200/50">
-                <Trophy className="h-5 w-5 text-amber-600" />
-              </div>
-              <span className="text-xs font-medium text-slate-600">View Matches</span>
-            </Link>
-            <Link
-              href="/admin/predictions"
-              className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-5 text-center transition-all hover:bg-emerald-50 hover:border-emerald-200"
-            >
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-100 border border-emerald-200/50">
-                <Target className="h-5 w-5 text-emerald-600" />
-              </div>
-              <span className="text-xs font-medium text-slate-600">Predictions</span>
-            </Link>
           </div>
         </div>
       </div>

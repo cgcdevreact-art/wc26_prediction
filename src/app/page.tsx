@@ -26,7 +26,7 @@ export default function Page() {
             className="mt-10 block overflow-hidden rounded-2xl border border-black/8 shadow-lg transition-opacity duration-300 hover:opacity-95 dark:border-white/10"
           >
             <Image
-              src="/banner.png"
+              src="/footerbanner.png"
               alt="FIFA World Cup 2026 Banner"
               width={1600}
               height={500}

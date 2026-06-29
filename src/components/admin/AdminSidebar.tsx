@@ -18,7 +18,7 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/matches", label: "Matches", icon: Trophy },
-  { href: "/admin/predictions", label: "Predictions", icon: Target },
+  // { href: "/admin/predictions", label: "Predictions", icon: Target },
 ];
 
 export function AdminSidebar() {
@@ -58,18 +58,16 @@ export function AdminSidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                  isActive
-                    ? "bg-violet-50 text-violet-700 shadow-sm border border-violet-100"
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent"
-                }`}
+                className={`group flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-all duration-200 ${isActive
+                  ? "bg-violet-50 text-violet-700 shadow-sm border border-violet-100"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent"
+                  }`}
               >
                 <Icon
-                  className={`h-4 w-4 shrink-0 transition-colors ${
-                    isActive
-                      ? "text-violet-600"
-                      : "text-slate-400 group-hover:text-slate-500"
-                  }`}
+                  className={`h-4 w-4 shrink-0 transition-colors ${isActive
+                    ? "text-violet-600"
+                    : "text-slate-400 group-hover:text-slate-500"
+                    }`}
                 />
                 <span>{item.label}</span>
                 {isActive && (

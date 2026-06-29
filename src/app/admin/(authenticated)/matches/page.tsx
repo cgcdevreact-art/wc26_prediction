@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
 
 interface MatchData {
@@ -24,6 +24,9 @@ export default function AdminMatchesPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState("utcDate");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [statusFilter, setStatusFilter] = useState("");
   const limit = 20;
 
   const fetchMatches = useCallback(async () => {
@@ -32,6 +35,9 @@ export default function AdminMatchesPage() {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(limit),
+        sort: sortBy,
+        order: sortOrder,
+        ...(statusFilter && { status: statusFilter }),
       });
       const res = await fetch(`/api/admin/matches?${params}`);
       const data = await res.json();
@@ -42,7 +48,7 @@ export default function AdminMatchesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, sortBy, sortOrder, statusFilter]);
 
   useEffect(() => {
     fetchMatches();
@@ -60,30 +66,82 @@ export default function AdminMatchesPage() {
     CANCELLED: "bg-red-50 border-red-200 text-red-600",
   };
 
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("desc");
+    }
+    setPage(1);
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortBy !== column) return <ArrowUpDown className="ml-1 inline-block h-3 w-3 text-slate-300" />;
+    return sortOrder === "asc" ? (
+      <ArrowUp className="ml-1 inline-block h-3 w-3 text-violet-500" />
+    ) : (
+      <ArrowDown className="ml-1 inline-block h-3 w-3 text-violet-500" />
+    );
+  };
+
   return (
     <>
       <AdminHeader title="Matches" description={`${total} matches synced`} />
 
       <div className="flex-1 overflow-y-auto p-8">
+        {/* Filters */}
+        <div className="mb-6 flex items-center gap-4">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-1 focus:ring-violet-400"
+          >
+            <option value="">All Statuses</option>
+            <option value="SCHEDULED">Scheduled</option>
+            <option value="TIMED">Timed</option>
+            <option value="IN_PLAY">In Play</option>
+            <option value="PAUSED">Paused</option>
+            <option value="FINISHED">Finished</option>
+            <option value="POSTPONED">Postponed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+
         {/* Table */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Match
+                <th 
+                  className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleSort("homeTeam")}
+                >
+                  Match <SortIcon column="homeTeam" />
                 </th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   Score
                 </th>
-                <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Status
+                <th 
+                  className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleSort("status")}
+                >
+                  Status <SortIcon column="status" />
                 </th>
-                <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Stage
+                <th 
+                  className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleSort("stage")}
+                >
+                  Stage <SortIcon column="stage" />
                 </th>
-                <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Date
+                <th 
+                  className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleSort("utcDate")}
+                >
+                  Date <SortIcon column="utcDate" />
                 </th>
               </tr>
             </thead>
