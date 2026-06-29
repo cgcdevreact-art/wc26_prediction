@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -105,7 +105,21 @@ export function ScoreTrendGraph({
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const selectorRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (selectorRef.current && !selectorRef.current.contains(event.target as Node)) {
+        setIsSelectorOpen(false);
+      }
+    }
+    if (isSelectorOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isSelectorOpen]);
   // Helper to get team by code
   const getTeam = (code: string) => {
     return teams.find((t) => t.code === code) || { code, name: code, flag: "🏳️" };
@@ -209,7 +223,7 @@ export function ScoreTrendGraph({
         </div>
 
         {/* Action button */}
-        <div className="relative">
+        <div className="relative" ref={selectorRef}>
           <button
             onClick={() => setIsSelectorOpen((prev) => !prev)}
             className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl border border-cyan-500/30 hover:border-cyan-500 bg-cyan-500/5 hover:bg-cyan-500/10 text-cyan-500 dark:text-cyan-400 transition"
@@ -220,7 +234,7 @@ export function ScoreTrendGraph({
 
           {/* Search Dropdown Selector */}
           {isSelectorOpen && (
-            <div className="absolute right-0 mt-2 w-72 max-h-96 overflow-y-auto glass-strong border border-border rounded-xl p-3 shadow-glass z-50 bg-popover/95 backdrop-blur-md">
+            <div className="absolute right-0 mt-2 w-72 max-h-96 overflow-y-auto glass-strong border border-border/60 rounded-xl p-3 shadow-xl z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
               <div className="relative mb-2">
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                 <input
@@ -228,7 +242,7 @@ export function ScoreTrendGraph({
                   placeholder="Search countries..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-muted/50 dark:bg-black/40 border border-border text-foreground focus:outline-none focus:border-cyan-500"
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-slate-50 dark:bg-slate-950 border border-border/50 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-cyan-500 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
               </div>
 
@@ -242,7 +256,7 @@ export function ScoreTrendGraph({
                       className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left text-xs transition ${
                         isSelected
                           ? "bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 font-bold"
-                          : "hover:bg-black/5 dark:hover:bg-white/5 border border-transparent text-muted-foreground hover:text-foreground"
+                          : "hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
