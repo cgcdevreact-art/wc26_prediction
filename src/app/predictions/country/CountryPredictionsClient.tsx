@@ -82,6 +82,8 @@ type SimulationSnapshot = {
   playersIn: string[];
   playersOut: string[];
   simResults: CountrySimulationResults;
+  useRealScores?: boolean;
+  bypassOverrides?: boolean;
 };
 
 function InfoTooltip({ content }: { content: string }) {
