@@ -40,7 +40,7 @@ export default async function RootLayout({
 }>) {
   const teams = await getTeams();
   const groupsConfig = getGroupsConfig();
-  const cupResults = getCupResults();
+  const cupResults = await getCupResults();
   const session = await auth();
 
   return (

@@ -222,13 +222,67 @@ export function getGroupsConfig() {
   return GROUPS_CONFIG;
 }
 
-export function getCupResults() {
+export async function getCupResults() {
   try {
     const cupData = getCupData();
-    return cupData.results || {};
+    const results = { ...(cupData.results || {}) };
+
+    let dbMatches = await prisma.fixtureCache.findMany({
+      orderBy: { matchNo: "asc" }
+    });
+
+    const isStale = dbMatches.length === 0 || 
+      !dbMatches[0].updatedAt || 
+      (Date.now() - new Date(dbMatches[0].updatedAt).getTime() > 120 * 1000);
+
+    if (isStale) {
+      try {
+        const { syncFixturesToDb } = await import("./fixtures/sync");
+        await syncFixturesToDb();
+        dbMatches = await prisma.fixtureCache.findMany({
+          orderBy: { matchNo: "asc" }
+        });
+      } catch (syncError) {
+        console.error("Failed to sync fixtures on layout getCupResults call:", syncError);
+      }
+    }
+
+    const groupMatches = dbMatches.filter(m => !m.isKnockout);
+
+    if (groupMatches.length > 0) {
+      // Group by group
+      const groups: Record<string, typeof dbMatches> = {};
+      groupMatches.forEach(m => {
+        if (!groups[m.group]) groups[m.group] = [];
+        groups[m.group].push(m);
+      });
+
+      Object.entries(groups).forEach(([groupName, matches]) => {
+        // Sort matches by matchNo ascending
+        matches.sort((a, b) => a.matchNo - b.matchNo);
+        matches.forEach((m, idx) => {
+          const finished = m.status === "COMPLETED";
+          if (finished) {
+            const hScore = parseInt(m.homeScore, 10);
+            const aScore = parseInt(m.awayScore, 10);
+            if (!isNaN(hScore) && !isNaN(aScore)) {
+              const key = `${groupName}-${String(idx + 1).padStart(2, "0")}`;
+              results[key] = { homeGoals: hScore, awayGoals: aScore };
+            }
+          }
+        });
+      });
+    }
+
+    return results;
   } catch (error) {
-    console.error("Failed to read results from cup.json:", error);
-    return {};
+    console.error("Failed to read results from cup.json or DB:", error);
+    try {
+      const cupData = getCupData();
+      return cupData.results || {};
+    } catch (_) {
+      return {};
+    }
   }
 }
 

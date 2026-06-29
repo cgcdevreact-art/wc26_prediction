@@ -163,7 +163,8 @@ export default function CountryPredictionsClient({
   const [zoomScale, setZoomScale] = useState(85);
 
   const [bypassOverrides, setBypassOverrides] = useState(false);
-  const [useRealScores, setUseRealScores] = useState(false);
+  const [useRealScores, setUseRealScores] = useState(true);
+  const [liveFixtures, setLiveFixtures] = useState<any[]>([]);
   const [isOverridesModalOpen, setIsOverridesModalOpen] = useState(false);
   const [staticDefaultPlayers, setStaticDefaultPlayers] = useState<Record<string, any>>({});
   const [staticDefaultTeams, setStaticDefaultTeams] = useState<any[]>([]);
@@ -694,10 +695,14 @@ export default function CountryPredictionsClient({
     Promise.all([
       fetch("/api/teams").then((res) => res.json()),
       fetch("/api/players").then((res) => res.json()),
-    ]).then(([teamsData, playersData]) => {
+      fetch("/api/fixtures").then((res) => res.json()).catch(() => ({ fixtures: [] })),
+    ]).then(([teamsData, playersData, fixturesData]) => {
       syncData(teamsData, playersData);
+      if (fixturesData && fixturesData.fixtures) {
+        setLiveFixtures(fixturesData.fixtures);
+      }
     }).catch((err) => {
-      console.error("Failed to sync teams/players in CountryPredictionsClient", err);
+      console.error("Failed to sync teams/players/fixtures in CountryPredictionsClient", err);
       initializeData(initialTeams, initialPlayers);
     });
     let localList: CustomCountry[] = [];
@@ -1000,6 +1005,16 @@ export default function CountryPredictionsClient({
 
       const snapshot = JSON.parse(stored) as SimulationSnapshot;
       if (!snapshot?.selectedCode || !snapshot?.simResults) {
+        localStorage.removeItem(COUNTRY_SIMULATION_SNAPSHOT_KEY);
+        hasRestoredSimulationSnapshot.current = true;
+        return;
+      }
+
+      const ELIMINATED_TEAMS = new Set(["KOR", "IRN", "UZB", "TUN", "HAI", "TUR", "SCO", "NZL", "PAN"]);
+      const hasEliminated = snapshot.simResults?.mockTournament?.r32?.some((m: any) => 
+        ELIMINATED_TEAMS.has(m.home) || ELIMINATED_TEAMS.has(m.away)
+      );
+      if (hasEliminated) {
         localStorage.removeItem(COUNTRY_SIMULATION_SNAPSHOT_KEY);
         hasRestoredSimulationSnapshot.current = true;
         return;
@@ -1388,7 +1403,7 @@ export default function CountryPredictionsClient({
             ].filter(Boolean)));
 
             // Generate R32 pairings
-            const rawR32Pairings = [
+            const baseR32Pairings = [
               { home: getWinner("A"), away: getThird(7) },
               { home: getRunner("B"), away: getRunner("C") },
               { home: getWinner("C"), away: getThird(6) },
@@ -1406,6 +1421,31 @@ export default function CountryPredictionsClient({
               { home: getWinner("I"), away: getWinner("J") },
               { home: getWinner("K"), away: getWinner("L") },
             ];
+
+            let rawR32Pairings = [...baseR32Pairings];
+            if (useRealScores && liveFixtures && liveFixtures.length > 0) {
+              const liveR32 = liveFixtures
+                .filter((f: any) => f.isKnockout && f.stageName === "Round of 32")
+                .sort((a, b) => a.match_no - b.match_no);
+
+              if (liveR32.length === 16) {
+                const isValidCode = (c: string) => c && c.length === 3 && !c.match(/Winner|Runner|3rd|TBC|TBD/i);
+
+                rawR32Pairings = baseR32Pairings.map((pair, idx) => {
+                  const match = liveR32[idx];
+                  if (match) {
+                    const liveHomeCode = (match.homeTeamObj?.code || match.homeTeamCode || "").trim().toUpperCase();
+                    const liveAwayCode = (match.awayTeamObj?.code || match.awayTeamCode || "").trim().toUpperCase();
+
+                    return {
+                      home: isValidCode(liveHomeCode) ? liveHomeCode : pair.home,
+                      away: isValidCode(liveAwayCode) ? liveAwayCode : pair.away
+                    };
+                  }
+                  return pair;
+                });
+              }
+            }
 
             const assignedTeams = new Set<string>();
             const takeReplacementTeam = (otherTeam?: string) => {
