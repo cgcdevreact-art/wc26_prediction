@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Trash2, Info, TrendingUp, Cpu, Award, Trophy, ChevronRight, Route, Sparkles, User, AlertCircle, BarChart2, Clock
+  Trash2, Info, TrendingUp, Cpu, Award, Trophy, ChevronRight, Route, Sparkles, User, AlertCircle, BarChart2, Clock, Zap, Shield, Plus, Minus
 } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend
@@ -20,6 +20,19 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+
+function formatTeamScaleRating(value: number | undefined | null) {
+  if (value === undefined || value === null) return 75;
+  if (value < 10) {
+    const minM = 0.75;
+    const maxM = 1.1;
+    const minR = 50;
+    const maxR = 95;
+    const rating = ((value - minM) / (maxM - minM)) * (maxR - minR) + minR;
+    return Math.max(15, Math.min(99, Math.round(rating)));
+  }
+  return Math.max(15, Math.min(99, Math.round(value)));
+}
 
 const CustomCompareTooltip = ({ active, payload, label, mode }: any) => {
   if (active && payload && payload.length) {
@@ -61,6 +74,20 @@ export default function SavedPredictionsClient() {
   const [compareMetricMode, setCompareMetricMode] = useState<"progression" | "attributes">("attributes");
   const [selectedHypotheticalCompareIds, setSelectedHypotheticalCompareIds] = useState<string[]>([]);
   const [compareHypotheticalMetricMode, setCompareHypotheticalMetricMode] = useState<"progression" | "attributes">("attributes");
+  const [customCountries, setCustomCountries] = useState<any[]>([]);
+
+  const fetchCustomCountries = async () => {
+    if (!session?.user?.id) return;
+    try {
+      const res = await fetch("/api/user/custom-countries");
+      if (res.ok) {
+        const data = await res.json();
+        setCustomCountries(data.customCountries || []);
+      }
+    } catch (err) {
+      console.error("Error fetching custom countries:", err);
+    }
+  };
 
   const standardPredictions = useMemo(() => {
     return savedPredictions.filter((p) => {
@@ -115,6 +142,7 @@ export default function SavedPredictionsClient() {
   useEffect(() => {
     if (session?.user?.id) {
       fetchSavedPredictions();
+      fetchCustomCountries();
     }
   }, [session]);
 
@@ -396,9 +424,33 @@ export default function SavedPredictionsClient() {
                             </td>
                             <td className="py-3.5 px-4">
                               <div className="flex flex-col gap-1.5">
-                                <div className="flex items-center gap-2">
-                                  <CountryFlag code={data.code} flag={data.flag} name={data.name} className="h-5 w-7 shrink-0 rounded object-cover shadow-sm" emojiClassName="text-lg leading-none" />
-                                  <span className="text-foreground font-bold">{data.name}</span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <CountryFlag code={data.code} flag={data.flag} name={data.name} className="h-5 w-7 shrink-0 rounded object-cover shadow-sm" emojiClassName="text-lg leading-none" />
+                                    <span className="text-foreground font-bold">{data.name}</span>
+                                  </div>
+                                  {isHypo && (() => {
+                                    const cc = customCountries.find(c => c.code === data.code);
+                                    const replacedCode = data.replacedCode || cc?.replacedCode;
+                                    const baselineCode = data.baselineCode || cc?.baselineCode;
+                                    const replacedName = data.replacedName || appTeams.find(t => t.code === replacedCode)?.name || replacedCode;
+                                    const baselineName = data.baselineName || appTeams.find(t => t.code === baselineCode)?.name || baselineCode;
+                                    const replacedFlag = appTeams.find(t => t.code === replacedCode)?.flag;
+                                    const baselineFlag = appTeams.find(t => t.code === baselineCode)?.flag;
+                                    
+                                    if (!replacedName && !baselineName) return null;
+                                    return (
+                                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 shrink-0 select-none">
+                                        <span className="font-extrabold uppercase text-[8px] tracking-wider opacity-60">Replaces:</span>
+                                        <CountryFlag code={replacedCode} flag={replacedFlag} name={replacedName} className="h-3.5 w-5 rounded object-cover shadow-sm shrink-0" emojiClassName="text-xs" />
+                                        <span className="font-black">{replacedName || "N/A"}</span>
+                                        <span className="opacity-40">•</span>
+                                        <span className="font-extrabold uppercase text-[8px] tracking-wider opacity-60">Cloned:</span>
+                                        <CountryFlag code={baselineCode} flag={baselineFlag} name={baselineName} className="h-3.5 w-5 rounded object-cover shadow-sm shrink-0" emojiClassName="text-xs" />
+                                        <span className="font-black">{baselineName || "N/A"}</span>
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                                 {data.path && data.path.length > 0 && (
                                   <div className="text-[10px] text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mt-0.5 font-sans">
@@ -411,6 +463,257 @@ export default function SavedPredictionsClient() {
                                     ))}
                                   </div>
                                 )}
+
+                                {/* Inclusion Badges for Actual Results & Custom Stats */}
+                                <div className="flex flex-wrap gap-2 mt-1.5 items-center">
+                                  {data.useRealScores && (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                                      <Zap className="w-2.5 h-2.5 fill-emerald-500/20" />
+                                      Real-Time Data
+                                    </span>
+                                  )}
+
+                                  {(() => {
+                                    const originalTeam = appTeams.find(t => t.code === data.code);
+                                    const defaultAttack = originalTeam ? formatTeamScaleRating(originalTeam.attack) : 75;
+                                    const defaultDefense = originalTeam ? formatTeamScaleRating(originalTeam.defense) : 75;
+                                    const isTeamEloCustomized = data.customElo !== undefined && originalTeam && Math.round(data.customElo) !== Math.round(originalTeam.elo);
+                                    const isTeamAttackCustomized = data.customAttack !== undefined && Math.round(data.customAttack) !== defaultAttack;
+                                    const isTeamDefenseCustomized = data.customDefense !== undefined && Math.round(data.customDefense) !== defaultDefense;
+                                    const hasPlayerChanges = !!(
+                                      (data.playersIn && data.playersIn.length > 0) || 
+                                      (data.playersOut && data.playersOut.length > 0) || 
+                                      (data.customPlayerRatingDelta !== undefined && data.customPlayerRatingDelta !== 0)
+                                    );
+
+                                    const isCustomCountry = data.code?.startsWith("CC_");
+                                    const hasCustomStats = data.hasCustomStats !== undefined 
+                                      ? data.hasCustomStats 
+                                      : !!(isCustomCountry || isTeamEloCustomized || isTeamAttackCustomized || isTeamDefenseCustomized || hasPlayerChanges);
+
+                                    return hasCustomStats ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400">
+                                        <Award className="w-2.5 h-2.5 fill-purple-500/20" />
+                                        Custom Overrides
+                                      </span>
+                                    ) : null;
+                                  })()}
+
+                                  {!data.useRealScores && (() => {
+                                    const originalTeam = appTeams.find(t => t.code === data.code);
+                                    const defaultAttack = originalTeam ? formatTeamScaleRating(originalTeam.attack) : 75;
+                                    const defaultDefense = originalTeam ? formatTeamScaleRating(originalTeam.defense) : 75;
+                                    const isTeamEloCustomized = data.customElo !== undefined && originalTeam && Math.round(data.customElo) !== Math.round(originalTeam.elo);
+                                    const isTeamAttackCustomized = data.customAttack !== undefined && Math.round(data.customAttack) !== defaultAttack;
+                                    const isTeamDefenseCustomized = data.customDefense !== undefined && Math.round(data.customDefense) !== defaultDefense;
+                                    const hasPlayerChanges = !!(
+                                      (data.playersIn && data.playersIn.length > 0) || 
+                                      (data.playersOut && data.playersOut.length > 0) || 
+                                      (data.customPlayerRatingDelta !== undefined && data.customPlayerRatingDelta !== 0)
+                                    );
+
+                                    const isCustomCountry = data.code?.startsWith("CC_");
+                                    const hasCustomStats = data.hasCustomStats !== undefined 
+                                      ? data.hasCustomStats 
+                                      : !!(isCustomCountry || isTeamEloCustomized || isTeamAttackCustomized || isTeamDefenseCustomized || hasPlayerChanges);
+
+                                    return !hasCustomStats;
+                                  })() && (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-400 dark:text-slate-500">
+                                      Standard Simulation
+                                    </span>
+                                  )}
+                                </div>
+                                {(() => {
+                                  const originalTeam = appTeams.find(t => t.code === data.code);
+                                  const defaultAttack = originalTeam ? formatTeamScaleRating(originalTeam.attack) : 75;
+                                  const defaultDefense = originalTeam ? formatTeamScaleRating(originalTeam.defense) : 75;
+                                  const isTeamEloCustomized = data.customElo !== undefined && originalTeam && Math.round(data.customElo) !== Math.round(originalTeam.elo);
+                                  const isTeamAttackCustomized = data.customAttack !== undefined && Math.round(data.customAttack) !== defaultAttack;
+                                  const isTeamDefenseCustomized = data.customDefense !== undefined && Math.round(data.customDefense) !== defaultDefense;
+                                  const hasPlayerChanges = !!(
+                                    (data.playersIn && data.playersIn.length > 0) || 
+                                    (data.playersOut && data.playersOut.length > 0) || 
+                                    (data.customPlayerRatingDelta !== undefined && data.customPlayerRatingDelta !== 0)
+                                  );
+
+                                  const isCustomCountry = data.code?.startsWith("CC_");
+                                  const hasCustomStats = data.hasCustomStats !== undefined 
+                                    ? data.hasCustomStats 
+                                    : !!(isCustomCountry || isTeamEloCustomized || isTeamAttackCustomized || isTeamDefenseCustomized || hasPlayerChanges);
+
+                                  if (!hasCustomStats) return null;
+
+                                  const details: { type: string; label: string; code: string; name: string; flag: string }[] = [];
+                                  const tName = originalTeam?.name || data.name || "";
+                                  const tCode = originalTeam?.code || data.code || "";
+                                  const tFlag = originalTeam?.flag || data.flag || "";
+
+                                  if (isCustomCountry) {
+                                    details.push({ type: "elo", label: `Elo: ${Math.round(data.customElo ?? data.elo ?? 1500)}`, code: tCode, name: tName, flag: tFlag });
+                                    details.push({ type: "attack", label: `Attack: ${Math.round(data.customAttack ?? 75)}`, code: tCode, name: tName, flag: tFlag });
+                                    details.push({ type: "defense", label: `Defense: ${Math.round(data.customDefense ?? 75)}`, code: tCode, name: tName, flag: tFlag });
+                                  } else {
+                                    if (isTeamEloCustomized) {
+                                      details.push({ type: "elo", label: `Elo: ${Math.round(data.customElo)} (vs ${Math.round(originalTeam.elo)})`, code: tCode, name: tName, flag: tFlag });
+                                    }
+                                    if (isTeamAttackCustomized) {
+                                      details.push({ type: "attack", label: `Attack: ${Math.round(data.customAttack)} (vs ${defaultAttack})`, code: tCode, name: tName, flag: tFlag });
+                                    }
+                                    if (isTeamDefenseCustomized) {
+                                      details.push({ type: "defense", label: `Defense: ${Math.round(data.customDefense)} (vs ${defaultDefense})`, code: tCode, name: tName, flag: tFlag });
+                                    }
+                                  }
+
+                                  if (data.customPlayerRatingDelta !== undefined && data.customPlayerRatingDelta !== 0) {
+                                    details.push({ type: "squad_quality", label: `Squad Quality: ${data.customPlayerRatingDelta > 0 ? "+" : ""}${data.customPlayerRatingDelta}`, code: tCode, name: tName, flag: tFlag });
+                                  }
+
+                                  const otherTeamsBadges = data.activeOverridesSummary?.teams
+                                    ?.filter((t: any) => t && t.code && t.name && t.name.trim() !== "")
+                                    ?.map((t: any, idx: number) => {
+                                      const flag = appTeams.find(x => x.code === t.code)?.flag;
+                                      return (
+                                        <span key={`other-t-${idx}`} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 dark:bg-white/5 text-slate-650 dark:text-slate-350 border border-slate-200 dark:border-white/10 select-none">
+                                          <CountryFlag code={t.code} flag={flag} name={t.name} className="h-2.5 w-3.5 rounded object-cover shadow-sm shrink-0" emojiClassName="text-[10px]" />
+                                          <span>{t.name} (Stats Modified)</span>
+                                        </span>
+                                      );
+                                    });
+
+                                  const playersList: { name: string; teamCode: string; teamName: string; detail?: string }[] = [];
+
+                                  // Load from activeOverridesSummary if present
+                                  if (data.activeOverridesSummary?.players) {
+                                    data.activeOverridesSummary.players.forEach((p: any) => {
+                                      playersList.push(p);
+                                    });
+                                  } else {
+                                    // Backward compatibility fallback for older saved runs
+                                    if (data.playersInNames && data.playersInNames.length > 0) {
+                                      data.playersInNames.forEach((name: string) => {
+                                        playersList.push({ name, teamCode: tCode, teamName: tName, detail: "Fit" });
+                                      });
+                                    } else if (data.playersIn && data.playersIn.length > 0) {
+                                      data.playersIn.forEach((id: string) => {
+                                        const name = id.split("-").pop() || id;
+                                        playersList.push({ name, teamCode: tCode, teamName: tName, detail: "Fit" });
+                                      });
+                                    }
+
+                                    if (data.playersOutNames && data.playersOutNames.length > 0) {
+                                      data.playersOutNames.forEach((name: string) => {
+                                        playersList.push({ name, teamCode: tCode, teamName: tName, detail: "Injured" });
+                                      });
+                                    } else if (data.playersOut && data.playersOut.length > 0) {
+                                      data.playersOut.forEach((id: string) => {
+                                        const name = id.split("-").pop() || id;
+                                        playersList.push({ name, teamCode: tCode, teamName: tName, detail: "Injured" });
+                                      });
+                                    }
+                                  }
+
+                                  const otherPlayersBadges = playersList
+                                    ?.filter((p: any) => p && p.name && p.name.trim() !== "" && p.teamCode)
+                                    ?.map((p: any, idx: number) => {
+                                      const flag = appTeams.find(x => x.code === p.teamCode)?.flag;
+                                      return (
+                                        <span key={`other-p-${idx}`} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 select-none">
+                                          <CountryFlag code={p.teamCode} flag={flag} name={p.teamName || p.teamCode} className="h-2.5 w-3.5 rounded object-cover shadow-sm shrink-0" emojiClassName="text-[10px]" />
+                                          <span className="opacity-75">{p.teamName || p.teamCode}</span>
+                                          <span className="mx-0.5 text-indigo-200 dark:text-indigo-800 font-normal">|</span>
+                                          <User className="w-2.5 h-2.5 shrink-0" />
+                                          <span>{p.name}</span>
+                                          {p.detail && (
+                                            <>
+                                              <span className="mx-0.5 text-indigo-200 dark:text-indigo-800 font-normal">|</span>
+                                              <span className="text-[8px] opacity-90">{p.detail}</span>
+                                            </>
+                                          )}
+                                        </span>
+                                      );
+                                    });
+
+                                  return (
+                                    <div className="flex flex-col gap-1.5 mt-2">
+                                      {/* Simulated Team Overrides */}
+                                      {details.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 items-center">
+                                          <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 dark:text-slate-500 mr-1 select-none">Active Overrides:</span>
+                                          {details.map((detail, index) => {
+                                            let bgClass = "bg-slate-500/5 text-slate-500 border-slate-500/10";
+                                            let icon = null;
+                                            
+                                            if (detail.type === "elo") {
+                                              bgClass = "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+                                              icon = <TrendingUp className="w-2.5 h-2.5 shrink-0" />;
+                                            } else if (detail.type === "attack") {
+                                              bgClass = "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
+                                              icon = <Sparkles className="w-2.5 h-2.5 shrink-0" />;
+                                            } else if (detail.type === "defense") {
+                                              bgClass = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+                                              icon = <Shield className="w-2.5 h-2.5 shrink-0" />;
+                                            } else if (detail.type === "squad_quality") {
+                                              bgClass = "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20";
+                                              icon = <Cpu className="w-2.5 h-2.5 shrink-0" />;
+                                            } else if (detail.type === "added") {
+                                              bgClass = "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20";
+                                              icon = <Plus className="w-2.5 h-2.5 shrink-0" />;
+                                            } else if (detail.type === "removed") {
+                                              bgClass = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
+                                              icon = <Minus className="w-2.5 h-2.5 shrink-0" />;
+                                            }
+
+                                            const isProjectedTeam = detail.code === data.code;
+                                            return (
+                                              <span key={index} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold border ${bgClass} select-none`}>
+                                                {!isProjectedTeam && (
+                                                  <>
+                                                    <CountryFlag code={detail.code} flag={detail.flag} name={detail.name} className="h-2.5 w-3.5 rounded object-cover shadow-sm shrink-0" emojiClassName="text-[10px]" />
+                                                    <span className="opacity-75">{detail.name}</span>
+                                                    <span className="mx-0.5 text-slate-300 dark:text-slate-700 font-normal">|</span>
+                                                  </>
+                                                )}
+                                                {icon}
+                                                <span>{detail.label}</span>
+                                              </span>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+
+                                      {/* Other Edited Teams */}
+                                      {otherTeamsBadges && otherTeamsBadges.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 items-center">
+                                          <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 dark:text-slate-500 mr-1 select-none">Other Edited Teams:</span>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {otherTeamsBadges}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Edited Players */}
+                                      {otherPlayersBadges && otherPlayersBadges.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 items-center">
+                                          <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 dark:text-slate-500 mr-1 select-none">Edited Players:</span>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {otherPlayersBadges}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Generic Overrides Warning for Older Runs */}
+                                      {details.length === 0 && (!otherTeamsBadges || otherTeamsBadges.length === 0) && (!otherPlayersBadges || otherPlayersBadges.length === 0) && (
+                                        <div className="flex flex-wrap gap-1.5 items-center">
+                                          <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 dark:text-slate-500 mr-1 select-none">Active Overrides:</span>
+                                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-slate-500/5 text-slate-500 border border-slate-500/10">
+                                            Tournament-wide custom overrides active
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </td>
                             <td className="py-3.5 px-4 font-mono text-xs text-muted-foreground">

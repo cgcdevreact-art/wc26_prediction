@@ -5,7 +5,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { useSimulationStore, PlayerStats, TeamStats } from "@/lib/store/simulationStore";
-import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
+import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
 import { getMatchExpectedGoals, SimTeam } from "@/lib/simulation/model";
 import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check, PencilLine, Lock, Trash2, X, Info, Minus, Plus, Shield, Zap, Coins, Cpu, Award, Route } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,8 @@ function clampRating(value: number, min = 1, max = 99) {
 type SimulationModel = "base" | "advanced" | "pro";
 
 const COUNTRY_SIMULATION_SNAPSHOT_KEY = "wc26_country_last_simulation_v1";
+const TOTAL_TOURNAMENT_MATCHES = 104;
+const GROUP_STAGE_RESULT_KEY_PATTERN = /^[A-L]-\d{2}$/;
 
 type CountrySimulationResults = {
   stages: Record<string, number>;
@@ -144,9 +146,10 @@ export default function CountryPredictionsClient({
   initialPlayers: PlayerStats[],
   flagMap: Record<string, string>
 }) {
-  const { isInitialized, initializeData, players: storePlayers, teams: storeTeams, selectedModel, setSelectedModel, resetToDefaults, updatePlayer, updateTeam, syncData } = useSimulationStore();
+  const { isInitialized, initializeData, players: storePlayers, teams: storeTeams, selectedModel, setSelectedModel, resetToDefaults, updatePlayer, updateTeam, syncData, toggleTeamOverride, togglePlayerOverride } = useSimulationStore();
   const appTeams = useTeams();
   const GROUPS_CONFIG = useGroupsConfig();
+  const cupResults = useCupResults();
   const { theme } = useTheme();
   const { data: session } = useSession();
   const router = useRouter();
@@ -158,6 +161,7 @@ export default function CountryPredictionsClient({
   const [zoomScale, setZoomScale] = useState(85);
 
   const [bypassOverrides, setBypassOverrides] = useState(false);
+  const [useRealScores, setUseRealScores] = useState(false);
   const [isOverridesModalOpen, setIsOverridesModalOpen] = useState(false);
   const [staticDefaultPlayers, setStaticDefaultPlayers] = useState<Record<string, any>>({});
   const [staticDefaultTeams, setStaticDefaultTeams] = useState<any[]>([]);
@@ -182,20 +186,43 @@ export default function CountryPredictionsClient({
   }, []);
 
   const players = useMemo(() => {
-    return bypassOverrides && Object.keys(staticDefaultPlayers).length > 0
-      ? staticDefaultPlayers
-      : storePlayers;
+    if (bypassOverrides && Object.keys(staticDefaultPlayers).length > 0) {
+      return staticDefaultPlayers;
+    }
+    const result: Record<string, PlayerStats> = { ...storePlayers };
+    if (Object.keys(staticDefaultPlayers).length > 0) {
+      Object.keys(result).forEach((key) => {
+        if (result[key]?.isCustom && result[key]?.isOverrideDisabled) {
+          const defaultPlayer = staticDefaultPlayers[key];
+          if (defaultPlayer) {
+            result[key] = {
+              ...defaultPlayer,
+              isCustom: true,
+              isOverrideDisabled: true,
+            };
+          }
+        }
+      });
+    }
+    return result;
   }, [bypassOverrides, staticDefaultPlayers, storePlayers]);
 
   const customPlayersCount = useMemo(() => {
-    return Object.values(storePlayers || {}).filter(p => p.isCustom).length;
+    return Object.values(storePlayers || {}).filter(p => p.isCustom && !p.isOverrideDisabled).length;
   }, [storePlayers]);
 
   const customTeamsCount = useMemo(() => {
-    return Object.values(storeTeams || {}).filter(t => t.isCustom).length;
+    return Object.values(storeTeams || {}).filter(t => t.isCustom && !t.isOverrideDisabled).length;
   }, [storeTeams]);
 
   const totalOverrides = customPlayersCount + customTeamsCount;
+
+  const groupRealPercent = useMemo(() => {
+    const completed = Object.entries(cupResults).filter(
+      ([matchKey, result]) => GROUP_STAGE_RESULT_KEY_PATTERN.test(matchKey) && !!result,
+    ).length;
+    return Math.round((completed / TOTAL_TOURNAMENT_MATCHES) * 100);
+  }, [cupResults]);
 
   const handleResetAllOverrides = async () => {
     if (session?.user?.id) {
@@ -409,6 +436,8 @@ export default function CountryPredictionsClient({
       setCustomPlayerRatingDelta(data.customPlayerRatingDelta ?? 0);
       setPlayersIn(data.playersIn ?? []);
       setPlayersOut(data.playersOut ?? []);
+      setUseRealScores(!!data.useRealScores);
+      setBypassOverrides(!!data.bypassOverrides);
 
       if (data.simResults) {
         setSimResults(data.simResults);
@@ -422,6 +451,8 @@ export default function CountryPredictionsClient({
           playersIn: data.playersIn ?? [],
           playersOut: data.playersOut ?? [],
           simResults: data.simResults,
+          useRealScores: !!data.useRealScores,
+          bypassOverrides: !!data.bypassOverrides,
         });
       } else {
         const reconstructedStages = data.stages || {
@@ -449,6 +480,8 @@ export default function CountryPredictionsClient({
           playersIn: data.playersIn ?? [],
           playersOut: data.playersOut ?? [],
           simResults: reconstructedResults,
+          useRealScores: !!data.useRealScores,
+          bypassOverrides: !!data.bypassOverrides,
         });
       }
 
@@ -842,7 +875,10 @@ export default function CountryPredictionsClient({
       let attackVal = isSelected ? customAttack : appTeam.attack;
       let defenseVal = isSelected ? customDefense : appTeam.defense;
 
-      if (bypassOverrides && staticDefaultTeams.length > 0) {
+      const storeTeam = storeTeams[code];
+      const isTeamOverrideDisabled = storeTeam?.isCustom && storeTeam?.isOverrideDisabled;
+
+      if ((bypassOverrides || isTeamOverrideDisabled) && staticDefaultTeams.length > 0) {
         const defaultTeamData = staticDefaultTeams.find(dt => dt.name === appTeam.name);
         if (defaultTeamData) {
           eloVal = isSelected ? customElo : defaultTeamData.elo;
@@ -887,34 +923,48 @@ export default function CountryPredictionsClient({
   const [playersIn, setPlayersIn] = useState<string[]>([]);
   const [playersOut, setPlayersOut] = useState<string[]>([]);
 
-  const prevSelectedCodeRef = useRef<string | null>(null);
   const isSnapshotRestoredRef = useRef<boolean>(false);
+  const lastOverrideStateRef = useRef<{ isOverrideDisabled: boolean; isCustom: boolean; selectedCode: string } | null>(null);
 
   useEffect(() => {
-    if (ignoreResetRef.current) {
-      prevSelectedCodeRef.current = selectedCode;
-      return;
-    }
+    if (!selectedTeam || !isInitialized) return;
     if (!hasRestoredSimulationSnapshot.current) return;
-    if (!selectedTeam) return;
 
-    if (isSnapshotRestoredRef.current && prevSelectedCodeRef.current === null) {
-      prevSelectedCodeRef.current = selectedCode;
-      isSnapshotRestoredRef.current = false;
+    const storeTeam = storeTeams[selectedCode];
+    const isOverrideDisabled = storeTeam?.isOverrideDisabled ?? false;
+    const isCustom = storeTeam?.isCustom ?? false;
+
+    if (ignoreResetRef.current) {
+      lastOverrideStateRef.current = { isOverrideDisabled, isCustom, selectedCode };
       return;
     }
 
-    if (prevSelectedCodeRef.current !== selectedCode) {
-      setCustomElo(Math.round(selectedTeam.elo));
-      setCustomAttack(formatTeamScaleRating(selectedTeam.attack));
-      setCustomDefense(formatTeamScaleRating(selectedTeam.defense));
-      setCustomPlayerRatingDelta(0);
-      setPlayersIn([]);
-      setPlayersOut([]);
-      setSimResults(null);
+    if (
+      lastOverrideStateRef.current === null ||
+      lastOverrideStateRef.current.selectedCode !== selectedCode ||
+      lastOverrideStateRef.current.isOverrideDisabled !== isOverrideDisabled ||
+      lastOverrideStateRef.current.isCustom !== isCustom
+    ) {
+      if (storeTeam && !isOverrideDisabled) {
+        if (storeTeam.elo !== undefined) setCustomElo(Math.round(storeTeam.elo));
+        if (storeTeam.attack !== undefined) setCustomAttack(formatTeamScaleRating(storeTeam.attack));
+        if (storeTeam.defense !== undefined) setCustomDefense(formatTeamScaleRating(storeTeam.defense));
+      } else {
+        setCustomElo(Math.round(selectedTeam.elo));
+        setCustomAttack(formatTeamScaleRating(selectedTeam.attack));
+        setCustomDefense(formatTeamScaleRating(selectedTeam.defense));
+      }
+
+      if (lastOverrideStateRef.current?.selectedCode !== selectedCode) {
+        setCustomPlayerRatingDelta(0);
+        setPlayersIn([]);
+        setPlayersOut([]);
+        setSimResults(null);
+      }
+
+      lastOverrideStateRef.current = { isOverrideDisabled, isCustom, selectedCode };
     }
-    prevSelectedCodeRef.current = selectedCode;
-  }, [selectedCode, selectedTeam]);
+  }, [selectedCode, selectedTeam, storeTeams, isInitialized]);
 
   useEffect(() => {
     if (ignoreResetRef.current) return;
@@ -985,6 +1035,8 @@ export default function CountryPredictionsClient({
       setPlayersOut(snapshot.playersOut ?? []);
       setSimResults(snapshot.simResults);
       setSaveSuccess(true);
+      if (snapshot.useRealScores !== undefined) setUseRealScores(snapshot.useRealScores);
+      if (snapshot.bypassOverrides !== undefined) setBypassOverrides(snapshot.bypassOverrides);
 
       setTimeout(() => {
         ignoreResetRef.current = false;
@@ -1235,9 +1287,39 @@ export default function CountryPredictionsClient({
                 elo: getTeam(code).elo || 1500
               }));
 
-              const playMatch = (t1Idx: number, t2Idx: number) => {
+              const playMatch = (t1Idx: number, t2Idx: number, matchIndex: number) => {
                 const t1 = getTeam(standings[t1Idx].code);
                 const t2 = getTeam(standings[t2Idx].code);
+
+                if (useRealScores) {
+                  const cupKey = `${groupName}-${String(matchIndex).padStart(2, "0")}`;
+                  const result = cupResults[cupKey];
+                  if (result) {
+                    const hs = result.homeGoals;
+                    const as = result.awayGoals;
+                    standings[t1Idx].gf += hs;
+                    standings[t1Idx].gd += (hs - as);
+                    standings[t2Idx].gf += as;
+                    standings[t2Idx].gd += (as - hs);
+
+                    if (hs > as) {
+                      standings[t1Idx].pts += 3;
+                      trackIterationMatch("group", t1.code, t2.code, hs, as, true);
+                      trackIterationMatch("group", t2.code, t1.code, as, hs, false);
+                    } else if (hs < as) {
+                      standings[t2Idx].pts += 3;
+                      trackIterationMatch("group", t1.code, t2.code, hs, as, false);
+                      trackIterationMatch("group", t2.code, t1.code, as, hs, true);
+                    } else {
+                      standings[t1Idx].pts += 1;
+                      standings[t2Idx].pts += 1;
+                      trackIterationMatch("group", t1.code, t2.code, hs, as, false);
+                      trackIterationMatch("group", t2.code, t1.code, as, hs, false);
+                    }
+                    return;
+                  }
+                }
+
                 const { homeLambda, awayLambda } = getMatchExpectedGoals(t1, t2, customizedPlayers, selectedModel);
                 const hs = getPoisson(homeLambda);
                 const as = getPoisson(awayLambda);
@@ -1264,12 +1346,12 @@ export default function CountryPredictionsClient({
               };
 
               // 6 fixtures:
-              playMatch(0, 1);
-              playMatch(2, 3);
-              playMatch(0, 2);
-              playMatch(1, 3);
-              playMatch(3, 0);
-              playMatch(1, 2);
+              playMatch(0, 1, 1);
+              playMatch(2, 3, 2);
+              playMatch(0, 2, 3);
+              playMatch(1, 3, 4);
+              playMatch(3, 0, 5);
+              playMatch(1, 2, 6);
 
               standings.sort((a, b) => {
                 if (b.pts !== a.pts) return b.pts - a.pts;
@@ -1527,6 +1609,8 @@ export default function CountryPredictionsClient({
       playersIn,
       playersOut,
       simResults: nextResults,
+      useRealScores,
+      bypassOverrides,
     });
     } catch (err) {
       console.error("Country simulation failed:", err);
@@ -1565,7 +1649,89 @@ export default function CountryPredictionsClient({
         customPlayerRatingDelta: customPlayerRatingDelta,
         playersIn: playersIn,
         playersOut: playersOut,
+        playersInNames: playersIn.map(id => storePlayers[id]?.['Player Name'] || id),
+        playersOutNames: playersOut.map(id => storePlayers[id]?.['Player Name'] || id),
+        activeOverridesSummary: {
+          teams: Object.values(storeTeams || {})
+            .filter(t => (t.isCustom || (t as any).isCustom) && !t.isOverrideDisabled && (t['Team Code'] || (t as any).code || t.code) !== selectedTeam.code)
+            .map(t => {
+              const code = t['Team Code'] || (t as any).code || t.code;
+              return {
+                code: code,
+                name: appTeams.find(x => x.code === code)?.name || t['Team'] || (t as any).name || code
+              };
+            }),
+          players: (() => {
+            const list = [];
+            const seen = new Set<string>();
+
+            const pushUnique = (item: { name: string; teamCode: string; teamName: string; detail: string }) => {
+              const key = `${item.teamCode}-${item.name}`;
+              if (seen.has(key)) return;
+              seen.add(key);
+              list.push(item);
+            };
+
+            // 1. Base custom player rating modifications from storePlayers
+            Object.values(storePlayers || {})
+              .filter(p => p.isCustom && !p.isOverrideDisabled)
+              .forEach(p => {
+                const teamCode = p['Team Code'] || (p as any).teamCode || "";
+                pushUnique({
+                  name: p['Player Name'] || (p as any).name || "",
+                  teamCode: teamCode,
+                  teamName: appTeams.find(x => x.code === teamCode)?.name || p['Team'] || (p as any).teamName || teamCode,
+                  detail: `Rating: ${p['Overall Rating'] || (p as any).rating || ""}`
+                });
+              });
+
+            // 2. Simulated team squad availability edits - playersIn (Fit)
+            playersIn.forEach(id => {
+              const p = storePlayers[id];
+              const teamCode = selectedTeam.code;
+              const name = p ? (p['Player Name'] || (p as any).name || id) : id;
+              pushUnique({
+                name: name,
+                teamCode: teamCode,
+                teamName: selectedTeam.name,
+                detail: "Fit"
+              });
+            });
+
+            // 3. Simulated team squad availability edits - playersOut (Injured)
+            playersOut.forEach(id => {
+              const p = storePlayers[id];
+              const teamCode = selectedTeam.code;
+              const name = p ? (p['Player Name'] || (p as any).name || id) : id;
+              pushUnique({
+                name: name,
+                teamCode: teamCode,
+                teamName: selectedTeam.name,
+                detail: "Injured"
+              });
+            });
+
+            return list;
+          })()
+        },
         simResults: simResults,
+        useRealScores: useRealScores,
+        bypassOverrides: bypassOverrides,
+        isWildcard: !!activeCustomCountry,
+        baselineCode: activeCustomCountry?.baselineCode || null,
+        replacedCode: activeCustomCountry?.replacedCode || null,
+        baselineName: activeCustomCountry ? (appTeams.find(t => t.code === activeCustomCountry.baselineCode)?.name || activeCustomCountry.baselineCode) : null,
+        replacedName: activeCustomCountry ? (appTeams.find(t => t.code === activeCustomCountry.replacedCode)?.name || activeCustomCountry.replacedCode) : null,
+        hasCustomStats: !bypassOverrides && (
+          customPlayersCount > 0 ||
+          customTeamsCount > 0 ||
+          customElo !== Math.round(selectedTeam.elo) ||
+          customAttack !== formatTeamScaleRating(selectedTeam.attack) ||
+          customDefense !== formatTeamScaleRating(selectedTeam.defense) ||
+          customPlayerRatingDelta !== 0 ||
+          playersIn.length > 0 ||
+          playersOut.length > 0
+        ),
         path: pathStepInfo.map(step => ({
           stage: step.stage,
           opponentCode: step.opponent?.code || null,
@@ -1841,6 +2007,27 @@ export default function CountryPredictionsClient({
             )}
           </div>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <label
+              className={`inline-flex min-h-[56px] items-center gap-3 rounded-2xl border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${
+                useRealScores
+                  ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+                  : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={useRealScores}
+                onChange={(e) => setUseRealScores(e.target.checked)}
+                className="h-5 w-5 rounded-md border-slate-300 dark:border-white/20 bg-slate-100 dark:bg-slate-800 text-cyan-600 focus:ring-cyan-500 cursor-pointer accent-cyan-500"
+              />
+              <div className="flex items-center gap-1.5">
+                <Zap className={`h-4 w-4 transition-all duration-300 ${useRealScores ? "text-cyan-500 fill-cyan-500 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)] animate-pulse" : "text-slate-400 dark:text-slate-500"}`} />
+                <span className="text-xs font-bold leading-none select-none">
+                  Include Real-Time Results ({groupRealPercent}%)
+                </span>
+              </div>
+            </label>
+
             {totalOverrides > 0 && (
               <label
                 className={`inline-flex min-h-[56px] items-center gap-3 rounded-2xl border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${
@@ -1863,7 +2050,7 @@ export default function CountryPredictionsClient({
                 }}>
                   <Award className={`h-4 w-4 ${bypassOverrides ? "text-slate-400" : "text-purple-500 fill-purple-500/20"}`} />
                   <span className="text-xs font-bold leading-none select-none hover:underline">
-                    {!bypassOverrides ? "Custom Stats Applied" : "Custom Stats Bypassed"} ({totalOverrides})
+                    {!bypassOverrides ? "My Customizations Applied" : "Apply my customizations"} ({totalOverrides})
                   </span>
                 </div>
               </label>
@@ -1947,10 +2134,15 @@ export default function CountryPredictionsClient({
                                   <PencilLine className="w-3.5 h-3.5 text-cyan-600 dark:text-neon shrink-0 animate-pulse" />
                                 )}
                               </div>
-                              <div className="mt-1 min-h-[1.25rem]">
-                                {"isCustom" in t && t.isCustom ? (
+                              <div className="mt-1 min-h-[1.25rem] flex items-center">
+                                {"isCustom" in t && t.isCustom && t.code.startsWith("CC_") ? (
                                   <span className="inline-flex max-w-full rounded-full border border-fuchsia-200 bg-fuchsia-50 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-fuchsia-700 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 sm:text-[9px]">
                                     Replaced with {t.replacedName}
+                                  </span>
+                                ) : "isCustom" in t && t.isCustom && !t.code.startsWith("CC_") ? (
+                                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+                                    <span>{t.code}</span>
+                                    <span className="text-[7px] px-1 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 lowercase tracking-normal">custom</span>
                                   </span>
                                 ) : (
                                   <span className="inline-flex text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
@@ -3213,8 +3405,15 @@ export default function CountryPredictionsClient({
                     {Object.values(storeTeams || {}).filter(t => t.isCustom).map((t) => {
                       const staticDefault = staticDefaultTeams.find(dt => dt.name === t.Team);
                       return (
-                        <div key={t["Team Code"]} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        <div key={t["Team Code"]} className={`flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 ${t.isOverrideDisabled ? "opacity-55" : ""}`}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={!t.isOverrideDisabled}
+                              onChange={() => toggleTeamOverride(t["Team Code"])}
+                              className="h-4 w-4 rounded border-slate-300 dark:border-white/20 text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0"
+                              title="Enable/Disable this override"
+                            />
                             <CountryFlag
                               code={t["Team Code"]}
                               flag={getTeam(t["Team Code"])?.flag}
@@ -3267,8 +3466,15 @@ export default function CountryPredictionsClient({
                       const key = `${p["Team Code"]}-${p["Player Name"]}`;
                       const staticDefault = staticDefaultPlayers[key];
                       return (
-                        <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        <div key={key} className={`flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 ${p.isOverrideDisabled ? "opacity-55" : ""}`}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={!p.isOverrideDisabled}
+                              onChange={() => togglePlayerOverride(key)}
+                              className="h-4 w-4 rounded border-slate-300 dark:border-white/20 text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0"
+                              title="Enable/Disable this override"
+                            />
                             <CountryFlag
                               code={p["Team Code"]}
                               flag={getTeam(p["Team Code"])?.flag}

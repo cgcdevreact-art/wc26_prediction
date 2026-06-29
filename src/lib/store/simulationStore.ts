@@ -16,6 +16,7 @@ export interface TeamStats {
   elo?: number;
   attack?: number;
   defense?: number;
+  isOverrideDisabled?: boolean;
 }
 
 export interface PlayerStats {
@@ -49,6 +50,7 @@ export interface PlayerStats {
   "Rating Tier": string;
   "ImageUrl"?: string; // For user-added real images
   isCustom?: boolean;
+  isOverrideDisabled?: boolean;
 }
 
 export type SimulationModel = "base" | "advanced" | "pro";
@@ -64,6 +66,8 @@ interface SimulationState {
   syncData: (defaultTeams: TeamStats[], defaultPlayers: PlayerStats[]) => void;
   updateTeam: (teamCode: string, field: keyof TeamStats, value: string) => void;
   updatePlayer: (playerId: string, field: keyof PlayerStats, value: string) => void;
+  toggleTeamOverride: (teamCode: string) => void;
+  togglePlayerOverride: (playerId: string) => void;
   resetToDefaults: () => void;
   setSelectedModel: (model: SimulationModel) => void;
 }
@@ -85,19 +89,25 @@ export const useSimulationStore = create<SimulationState>()(
           const code = t['Team Code'] || (t as any).code;
           const name = t['Team'] || (t as any).name;
           const isCustom = t.isCustom || (t as any).isCustom || false;
+          const isOverrideDisabled = state.teams[code]?.isOverrideDisabled || false;
 
           teamsMap[code] = {
             ...t,
             'Team Code': code,
             'Team': name,
             isCustom,
+            isOverrideDisabled,
           };
         });
 
         const playersMap: Record<string, PlayerStats> = {};
         defaultPlayers.forEach((p) => {
           const id = `${p['Team Code']}-${p['Player Name']}`;
-          playersMap[id] = p;
+          const isOverrideDisabled = state.players[id]?.isOverrideDisabled || false;
+          playersMap[id] = {
+            ...p,
+            isOverrideDisabled,
+          };
         });
 
         return {
@@ -113,19 +123,25 @@ export const useSimulationStore = create<SimulationState>()(
           const code = t['Team Code'] || (t as any).code;
           const name = t['Team'] || (t as any).name;
           const isCustom = t.isCustom || (t as any).isCustom || false;
+          const isOverrideDisabled = state.teams[code]?.isOverrideDisabled || false;
 
           teamsMap[code] = {
             ...t,
             'Team Code': code,
             'Team': name,
             isCustom,
+            isOverrideDisabled,
           };
         });
 
         const playersMap: Record<string, PlayerStats> = {};
         defaultPlayers.forEach((p) => {
           const id = `${p['Team Code']}-${p['Player Name']}`;
-          playersMap[id] = p;
+          const isOverrideDisabled = state.players[id]?.isOverrideDisabled || false;
+          playersMap[id] = {
+            ...p,
+            isOverrideDisabled,
+          };
         });
 
         return {
@@ -153,6 +169,26 @@ export const useSimulationStore = create<SimulationState>()(
             ...state.players[playerId],
             [field]: value,
             isCustom: true,
+          }
+        }
+      })),
+
+      toggleTeamOverride: (teamCode) => set((state) => ({
+        teams: {
+          ...state.teams,
+          [teamCode]: {
+            ...state.teams[teamCode],
+            isOverrideDisabled: !state.teams[teamCode]?.isOverrideDisabled,
+          }
+        }
+      })),
+
+      togglePlayerOverride: (playerId) => set((state) => ({
+        players: {
+          ...state.players,
+          [playerId]: {
+            ...state.players[playerId],
+            isOverrideDisabled: !state.players[playerId]?.isOverrideDisabled,
           }
         }
       })),
