@@ -1664,7 +1664,7 @@ export default function CountryPredictionsClient({
               };
             }),
           players: (() => {
-            const list = [];
+            const list: { name: string; teamCode: string; teamName: string; detail: string }[] = [];
             const seen = new Set<string>();
 
             const pushUnique = (item: { name: string; teamCode: string; teamName: string; detail: string }) => {
