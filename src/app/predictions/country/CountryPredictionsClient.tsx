@@ -1655,9 +1655,9 @@ export default function CountryPredictionsClient({
         playersOutNames: playersOut.map(id => storePlayers[id]?.['Player Name'] || id),
         activeOverridesSummary: {
           teams: Object.values(storeTeams || {})
-            .filter(t => (t.isCustom || (t as any).isCustom) && !t.isOverrideDisabled && (t['Team Code'] || (t as any).code || t.code) !== selectedTeam.code)
+            .filter(t => (t.isCustom || (t as any).isCustom) && !t.isOverrideDisabled && (t['Team Code'] || (t as any).code) !== selectedTeam.code)
             .map(t => {
-              const code = t['Team Code'] || (t as any).code || t.code;
+              const code = t['Team Code'] || (t as any).code;
               return {
                 code: code,
                 name: appTeams.find(x => x.code === code)?.name || t['Team'] || (t as any).name || code
