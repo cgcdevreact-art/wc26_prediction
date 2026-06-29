@@ -184,16 +184,7 @@ export default async function AdminDashboard() {
         {/* Quick Actions */}
         <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
           <h2 className="text-sm font-semibold text-slate-800 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Link
-              href="/admin/sync"
-              className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-5 text-center transition-all hover:bg-violet-50 hover:border-violet-200"
-            >
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-violet-100 border border-violet-200/50">
-                <Activity className="h-5 w-5 text-violet-600" />
-              </div>
-              <span className="text-xs font-medium text-slate-600">Sync Data</span>
-            </Link>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Link
               href="/admin/users"
               className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-5 text-center transition-all hover:bg-fuchsia-50 hover:border-fuchsia-200"

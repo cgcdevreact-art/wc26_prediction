@@ -19,7 +19,6 @@ const NAV_ITEMS = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/matches", label: "Matches", icon: Trophy },
   { href: "/admin/predictions", label: "Predictions", icon: Target },
-  { href: "/admin/sync", label: "Data Sync", icon: RefreshCw },
 ];
 
 export function AdminSidebar() {
