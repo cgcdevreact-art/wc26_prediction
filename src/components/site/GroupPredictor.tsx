@@ -6,7 +6,7 @@ import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProv
 import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle, Brain, Cpu } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { StaminaBar, AlignmentGauge, TemperatureSlider } from "@/components/ui/SciFiControls";
-import { useSimulationStore } from "@/lib/store/simulationStore";
+import { useSimulationStore, PlayerStats } from "@/lib/store/simulationStore";
 import { toast } from "sonner";
 import { getMatchExpectedGoals } from "@/lib/simulation/model";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
