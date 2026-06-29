@@ -2738,88 +2738,93 @@ export default function CountryPredictionsClient({
           {/* Dual Charts Row */}
           <div className="grid items-stretch gap-6 md:grid-cols-2">
             {/* Radar Attributes Card */}
-            <div className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
-              <div className="px-6 pt-6 pb-3">
-                <div>
-                  <div className="font-display font-bold text-base text-foreground">Performance Attributes</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</div>
-                </div>
-              </div>
-              <div className="flex-1 px-6 pb-6">
-                <div className="flex justify-end mb-6">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30">
-                    Attributes
-                  </span>
-                </div>
-                <div className="flex h-64 min-h-[280px] items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={radarData} outerRadius={85}>
-                      <PolarGrid stroke={activeTheme === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.14)"} />
-                      <PolarAngleAxis dataKey="axis" tick={{ fill: activeTheme === "light" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.6)", fontSize: 10, fontFamily: "var(--font-display)" }} />
-                      <Radar dataKey="v" stroke="var(--color-neon)" fill="var(--color-neon)" fillOpacity={activeTheme === "light" ? 0.35 : 0.2} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
+            <Accordion type="single" collapsible defaultValue="performance" className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="performance" className="border-none flex flex-col h-full">
+                <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
+                  <div className="text-left">
+                    <div className="font-display font-bold text-base text-foreground">Performance Attributes</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="flex-1 px-6 pb-6">
+                  <div className="flex justify-end mb-6">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30">
+                      Attributes
+                    </span>
+                  </div>
+                  <div className="flex h-64 min-h-[280px] items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={radarData} outerRadius={85}>
+                        <PolarGrid stroke={activeTheme === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.14)"} />
+                        <PolarAngleAxis dataKey="axis" tick={{ fill: activeTheme === "light" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.6)", fontSize: 10, fontFamily: "var(--font-display)" }} />
+                        <Radar dataKey="v" stroke="var(--color-neon)" fill="var(--color-neon)" fillOpacity={activeTheme === "light" ? 0.35 : 0.2} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
             {/* Squad Quality Tiers Card */}
-            <div className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
-              <div className="px-6 pt-6 pb-3">
-                <div>
-                  <div className="font-display font-bold text-base text-foreground">Squad Quality Tiers</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</div>
-                </div>
-              </div>
-              <div className="flex-1 px-6 pb-6">
-                <div className="flex justify-end mb-6">
-                  <span className="self-start rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-fuchsia-700 dark:border-neon-2/30 dark:bg-neon-2/10 dark:text-neon-2">
-                    Squad Profile
-                  </span>
-                </div>
-
-                <div className="mt-6 flex flex-col gap-6">
-                  <div className="flex min-h-[140px] w-full flex-col justify-center items-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/5 dark:bg-white/[0.02]">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</span>
-                    <span className="mt-2 text-5xl font-black font-mono text-foreground">
-                      {squadStats.avgRating || "--"}
-                      {squadStats.avgRating ? <span className="text-2xl align-top">%</span> : null}
+            <Accordion type="single" collapsible defaultValue="squad-quality" className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="squad-quality" className="border-none flex flex-col h-full">
+                <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
+                  <div className="text-left">
+                    <div className="font-display font-bold text-base text-foreground">Squad Quality Tiers</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="flex-1 px-6 pb-6">
+                  <div className="flex justify-end mb-6">
+                    <span className="self-start rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-fuchsia-700 dark:border-neon-2/30 dark:bg-neon-2/10 dark:text-neon-2">
+                      Squad Profile
                     </span>
-                    <span className="mt-3 text-sm font-semibold text-emerald-700 dark:text-neon">{squadStats.total} Players</span>
                   </div>
 
-                  <div className="space-y-4 w-full">
-                    {squadTiers.map((tier) => (
-                      <div key={tier.label} className="flex items-center gap-3 w-full">
-                        <div className="text-xs font-semibold text-foreground w-28 shrink-0 truncate">
-                          {tier.label}
+                  <div className="mt-6 flex flex-col gap-6">
+                    <div className="flex min-h-[140px] w-full flex-col justify-center items-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/5 dark:bg-white/[0.02]">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</span>
+                      <span className="mt-2 text-5xl font-black font-mono text-foreground">
+                        {squadStats.avgRating || "--"}
+                        {squadStats.avgRating ? <span className="text-2xl align-top">%</span> : null}
+                      </span>
+                      <span className="mt-3 text-sm font-semibold text-emerald-700 dark:text-neon">{squadStats.total} Players</span>
+                    </div>
+
+                    <div className="space-y-4 w-full">
+                      {squadTiers.map((tier) => (
+                        <div key={tier.label} className="flex items-center gap-3 w-full">
+                          <div className="text-xs font-semibold text-foreground w-28 shrink-0 truncate">
+                            {tier.label}
+                          </div>
+                          <div className="flex-1 h-3 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/8">
+                            <div
+                              className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
+                              style={{ width: `${Math.max(tier.pct, tier.count > 0 ? 4 : 0)}%` }}
+                            />
+                          </div>
+                          <div className="w-20 shrink-0 text-right font-mono text-xs font-bold tabular-nums text-foreground">
+                            {tier.count}
+                            <span className="ml-1.5 text-[10px] text-muted-foreground font-medium">({tier.pct}%)</span>
+                          </div>
                         </div>
-                        <div className="flex-1 h-3 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/8">
-                          <div
-                            className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
-                            style={{ width: `${Math.max(tier.pct, tier.count > 0 ? 4 : 0)}%` }}
-                          />
-                        </div>
-                        <div className="w-20 shrink-0 text-right font-mono text-xs font-bold tabular-nums text-foreground">
-                          {tier.count}
-                          <span className="ml-1.5 text-[10px] text-muted-foreground font-medium">({tier.pct}%)</span>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
 
-          <div className="rounded-[2rem] bg-white border border-slate-200 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
-            <div className="px-6 pt-6 pb-3">
-              <div>
-                <div className="font-display font-bold text-lg text-foreground">Expected Path to Glory</div>
-                <div className="text-xs text-muted-foreground mt-0.5">Calculated dynamically from the most common matchups and scores across all simulations.</div>
-              </div>
-            </div>
-            <div className="px-6 pb-6">
+          <Accordion type="single" collapsible defaultValue="expected-path" className="rounded-[2rem] bg-white border border-slate-200 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900 mt-6">
+            <AccordionItem value="expected-path" className="border-none">
+              <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
+                <div className="text-left">
+                  <div className="font-display font-bold text-lg text-foreground">Expected Path to Glory</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Calculated dynamically from the most common matchups and scores across all simulations.</div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-6 pb-6">
                 <div className="flex justify-end border-b border-slate-200 pb-5 mb-6 dark:border-white/5">
                   <div className="text-[10px] uppercase bg-cyan-50 border border-cyan-200 text-cyan-700 px-3.5 py-1.5 rounded-full font-bold self-start sm:self-auto shadow-sm dark:bg-neon/10 dark:border-neon/30 dark:text-neon">
                     Model: {formattedModelName}
@@ -2905,8 +2910,9 @@ export default function CountryPredictionsClient({
                     </div>
                   </div>
                 )}
-            </div>
-          </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
       </div>
 

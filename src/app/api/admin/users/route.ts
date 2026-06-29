@@ -13,9 +13,14 @@ export async function GET(request: Request) {
     const search = url.searchParams.get("search") || "";
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "20");
+    const sort = url.searchParams.get("sort") || "createdAt";
+    const order = url.searchParams.get("order") || "desc";
+    const role = url.searchParams.get("role") || "";
+    const tier = url.searchParams.get("tier") || "";
+    
     const skip = (page - 1) * limit;
 
-    const where = search
+    const where: any = search
       ? {
           OR: [
             { name: { contains: search } },
@@ -23,13 +28,23 @@ export async function GET(request: Request) {
           ],
         }
       : {};
+      
+    if (role) where.role = role;
+    if (tier) where.subscriptionTier = tier;
+
+    let orderBy: any = {};
+    if (sort === 'predictions') {
+      orderBy = { predictions: { _count: order } };
+    } else {
+      orderBy = { [sort]: order };
+    }
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         include: {
           _count: {
             select: { predictions: true },

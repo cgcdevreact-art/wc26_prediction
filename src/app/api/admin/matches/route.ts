@@ -27,19 +27,34 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "20");
+    const sort = url.searchParams.get("sort") || "utcDate";
+    const order = url.searchParams.get("order") || "desc";
+    const status = url.searchParams.get("status") || "";
+    
     const skip = (page - 1) * limit;
+
+    const where = status ? { status } : {};
+    
+    // Support sorting by nested relation fields or standard fields
+    let orderBy: any = {};
+    if (sort === 'homeTeam') {
+      orderBy = { homeTeam: { shortName: order } };
+    } else {
+      orderBy = { [sort]: order };
+    }
 
     const [matches, total] = await Promise.all([
       prisma.match.findMany({
+        where,
         skip,
         take: limit,
-        orderBy: { utcDate: "desc" },
+        orderBy,
         include: {
           homeTeam: { select: { name: true, shortName: true, tla: true, crest: true } },
           awayTeam: { select: { name: true, shortName: true, tla: true, crest: true } },
         },
       }),
-      prisma.match.count(),
+      prisma.match.count({ where }),
     ]);
 
     return NextResponse.json({ matches, total, page, limit });

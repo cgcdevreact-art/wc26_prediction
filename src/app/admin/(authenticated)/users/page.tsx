@@ -11,6 +11,9 @@ import {
   Crown,
   Loader2,
   X,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -35,6 +38,10 @@ export default function AdminUsersPage() {
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [tempTier, setTempTier] = useState<string>("");
   const [showConfirm, setShowConfirm] = useState(false);
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [tierFilter, setTierFilter] = useState("");
   const limit = 15;
 
   useEffect(() => {
@@ -50,7 +57,11 @@ export default function AdminUsersPage() {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(limit),
+        sort: sortBy,
+        order: sortOrder,
         ...(search && { search }),
+        ...(roleFilter && { role: roleFilter }),
+        ...(tierFilter && { tier: tierFilter }),
       });
       const res = await fetch(`/api/admin/users?${params}`);
       const data = await res.json();
@@ -61,7 +72,7 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, sortBy, sortOrder, roleFilter, tierFilter]);
 
   useEffect(() => {
     fetchUsers();
@@ -102,13 +113,32 @@ export default function AdminUsersPage() {
     pro: "Expert Predictor",
   };
 
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("desc");
+    }
+    setPage(1);
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortBy !== column) return <ArrowUpDown className="ml-1 inline-block h-3 w-3 text-slate-300" />;
+    return sortOrder === "asc" ? (
+      <ArrowUp className="ml-1 inline-block h-3 w-3 text-violet-500" />
+    ) : (
+      <ArrowDown className="ml-1 inline-block h-3 w-3 text-violet-500" />
+    );
+  };
+
   return (
     <>
       <AdminHeader title="Users" description={`${total} registered users`} />
 
       <div className="flex-1 overflow-y-auto p-8">
         {/* Search */}
-        <div className="mb-6 flex items-center gap-4">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -122,6 +152,35 @@ export default function AdminUsersPage() {
               className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-violet-400 focus:ring-1 focus:ring-violet-400"
             />
           </div>
+          
+          <div className="flex items-center gap-3">
+            <select
+              value={roleFilter}
+              onChange={(e) => {
+                setRoleFilter(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-1 focus:ring-violet-400"
+            >
+              <option value="">All Roles</option>
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+            
+            <select
+              value={tierFilter}
+              onChange={(e) => {
+                setTierFilter(e.target.value);
+                setPage(1);
+              }}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-1 focus:ring-violet-400"
+            >
+              <option value="">All Tiers</option>
+              <option value="free">Free</option>
+              <option value="plus">Advanced</option>
+              <option value="pro">Expert</option>
+            </select>
+          </div>
         </div>
 
         {/* Table */}
@@ -129,20 +188,35 @@ export default function AdminUsersPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  User
+                <th 
+                  className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleSort("name")}
+                >
+                  User <SortIcon column="name" />
                 </th>
-                <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Role
+                <th 
+                  className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleSort("role")}
+                >
+                  Role <SortIcon column="role" />
                 </th>
-                <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Tier
+                <th 
+                  className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleSort("subscriptionTier")}
+                >
+                  Tier <SortIcon column="subscriptionTier" />
                 </th>
-                <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Predictions
+                <th 
+                  className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleSort("predictions")}
+                >
+                  Predictions <SortIcon column="predictions" />
                 </th>
-                <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  Joined
+                <th 
+                  className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 cursor-pointer hover:bg-slate-100 transition"
+                  onClick={() => handleSort("createdAt")}
+                >
+                  Joined <SortIcon column="createdAt" />
                 </th>
                 <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   Actions
