@@ -338,9 +338,14 @@ export default function SavedPredictionsClient() {
         defaultValue={[accordionValue]}
         className="w-full bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-[2rem] relative shadow-[0_18px_50px_rgba(15,23,42,0.08)] mt-8"
       >
-        <AccordionItem value={accordionValue} className="border-none">
-          <AccordionTrigger className="px-6 md:px-8 pt-6 md:pt-8 pb-3 hover:no-underline">
-            <div>
+        <AccordionItem value={accordionValue} className="border-none relative overflow-hidden rounded-[2rem]">
+          <div className="absolute top-7 right-14 hidden md:flex items-center select-none pointer-events-none z-10">
+            <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 ring-1 ring-inset ring-slate-200 dark:ring-white/10">
+              {isHypo ? "Custom / Hypothetical" : "Country Prediction"}
+            </span>
+          </div>
+          <AccordionTrigger className="px-6 md:px-8 pt-6 md:pt-8 pb-3 hover:no-underline relative z-10">
+            <div className="text-left">
               <div className="font-display font-extrabold text-2xl text-foreground dark:text-white tracking-tight">{title}</div>
               <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">{subtitle}</div>
             </div>
@@ -370,10 +375,10 @@ export default function SavedPredictionsClient() {
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="overflow-x-auto rounded-[1.5rem] border border-slate-200 dark:border-white/10 bg-slate-50/30 dark:bg-black/20">
+                <div className="overflow-x-auto overflow-y-auto max-h-[520px] rounded-[1.5rem] border border-slate-200 dark:border-white/10 bg-slate-50/30 dark:bg-black/20 custom-scrollbar">
                   <table className="w-full text-left border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    <thead className="sticky top-0 z-20 shadow-sm">
+                      <tr className="border-b border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-900 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         <th className="py-3 px-4 w-12 text-center">Compare</th>
                         <th className="py-3 px-4 min-w-[150px]">Country</th>
                         <th className="py-3 px-4">Elo Rating</th>
@@ -743,7 +748,11 @@ export default function SavedPredictionsClient() {
                               {data.modelName || "base"}
                             </td>
                             <td className="py-3.5 px-4 font-bold text-foreground">
-                              {Number(data.championProb || 0).toFixed(1)}
+                              {(() => {
+                                const ch = data.stages?.champion ?? (data.championProb * 10 || 0);
+                                const prob = ch / 10;
+                                return prob > 0 ? (100 / prob).toFixed(2) : "-";
+                              })()}
                             </td>
                             <td className="py-3.5 px-4 whitespace-nowrap">
                               <div className="flex flex-col gap-0.5">
@@ -1105,7 +1114,7 @@ export default function SavedPredictionsClient() {
                                           <div className={`space-y-1.5 max-w-[180px] ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                                             <div className="flex items-center justify-between text-xs font-black font-mono">
                                               <span className={isBest ? "text-cyan-600 dark:text-neon text-sm" : "text-foreground"}>
-                                                {prob.toFixed(1)}
+                                                {prob > 0 ? (100 / prob).toFixed(2) : "-"}
                                               </span>
                                               {isBest && (
                                                 <span className="text-[9px] font-extrabold text-cyan-600 dark:text-neon uppercase tracking-wide bg-cyan-500/15 dark:bg-neon/20 px-1 py-0.2 rounded flex items-center gap-0.5">

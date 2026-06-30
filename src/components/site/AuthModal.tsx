@@ -186,7 +186,14 @@ export function AuthModal({
                 />
               </div>
               {mode === "signup" && (
-                <p className="text-[10px] text-muted-foreground">Must be at least 6 characters.</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Must be at least 6 characters.</p>
+              )}
+              {mode === "signin" && (
+                <div className="flex justify-end mt-1">
+                  <a href="/forgot-password" className="text-[10px] text-neon hover:underline cursor-pointer">
+                    Forgot Password?
+                  </a>
+                </div>
               )}
             </div>
 
