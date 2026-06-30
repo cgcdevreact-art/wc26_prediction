@@ -175,7 +175,7 @@ function getGroupMatchDetails(
   const getCode = (id: string | number, nameEn: string) => {
     // 1. Static API ID mapping (highly reliable)
     const liveTeamIdMap: Record<string, string> = {
-      "1":"MEX","2":"RSA","3":"KOR","4":"CZE","5":"CAN","6":"BIH","7":"QAT","8":"SUI","9":"BRA","10":"MAR","11":"HAI","12":"SCO","13":"USA","14":"PAR","15":"AUS","16":"TUR","17":"GER","18":"CUW","19":"CIV","20":"ECU","21":"NED","22":"JPN","23":"SWE","24":"TUN","25":"BEL","26":"EGY","27":"IRN","28":"NZL","29":"ESP","30":"CPV","31":"KSA","32":"URU","33":"FRA","34":"SEN","35":"IRQ","36":"NOR","37":"ARG","38":"ALG","39":"AUT","40":"JOR","41":"POR","42":"COD","43":"UZB","44":"COL","45":"ENG","46":"CRO","47":"GHA","48":"PAN"
+      "1": "MEX", "2": "RSA", "3": "KOR", "4": "CZE", "5": "CAN", "6": "BIH", "7": "QAT", "8": "SUI", "9": "BRA", "10": "MAR", "11": "HAI", "12": "SCO", "13": "USA", "14": "PAR", "15": "AUS", "16": "TUR", "17": "GER", "18": "CUW", "19": "CIV", "20": "ECU", "21": "NED", "22": "JPN", "23": "SWE", "24": "TUN", "25": "BEL", "26": "EGY", "27": "IRN", "28": "NZL", "29": "ESP", "30": "CPV", "31": "KSA", "32": "URU", "33": "FRA", "34": "SEN", "35": "IRQ", "36": "NOR", "37": "ARG", "38": "ALG", "39": "AUT", "40": "JOR", "41": "POR", "42": "COD", "43": "UZB", "44": "COL", "45": "ENG", "46": "CRO", "47": "GHA", "48": "PAN"
     };
     const mappedCode = liveTeamIdMap[String(id)];
     if (mappedCode) return normalizeCode(mappedCode);
@@ -191,7 +191,7 @@ function getGroupMatchDetails(
     };
 
     const targetName = normalizeName(nameEn);
-    const t = teams.find((x: any) => 
+    const t = teams.find((x: any) =>
       (x.id !== undefined && x.id !== null && String(x.id) === String(id)) ||
       (x.name && targetName && normalizeName(x.name) === targetName)
     );
@@ -199,14 +199,14 @@ function getGroupMatchDetails(
   };
 
   const groupGames = allGames.filter((g: any) => g.group === group);
-  
+
   // Find match dynamically based on team codes
   let game = groupGames.find((g: any) => {
     const hCode = getCode(g.home_team_id, g.home_team_name_en || "");
     const aCode = getCode(g.away_team_id, g.away_team_name_en || "");
     const targetH = normalizeCode(homeCode);
     const targetA = normalizeCode(awayCode);
-    
+
     return (hCode === targetH && aCode === targetA) || (hCode === targetA && aCode === targetH);
   });
 
@@ -890,12 +890,12 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
       const getCode = (id: string | number, nameEn: string) => {
         const liveTeamIdMap: Record<string, string> = {
-          "1":"MEX","2":"RSA","3":"KOR","4":"CZE","5":"CAN","6":"BIH","7":"QAT","8":"SUI","9":"BRA","10":"MAR","11":"HAI","12":"SCO","13":"USA","14":"PAR","15":"AUS","16":"TUR","17":"GER","18":"CUW","19":"CIV","20":"ECU","21":"NED","22":"JPN","23":"SWE","24":"TUN","25":"BEL","26":"EGY","27":"IRN","28":"NZL","29":"ESP","30":"CPV","31":"KSA","32":"URU","33":"FRA","34":"SEN","35":"IRQ","36":"NOR","37":"ARG","38":"ALG","39":"AUT","40":"JOR","41":"POR","42":"COD","43":"UZB","44":"COL","45":"ENG","46":"CRO","47":"GHA","48":"PAN"
+          "1": "MEX", "2": "RSA", "3": "KOR", "4": "CZE", "5": "CAN", "6": "BIH", "7": "QAT", "8": "SUI", "9": "BRA", "10": "MAR", "11": "HAI", "12": "SCO", "13": "USA", "14": "PAR", "15": "AUS", "16": "TUR", "17": "GER", "18": "CUW", "19": "CIV", "20": "ECU", "21": "NED", "22": "JPN", "23": "SWE", "24": "TUN", "25": "BEL", "26": "EGY", "27": "IRN", "28": "NZL", "29": "ESP", "30": "CPV", "31": "KSA", "32": "URU", "33": "FRA", "34": "SEN", "35": "IRQ", "36": "NOR", "37": "ARG", "38": "ALG", "39": "AUT", "40": "JOR", "41": "POR", "42": "COD", "43": "UZB", "44": "COL", "45": "ENG", "46": "CRO", "47": "GHA", "48": "PAN"
         };
         const mappedCode = liveTeamIdMap[String(id)];
         if (mappedCode) return mappedCode.toUpperCase().trim();
         const targetName = nameEn.toLowerCase().trim();
-        const t = teams.find((x: any) => 
+        const t = teams.find((x: any) =>
           (x.id !== undefined && x.id !== null && String(x.id) === String(id)) ||
           (x.name && targetName && x.name.toLowerCase().trim() === targetName)
         );
@@ -923,12 +923,12 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
     const getCode = (id: string | number, nameEn: string) => {
       const liveTeamIdMap: Record<string, string> = {
-        "1":"MEX","2":"RSA","3":"KOR","4":"CZE","5":"CAN","6":"BIH","7":"QAT","8":"SUI","9":"BRA","10":"MAR","11":"HAI","12":"SCO","13":"USA","14":"PAR","15":"AUS","16":"TUR","17":"GER","18":"CUW","19":"CIV","20":"ECU","21":"NED","22":"JPN","23":"SWE","24":"TUN","25":"BEL","26":"EGY","27":"IRN","28":"NZL","29":"ESP","30":"CPV","31":"KSA","32":"URU","33":"FRA","34":"SEN","35":"IRQ","36":"NOR","37":"ARG","38":"ALG","39":"AUT","40":"JOR","41":"POR","42":"COD","43":"UZB","44":"COL","45":"ENG","46":"CRO","47":"GHA","48":"PAN"
+        "1": "MEX", "2": "RSA", "3": "KOR", "4": "CZE", "5": "CAN", "6": "BIH", "7": "QAT", "8": "SUI", "9": "BRA", "10": "MAR", "11": "HAI", "12": "SCO", "13": "USA", "14": "PAR", "15": "AUS", "16": "TUR", "17": "GER", "18": "CUW", "19": "CIV", "20": "ECU", "21": "NED", "22": "JPN", "23": "SWE", "24": "TUN", "25": "BEL", "26": "EGY", "27": "IRN", "28": "NZL", "29": "ESP", "30": "CPV", "31": "KSA", "32": "URU", "33": "FRA", "34": "SEN", "35": "IRQ", "36": "NOR", "37": "ARG", "38": "ALG", "39": "AUT", "40": "JOR", "41": "POR", "42": "COD", "43": "UZB", "44": "COL", "45": "ENG", "46": "CRO", "47": "GHA", "48": "PAN"
       };
       const mappedCode = liveTeamIdMap[String(id)];
       if (mappedCode) return mappedCode.toUpperCase().trim();
       const targetName = nameEn.toLowerCase().trim();
-      const t = teams.find((x: any) => 
+      const t = teams.find((x: any) =>
         (x.id !== undefined && x.id !== null && String(x.id) === String(id)) ||
         (x.name && targetName && x.name.toLowerCase().trim() === targetName)
       );
@@ -1399,12 +1399,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setSlotSummaries(summaries);
   }, [allPredictions]);
 
+  const hasLoadedInitialPredictions = useRef(false);
+
   // Load predictions from DB on authentication
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || hasLoadedInitialPredictions.current) return;
 
     const fetchUserPredictions = async () => {
       const preds = await fetchAllUserPredictions();
+      hasLoadedInitialPredictions.current = true;
       if (!preds || preds.length === 0) return;
 
       const groupPreds = preds.filter((p: any) => p.type === "MATCH_SCORE");
@@ -1468,7 +1471,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     };
 
     fetchUserPredictions();
-  }, [session]);
+  }, [session?.user?.id]);
 
   const handleLoadFromSlot = async (slotId: number | null) => {
     disableRealScoresState();
@@ -2034,10 +2037,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
     const isEliminated = (teamCode: string) => {
       if (!isSynced) return false;
-      
+
       const finalMatch = koMatchups.final[0];
       const finalWinner = koWinners.final[0];
-      
+
       if (finalWinner && finalMatch && (finalWinner === finalMatch.home || finalWinner === finalMatch.away)) {
         if (finalWinner !== teamCode) return true;
       }
@@ -2074,7 +2077,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     return [...teams]
       .map(t => {
         const eliminated = isTeamEliminated(t.code);
-        
+
         // Calculate true live probability
         let winProb = t.prob.champion;
         if (eliminated) {
@@ -2985,11 +2988,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             )
           )}
           <label
-            className={`inline-flex min-h-[56px] w-full items-center justify-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto sm:min-w-[180px] ${
-              useRealScores
-                ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
-                : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-700 dark:text-slate-300 dark:hover:bg-white/5"
-            }`}
+            className={`inline-flex min-h-[56px] w-full items-center justify-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto sm:min-w-[180px] ${useRealScores
+              ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+              : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-700 dark:text-slate-300 dark:hover:bg-white/5"
+              }`}
           >
             <input
               type="checkbox"
@@ -3008,11 +3010,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
           {totalOverrides > 0 && (
             <label
-              className={`inline-flex min-h-[56px] items-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${
-                bypassOverrides
-                  ? "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
-                  : "bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.15)] animate-pulse"
-              }`}
+              className={`inline-flex min-h-[56px] items-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${bypassOverrides
+                ? "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
+                : "bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.15)] animate-pulse"
+                }`}
             >
               <input
                 type="checkbox"
@@ -3028,7 +3029,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               }}>
                 <Award className={`h-4 w-4 ${bypassOverrides ? "text-slate-400" : "text-purple-500 fill-purple-500/20"}`} />
                 <span className="text-xs font-bold leading-none select-none hover:underline">
-                  {!bypassOverrides ? "My Customizations Applied" : "Apply my customizations"} ({totalOverrides})
+                  {!bypassOverrides ? "My Customizations Applied" : "Apply My Customizations"} ({totalOverrides})
                 </span>
               </div>
             </label>
@@ -3219,9 +3220,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         <div className="space-y-6">
           {/* Real-life Scores Integrator */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl glass-strong border border-border/40 bg-slate-900/10 dark:bg-black/10 shadow-glass">
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
                 id="use-actual-scores"
                 checked={useRealScores}
                 onChange={(e) => handleToggleRealScores(e.target.checked)}
@@ -3458,11 +3459,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               )
                             )}
                             <span className="opacity-40">#{details.matchNumber}</span>
-                             {(((storeTeams[m.homeCode]?.isCustom && !storeTeams[m.homeCode]?.isOverrideDisabled) || (storeTeams[m.awayCode]?.isCustom && !storeTeams[m.awayCode]?.isOverrideDisabled)) && !bypassOverrides) && (
-                               <span className="inline-block text-[7px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 w-fit font-black uppercase tracking-widest leading-none mt-0.5" title="Simulation includes overridden players/stats">
-                                 Adjusted
-                               </span>
-                             )}
+                            {(((storeTeams[m.homeCode]?.isCustom && !storeTeams[m.homeCode]?.isOverrideDisabled) || (storeTeams[m.awayCode]?.isCustom && !storeTeams[m.awayCode]?.isOverrideDisabled)) && !bypassOverrides) && (
+                              <span className="inline-block text-[7px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 w-fit font-black uppercase tracking-widest leading-none mt-0.5" title="Simulation includes overridden players/stats">
+                                Adjusted
+                              </span>
+                            )}
                           </div>
 
                           {/* Match Core (Teams & Score) */}
@@ -4842,11 +4843,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       <button
                         type="button"
                         onClick={() => setSimScope("whole")}
-                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${
-                          simScope === "whole"
-                            ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
-                            : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
-                        }`}
+                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${simScope === "whole"
+                          ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+                          : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
+                          }`}
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <Trophy className={`h-4 w-4 ${simScope === "whole" ? "text-cyan-500" : "text-slate-400"}`} />
@@ -4861,11 +4861,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       <button
                         type="button"
                         onClick={() => setSimScope("r32")}
-                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${
-                          simScope === "r32"
-                            ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
-                            : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
-                        }`}
+                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${simScope === "r32"
+                          ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+                          : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
+                          }`}
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <Sparkles className={`h-4 w-4 ${simScope === "r32" ? "text-cyan-500" : "text-slate-400"}`} />
