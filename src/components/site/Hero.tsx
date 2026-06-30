@@ -75,18 +75,18 @@ export function Hero() {
   // 4. Fallback to client's local date.
   const getActiveDate = (matches: any[]) => {
     if (matches.length === 0) return new Date().toISOString().slice(0, 10);
-    
+
     const liveMatch = matches.find((m) => m.status === "LIVE");
     if (liveMatch) return liveMatch.date;
-    
+
     const upcomingMatch = matches.find((m) => m.status === "UPCOMING");
     if (upcomingMatch) return upcomingMatch.date;
-    
+
     const completedMatches = matches.filter((m) => m.status === "COMPLETED");
     if (completedMatches.length > 0) {
       return completedMatches[completedMatches.length - 1].date;
     }
-    
+
     return new Date().toISOString().slice(0, 10);
   };
 
@@ -182,7 +182,7 @@ export function Hero() {
               Run Simulation <ArrowRight className="h-4 w-4" />
             </button>
             <a
-              href="#predict"
+              href=""
               onClick={handleStartPredictingClick}
               className="rounded-md glass px-5 py-3 text-sm font-semibold hover:bg-white/10"
             >
@@ -321,155 +321,155 @@ export function Hero() {
             <p className="text-[11px] text-muted-foreground mt-1 max-w-xs mx-auto">Click to browse full schedules, venues, and stage filters.</p>
           </div>
         )}
-          </div>
-          <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
-        </section>
-      );
+      </div>
+      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+    </section>
+  );
+}
+
+function HeroMatchCard({
+  match,
+  onClick,
+}: {
+  match: any;
+  onClick: () => void;
+}) {
+  const kickoffMs = new Date(match.kickoffAtIso).getTime();
+  const [nowTime, setNowTime] = useState<number>(kickoffMs);
+
+  useEffect(() => {
+    const syncTimer = window.setTimeout(() => {
+      setNowTime(Date.now());
+    }, 0);
+    const timer = setInterval(() => {
+      setNowTime(Date.now());
+    }, 1000);
+    return () => {
+      window.clearTimeout(syncTimer);
+      clearInterval(timer);
+    };
+  }, []);
+
+  const diffMs = kickoffMs - nowTime;
+  const isLive = match.status === "LIVE" || (match.status === "UPCOMING" && diffMs <= 0);
+  const isCompleted = match.status === "COMPLETED";
+
+  const getCountdownString = (diff: number) => {
+    if (diff <= 0) return "0s";
+    const totalSec = Math.floor(diff / 1000);
+    const hrs = Math.floor(totalSec / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+
+    if (hrs > 0) {
+      return `${hrs}h ${mins}m ${secs}s`;
     }
+    if (mins > 0) {
+      return `${mins}m ${secs}s`;
+    }
+    return `${secs}s`;
+  };
 
-    function HeroMatchCard({
-      match,
-      onClick,
-    }: {
-      match: any;
-      onClick: () => void;
-    }) {
-      const kickoffMs = new Date(match.kickoffAtIso).getTime();
-      const [nowTime, setNowTime] = useState<number>(kickoffMs);
+  // Card styles
+  let cardClass = "hover:scale-[1.01] transition-all duration-300 rounded-2xl p-3.5 cursor-pointer relative overflow-hidden group select-none border";
+  if (isLive) {
+    cardClass += " border-red-500/80 bg-red-500/[0.04] dark:bg-red-500/[0.08] hover:bg-red-500/[0.06] dark:hover:bg-red-500/[0.1] shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-[pulse_3s_infinite]";
+  } else {
+    cardClass += " border-slate-200/50 dark:border-white/5 bg-slate-100/80 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-white/10 hover:shadow-sm";
+  }
+  if (isCompleted) {
+    cardClass += " opacity-70";
+  }
 
-      useEffect(() => {
-        const syncTimer = window.setTimeout(() => {
-          setNowTime(Date.now());
-        }, 0);
-        const timer = setInterval(() => {
-          setNowTime(Date.now());
-        }, 1000);
-        return () => {
-          window.clearTimeout(syncTimer);
-          clearInterval(timer);
-        };
-      }, []);
+  // Center pill styles
+  let pillClass = "shrink-0 px-2 py-1.5 rounded-lg border text-center min-w-[85px] flex flex-col justify-center items-center transition-all duration-300";
+  if (isLive) {
+    pillClass += " bg-red-500/10 border-red-500/25 text-red-500";
+  } else {
+    pillClass += " bg-slate-200/40 dark:bg-black/40 border-slate-200/60 dark:border-white/5 text-slate-700 dark:text-slate-350";
+  }
 
-      const diffMs = kickoffMs - nowTime;
-      const isLive = match.status === "LIVE" || (match.status === "UPCOMING" && diffMs <= 0);
-      const isCompleted = match.status === "COMPLETED";
+  return (
+    <div onClick={onClick} className={cardClass}>
+      {/* Shimmer effect on hover */}
+      <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
 
-      const getCountdownString = (diff: number) => {
-        if (diff <= 0) return "0s";
-        const totalSec = Math.floor(diff / 1000);
-        const hrs = Math.floor(totalSec / 3600);
-        const mins = Math.floor((totalSec % 3600) / 60);
-        const secs = totalSec % 60;
-        
-        if (hrs > 0) {
-          return `${hrs}h ${mins}m ${secs}s`;
-        }
-        if (mins > 0) {
-          return `${mins}m ${secs}s`;
-        }
-        return `${secs}s`;
-      };
+      <div className="flex items-center justify-between text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-2">
+        <span className={isLive ? "text-red-500 font-extrabold" : "text-slate-600 dark:text-slate-400 font-extrabold"}>
+          Match #{match.match_no}
+        </span>
+        <span className={isLive ? "text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full font-extrabold" : "text-slate-600 bg-slate-500/10 dark:text-slate-450 dark:bg-white/5 px-2 py-0.5 rounded-full font-extrabold"}>
+          {match.group ? `Group ${match.group}` : match.stageName}
+        </span>
+      </div>
 
-      // Card styles
-      let cardClass = "hover:scale-[1.01] transition-all duration-300 rounded-2xl p-3.5 cursor-pointer relative overflow-hidden group select-none border";
-      if (isLive) {
-        cardClass += " border-red-500/80 bg-red-500/[0.04] dark:bg-red-500/[0.08] hover:bg-red-500/[0.06] dark:hover:bg-red-500/[0.1] shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-[pulse_3s_infinite]";
-      } else {
-        cardClass += " border-slate-200/50 dark:border-white/5 bg-slate-100/80 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-white/10 hover:shadow-sm";
-      }
-      if (isCompleted) {
-        cardClass += " opacity-70";
-      }
-
-      // Center pill styles
-      let pillClass = "shrink-0 px-2 py-1.5 rounded-lg border text-center min-w-[85px] flex flex-col justify-center items-center transition-all duration-300";
-      if (isLive) {
-        pillClass += " bg-red-500/10 border-red-500/25 text-red-500";
-      } else {
-        pillClass += " bg-slate-200/40 dark:bg-black/40 border-slate-200/60 dark:border-white/5 text-slate-700 dark:text-slate-350";
-      }
-
-      return (
-        <div onClick={onClick} className={cardClass}>
-          {/* Shimmer effect on hover */}
-          <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-
-          <div className="flex items-center justify-between text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-2">
-            <span className={isLive ? "text-red-500 font-extrabold" : "text-slate-600 dark:text-slate-400 font-extrabold"}>
-              Match #{match.match_no}
-            </span>
-            <span className={isLive ? "text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full font-extrabold" : "text-slate-600 bg-slate-500/10 dark:text-slate-450 dark:bg-white/5 px-2 py-0.5 rounded-full font-extrabold"}>
-              {match.group ? `Group ${match.group}` : match.stageName}
-            </span>
+      <div className="flex items-center justify-between gap-2.5 my-1.5">
+        {/* Home Team */}
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <div className="shrink-0 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 rounded-md border border-white/5">
+            <CountryFlag
+              code={match.homeTeamObj.code}
+              flag={match.homeTeamObj.flag}
+              name={match.homeTeamObj.name}
+              className="h-4.5 w-6 shrink-0"
+              emojiClassName="text-base leading-none"
+            />
           </div>
+          <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
+            {match.homeTeamObj.code || match.homeTeamObj.name.slice(0, 3)}
+          </span>
+        </div>
 
-          <div className="flex items-center justify-between gap-2.5 my-1.5">
-            {/* Home Team */}
-            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <div className="shrink-0 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 rounded-md border border-white/5">
-                <CountryFlag
-                  code={match.homeTeamObj.code}
-                  flag={match.homeTeamObj.flag}
-                  name={match.homeTeamObj.name}
-                  className="h-4.5 w-6 shrink-0"
-                  emojiClassName="text-base leading-none"
-                />
-              </div>
-              <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
-                {match.homeTeamObj.code || match.homeTeamObj.name.slice(0, 3)}
+        {/* Score / VS / Countdown display */}
+        <div className={pillClass}>
+          {isLive ? (
+            <>
+              <span className="font-mono text-xs font-bold text-red-500 tracking-wider">
+                {match.homeScore !== "-" ? match.homeScore : "0"} - {match.awayScore !== "-" ? match.awayScore : "0"}
               </span>
-            </div>
-
-            {/* Score / VS / Countdown display */}
-            <div className={pillClass}>
-              {isLive ? (
-                <>
-                  <span className="font-mono text-xs font-bold text-red-500 tracking-wider">
-                    {match.homeScore !== "-" ? match.homeScore : "0"} - {match.awayScore !== "-" ? match.awayScore : "0"}
-                  </span>
-                  <span className="text-[7px] font-black text-red-500 tracking-widest uppercase flex items-center gap-1 mt-0.5">
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
-                    </span>
-                    LIVE
-                  </span>
-                </>
-              ) : isCompleted ? (
-                <>
-                  <span className="font-mono text-xs font-bold text-muted-foreground">{match.homeScore} - {match.awayScore}</span>
-                  <span className="text-[7px] text-muted-foreground/80 uppercase font-extrabold mt-0.5">FT</span>
-                </>
-              ) : (
-                <span className="font-mono text-[9px] font-bold text-red-500">
-                  {getCountdownString(diffMs)}
+              <span className="text-[7px] font-black text-red-500 tracking-widest uppercase flex items-center gap-1 mt-0.5">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
                 </span>
-              )}
-            </div>
-
-            {/* Away Team */}
-            <div className="flex items-center gap-1.5 justify-end min-w-0 flex-1 text-right">
-              <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
-                {match.awayTeamObj.code || match.awayTeamObj.name.slice(0, 3)}
+                LIVE
               </span>
-              <div className="shrink-0 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 rounded-md border border-white/5">
-                <CountryFlag
-                  code={match.awayTeamObj.code}
-                  flag={match.awayTeamObj.flag}
-                  name={match.awayTeamObj.name}
-                  className="h-4.5 w-6 shrink-0"
-                  emojiClassName="text-base leading-none"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="text-[9px] text-center text-muted-foreground/80 mt-2.5 pt-1.5 border-t border-white/5 flex items-center justify-center gap-1.5 font-medium truncate">
-            <MapPin className={`h-2.5 w-2.5 shrink-0 ${isLive ? "text-red-500" : "text-slate-500 dark:text-slate-400"}`} />
-            <span className="truncate">
-              {match.kickoffTime} {match.timezoneLabel} · {match.venue}, {match.city}
+            </>
+          ) : isCompleted ? (
+            <>
+              <span className="font-mono text-xs font-bold text-muted-foreground">{match.homeScore} - {match.awayScore}</span>
+              <span className="text-[7px] text-muted-foreground/80 uppercase font-extrabold mt-0.5">FT</span>
+            </>
+          ) : (
+            <span className="font-mono text-[9px] font-bold text-red-500">
+              {getCountdownString(diffMs)}
             </span>
+          )}
+        </div>
+
+        {/* Away Team */}
+        <div className="flex items-center gap-1.5 justify-end min-w-0 flex-1 text-right">
+          <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
+            {match.awayTeamObj.code || match.awayTeamObj.name.slice(0, 3)}
+          </span>
+          <div className="shrink-0 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 rounded-md border border-white/5">
+            <CountryFlag
+              code={match.awayTeamObj.code}
+              flag={match.awayTeamObj.flag}
+              name={match.awayTeamObj.name}
+              className="h-4.5 w-6 shrink-0"
+              emojiClassName="text-base leading-none"
+            />
           </div>
         </div>
-      );
-    }
+      </div>
+
+      <div className="text-[9px] text-center text-muted-foreground/80 mt-2.5 pt-1.5 border-t border-white/5 flex items-center justify-center gap-1.5 font-medium truncate">
+        <MapPin className={`h-2.5 w-2.5 shrink-0 ${isLive ? "text-red-500" : "text-slate-500 dark:text-slate-400"}`} />
+        <span className="truncate">
+          {match.kickoffTime} {match.timezoneLabel} · {match.venue}, {match.city}
+        </span>
+      </div>
+    </div>
+  );
+}

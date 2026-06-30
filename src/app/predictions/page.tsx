@@ -137,7 +137,7 @@ export default async function PredictionsPage(props: {
         if (parsed && typeof parsed === "object" && "name" in parsed && parsed.name) {
           slotNames[slotId] = parsed.name;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   });
 
@@ -156,22 +156,22 @@ export default async function PredictionsPage(props: {
       if (parsed && typeof parsed === "object" && "summary" in parsed) {
         activeSummary = parsed.summary;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const groupPredictedCount = activeSummary?.groupPredictedCount ?? matchesPreds.filter(p => p.predictedHomeScore !== null && p.predictedAwayScore !== null).length;
   const bracketPredictedCount = activeSummary?.bracketPredictedCount ?? knockoutPreds.filter(p => p.predictedTeamId !== null || p.predictedWinner !== null || p.predictedPayload !== null).length;
   const championCode = activeSummary?.championCode ?? (() => {
     const finalPred = knockoutPreds.find(p => p.matchId === 500);
-      if (finalPred) {
-        if (finalPred.predictedTeamId) return intToTeamCode(finalPred.predictedTeamId);
-        try {
+    if (finalPred) {
+      if (finalPred.predictedTeamId) return intToTeamCode(finalPred.predictedTeamId);
+      try {
         const parsed = readPredictionPayload<{ winnerCode?: string | null }>(finalPred.predictedPayload, finalPred.predictedWinner);
         if (parsed && typeof parsed === "object" && "winnerCode" in parsed) {
           return parsed.winnerCode || null;
         }
-        } catch (e) {}
-      }
+      } catch (e) { }
+    }
     return null;
   })();
   const standingsSummary = activeSummary?.standingsSummary || null;
@@ -199,16 +199,15 @@ export default async function PredictionsPage(props: {
             {[0, 1, 2, 3, 4, 5].map((slotId) => {
               const isActive = currentSlotId === slotId;
               const hasData = slotId === 0 || predictions.some(p => p.type === `MATCH_SCORE_SLOT_${slotId}` || p.type === `KNOCKOUT_WINNER_SLOT_${slotId}`);
-              
+
               return (
                 <a
                   key={slotId}
                   href={slotId === 0 ? "/predictions" : `/predictions?slot=${slotId}`}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
-                    isActive
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${isActive
                       ? "bg-gradient-to-r from-cyan-600 to-fuchsia-600 border-transparent text-white shadow-md active:scale-95"
                       : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 dark:text-slate-300"
-                  } ${!hasData && slotId !== 0 ? "opacity-50 hover:opacity-100" : ""}`}
+                    } ${!hasData && slotId !== 0 ? "opacity-50 hover:opacity-100" : ""}`}
                 >
                   {slotNames[slotId]} {!hasData && slotId !== 0 && " (Empty)"}
                 </a>
@@ -226,10 +225,10 @@ export default async function PredictionsPage(props: {
                 <span>{slotNames[currentSlotId]} Overview</span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Summary of standings, progress, and champion picks for this slot.
+                Simulated Summary of standings, progress, and champion picks for this slot.
               </p>
             </div>
-            
+
             {/* Predicted Champion Preview */}
             {championCode && teamsMap.get(championCode) && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/10 dark:border-amber-500/20 text-xs shadow-sm self-start sm:self-auto">
@@ -293,7 +292,7 @@ export default async function PredictionsPage(props: {
                       <div className="text-[10px] font-black text-slate-500 dark:text-slate-400 border-b border-slate-200/50 dark:border-white/5 pb-1 mb-1 font-mono uppercase tracking-wider">
                         Group {group}
                       </div>
-                      
+
                       {winnerTeam ? (
                         <div className="flex items-center gap-1.5 text-xs text-slate-850 dark:text-slate-200 truncate">
                           <span className="text-amber-500 dark:text-amber-400 font-bold font-mono text-[10px] shrink-0 w-5">1st</span>

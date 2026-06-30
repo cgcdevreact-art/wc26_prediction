@@ -363,9 +363,7 @@ export function ScoreTrendGraph({
                 labelStyle={{ fontWeight: "bold", color: "var(--foreground)", marginBottom: "4px" }}
                 itemStyle={{ color: "var(--foreground)" }}
                 formatter={(value: any, name: any) => {
-                  const label =
-                    name === "realDataPoints" ? "Real Data Points" : "Simulated/Predicted Points";
-                  return [`${Math.round(Number(value))} Pts`, label];
+                  return [`${Math.round(Number(value))} Pts`, name];
                 }}
               />
               <Bar

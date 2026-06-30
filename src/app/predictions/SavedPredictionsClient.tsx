@@ -74,6 +74,7 @@ export default function SavedPredictionsClient() {
   const [compareMetricMode, setCompareMetricMode] = useState<"progression" | "attributes">("attributes");
   const [selectedHypotheticalCompareIds, setSelectedHypotheticalCompareIds] = useState<string[]>([]);
   const [compareHypotheticalMetricMode, setCompareHypotheticalMetricMode] = useState<"progression" | "attributes">("attributes");
+  const [expandedPredictionIds, setExpandedPredictionIds] = useState<Record<string, boolean>>({});
   const [customCountries, setCustomCountries] = useState<any[]>([]);
 
   const fetchCustomCountries = async () => {
@@ -392,6 +393,10 @@ export default function SavedPredictionsClient() {
                         }
 
                         if (!data) return null;
+
+                        const isCustomCountry = data.code?.startsWith("CC_");
+                        const isDeletedCustomCountry = isCustomCountry && !customCountries.some((c: any) => c.code === data.code);
+
                         const isChecked = selectedIds.includes(p.id);
                         const hasDifferentCountrySelected = selectedCountryNames.length > 0 && !selectedCountryNames.includes(data.name);
                         const isDisableCompare = !isChecked && (
@@ -682,23 +687,38 @@ export default function SavedPredictionsClient() {
                                         </div>
                                       )}
 
-                                      {/* Other Edited Teams */}
-                                      {otherTeamsBadges && otherTeamsBadges.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5 items-center">
-                                          <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 dark:text-slate-500 mr-1 select-none">Other Edited Teams:</span>
-                                          <div className="flex flex-wrap gap-1.5">
-                                            {otherTeamsBadges}
-                                          </div>
-                                        </div>
+                                      {/* Toggle for Others Edited */}
+                                      {((otherTeamsBadges && otherTeamsBadges.length > 0) || (otherPlayersBadges && otherPlayersBadges.length > 0)) && (
+                                        <button
+                                          onClick={() => setExpandedPredictionIds(prev => ({ ...prev, [p.id]: !prev[p.id] }))}
+                                          className="text-[10px] font-bold text-slate-400 hover:text-cyan-500 dark:text-slate-500 dark:hover:text-cyan-400 flex items-center mt-2 transition-colors cursor-pointer select-none"
+                                        >
+                                          {expandedPredictionIds[p.id] ? "Hide Others Edited" : "Show Others Edited"}
+                                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`ml-1 transition-transform ${expandedPredictionIds[p.id] ? "rotate-180" : ""}`}><path d="m6 9 6 6 6-6"/></svg>
+                                        </button>
                                       )}
 
-                                      {/* Edited Players */}
-                                      {otherPlayersBadges && otherPlayersBadges.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5 items-center">
-                                          <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 dark:text-slate-500 mr-1 select-none">Edited Players:</span>
-                                          <div className="flex flex-wrap gap-1.5">
-                                            {otherPlayersBadges}
-                                          </div>
+                                      {expandedPredictionIds[p.id] && (
+                                        <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
+                                          {/* Other Edited Teams */}
+                                          {otherTeamsBadges && otherTeamsBadges.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5 items-center">
+                                              <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 dark:text-slate-500 mr-1 select-none">Other Edited Teams:</span>
+                                              <div className="flex flex-wrap gap-1.5">
+                                                {otherTeamsBadges}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Edited Players */}
+                                          {otherPlayersBadges && otherPlayersBadges.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5 items-center">
+                                              <span className="text-[9px] uppercase tracking-wider font-extrabold text-slate-400 dark:text-slate-500 mr-1 select-none">Others Edited Players:</span>
+                                              <div className="flex flex-wrap gap-1.5">
+                                                {otherPlayersBadges}
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
                                       )}
 
@@ -740,8 +760,13 @@ export default function SavedPredictionsClient() {
                               <div className="flex items-center justify-end gap-2.5">
                                 <button
                                   onClick={() => handleLoadPrediction(p)}
-                                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 hover:border-cyan-400 hover:text-cyan-500 bg-white hover:bg-slate-50 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 dark:text-white transition cursor-pointer"
-                                  title="Load this simulation results and setup"
+                                  disabled={isDeletedCustomCountry}
+                                  className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition ${
+                                    isDeletedCustomCountry
+                                      ? "border-slate-200 bg-slate-100 text-slate-400 dark:border-white/5 dark:bg-white/5 dark:text-slate-500 cursor-not-allowed"
+                                      : "border-slate-200 hover:border-cyan-400 hover:text-cyan-500 bg-white hover:bg-slate-50 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 dark:text-white cursor-pointer"
+                                  }`}
+                                  title={isDeletedCustomCountry ? "This custom country has been deleted" : "Load this simulation results and setup"}
                                 >
                                   Load
                                 </button>
