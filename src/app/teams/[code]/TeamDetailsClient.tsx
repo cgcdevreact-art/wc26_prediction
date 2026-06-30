@@ -83,14 +83,15 @@ export default function TeamDetailsClient({
   const team = teams[teamCode];
 
   const teamPlayers = useMemo(() => {
-    return Object.values(players)
+    const sourcePlayers = Object.keys(players).length > 0 ? Object.values(players) : initialPlayers;
+    return sourcePlayers
       .filter(p => p["Team Code"] === teamCode)
       .sort((a, b) => {
         const ratingA = parseInt(a["Overall Rating"]?.replace("%", "") || "0");
         const ratingB = parseInt(b["Overall Rating"]?.replace("%", "") || "0");
         return ratingB - ratingA;
       });
-  }, [players, teamCode]);
+  }, [players, teamCode, initialPlayers]);
 
   const topPlayer = teamPlayers[0];
 

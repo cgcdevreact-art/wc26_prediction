@@ -81,8 +81,14 @@ export const useSimulationStore = create<SimulationState>()(
       selectedModel: "base",
 
        initializeData: (defaultTeams, defaultPlayers) => set((state) => {
-        // Only initialize if it hasn't been initialized yet, or if the state is missing teams
-        if (state.isInitialized && Object.keys(state.teams).length >= defaultTeams.length) return state;
+        // Only initialize if it hasn't been initialized yet, or if the state is missing teams or players
+        if (
+          state.isInitialized &&
+          Object.keys(state.teams).length >= defaultTeams.length &&
+          Object.keys(state.players).length >= defaultPlayers.length
+        ) {
+          return state;
+        }
 
         const teamsMap: Record<string, TeamStats> = {};
         defaultTeams.forEach((t) => {
