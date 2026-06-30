@@ -1716,7 +1716,7 @@ export default function CountryPredictionsClient({
         name: selectedTeam.name,
         flag: selectedTeam.flag,
         elo: Math.round(selectedTeam.elo),
-        championProb: Math.round((simResults.stages.champion / 1000) * 100),
+        championProb: Number(((simResults.stages.champion / 1000) * 100).toFixed(2)),
         stages: simResults.stages,
         modelName: selectedModel,
         customElo: customElo,
@@ -2696,7 +2696,7 @@ export default function CountryPredictionsClient({
                         </svg>
                         <div className="absolute text-center">
                           <div className="text-xl font-black font-mono text-slate-950 dark:text-foreground leading-none">
-                            {championProbability > 0 ? (100 / championProbability).toFixed(2) : "-"}
+                            {championProbability > 0 ? Math.min(100, 100 / championProbability).toFixed(2) : "-"}
                           </div>
                         </div>
                       </div>

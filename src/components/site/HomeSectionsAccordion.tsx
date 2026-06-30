@@ -9,7 +9,7 @@ import { WildcardCountrySection } from "@/components/site/WildcardCountrySection
 import { FixturesExplorer } from "@/components/site/FixturesExplorer";
 import { ChevronDown } from "lucide-react";
 
-const DEFAULT_OPEN_SECTIONS = [ "fixtures"];
+const DEFAULT_OPEN_SECTIONS = ["fixtures"];
 export const HOME_SECTION_OPEN_EVENT = "wc26:open-home-section";
 const PROBABILITY_SECTION_VALUE = "probability";
 
@@ -120,7 +120,7 @@ export function HomeSectionsAccordion() {
             {section.value === PROBABILITY_SECTION_VALUE ? (
               <Link
                 href="/predictions/country"
-                className="my-10 block overflow-hidden rounded-2xl border border-black/8 shadow-lg transition-opacity duration-300 hover:opacity-95 dark:border-white/10"
+                className="my-25 block overflow-hidden rounded-2xl border border-black/8 shadow-lg transition-opacity duration-300 hover:opacity-95 dark:border-white/10"
               >
                 <Image
                   src="/banner2.png"
