@@ -6,6 +6,20 @@ import Link from "next/link";
 export function Footer() {
   return (
     <footer className="border-t border-white/5 mt-10">
+      <div className="container mx-auto px-4 pt-10 pb-4">
+        <Link
+          href="/predictions/country"
+          className="block overflow-hidden rounded-2xl border border-black/8 shadow-lg transition-opacity duration-300 hover:opacity-95 dark:border-white/10"
+        >
+          <Image
+            src="/footerbanner.png"
+            alt="FIFA World Cup 2026 Banner"
+            width={1600}
+            height={500}
+            className="h-auto w-full"
+          />
+        </Link>
+      </div>
       <div className="container mx-auto grid gap-6 px-4 py-10 sm:grid-cols-2 lg:grid-cols-5">
         <div className="sm:col-span-2 lg:col-span-2 xl:col-span-1">
           <div className="flex items-center gap-2">

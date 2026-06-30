@@ -20,20 +20,6 @@ export default function Page() {
         <Hero />
         <LiveStats />
         <HomeSectionsAccordion />
-        <div className="container mx-auto px-4 pb-12">
-          <Link
-            href="/predictions/country"
-            className="mt-10 block overflow-hidden rounded-2xl border border-black/8 shadow-lg transition-opacity duration-300 hover:opacity-95 dark:border-white/10"
-          >
-            <Image
-              src="/footerbanner.png"
-              alt="FIFA World Cup 2026 Banner"
-              width={1600}
-              height={500}
-              className="h-auto w-full"
-            />
-          </Link>
-        </div>
       </main>
       <Footer />
       <ScrollToTop />
