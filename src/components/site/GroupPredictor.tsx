@@ -6,7 +6,7 @@ import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProv
 import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle, Brain, Cpu } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { StaminaBar, AlignmentGauge, TemperatureSlider } from "@/components/ui/SciFiControls";
-import { useSimulationStore } from "@/lib/store/simulationStore";
+import { useSimulationStore, PlayerStats } from "@/lib/store/simulationStore";
 import { toast } from "sonner";
 import { getMatchExpectedGoals } from "@/lib/simulation/model";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
@@ -175,7 +175,7 @@ function getGroupMatchDetails(
   const getCode = (id: string | number, nameEn: string) => {
     // 1. Static API ID mapping (highly reliable)
     const liveTeamIdMap: Record<string, string> = {
-      "1":"MEX","2":"RSA","3":"KOR","4":"CZE","5":"CAN","6":"BIH","7":"QAT","8":"SUI","9":"BRA","10":"MAR","11":"HAI","12":"SCO","13":"USA","14":"PAR","15":"AUS","16":"TUR","17":"GER","18":"CUW","19":"CIV","20":"ECU","21":"NED","22":"JPN","23":"SWE","24":"TUN","25":"BEL","26":"EGY","27":"IRN","28":"NZL","29":"ESP","30":"CPV","31":"KSA","32":"URU","33":"FRA","34":"SEN","35":"IRQ","36":"NOR","37":"ARG","38":"ALG","39":"AUT","40":"JOR","41":"POR","42":"COD","43":"UZB","44":"COL","45":"ENG","46":"CRO","47":"GHA","48":"PAN"
+      "1": "MEX", "2": "RSA", "3": "KOR", "4": "CZE", "5": "CAN", "6": "BIH", "7": "QAT", "8": "SUI", "9": "BRA", "10": "MAR", "11": "HAI", "12": "SCO", "13": "USA", "14": "PAR", "15": "AUS", "16": "TUR", "17": "GER", "18": "CUW", "19": "CIV", "20": "ECU", "21": "NED", "22": "JPN", "23": "SWE", "24": "TUN", "25": "BEL", "26": "EGY", "27": "IRN", "28": "NZL", "29": "ESP", "30": "CPV", "31": "KSA", "32": "URU", "33": "FRA", "34": "SEN", "35": "IRQ", "36": "NOR", "37": "ARG", "38": "ALG", "39": "AUT", "40": "JOR", "41": "POR", "42": "COD", "43": "UZB", "44": "COL", "45": "ENG", "46": "CRO", "47": "GHA", "48": "PAN"
     };
     const mappedCode = liveTeamIdMap[String(id)];
     if (mappedCode) return normalizeCode(mappedCode);
@@ -191,7 +191,7 @@ function getGroupMatchDetails(
     };
 
     const targetName = normalizeName(nameEn);
-    const t = teams.find((x: any) => 
+    const t = teams.find((x: any) =>
       (x.id !== undefined && x.id !== null && String(x.id) === String(id)) ||
       (x.name && targetName && normalizeName(x.name) === targetName)
     );
@@ -199,14 +199,14 @@ function getGroupMatchDetails(
   };
 
   const groupGames = allGames.filter((g: any) => g.group === group);
-  
+
   // Find match dynamically based on team codes
   let game = groupGames.find((g: any) => {
     const hCode = getCode(g.home_team_id, g.home_team_name_en || "");
     const aCode = getCode(g.away_team_id, g.away_team_name_en || "");
     const targetH = normalizeCode(homeCode);
     const targetA = normalizeCode(awayCode);
-    
+
     return (hCode === targetH && aCode === targetA) || (hCode === targetA && aCode === targetH);
   });
 
@@ -411,7 +411,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const GROUPS_CONFIG = useGroupsConfig();
   const cupResults = useCupResults();
   const { data: session } = useSession();
-  const { players: storePlayers, teams: storeTeams, isInitialized, initializeData, syncData, selectedModel, resetToDefaults, updatePlayer, updateTeam } = useSimulationStore();
+  const { players: storePlayers, teams: storeTeams, isInitialized, initializeData, syncData, selectedModel, resetToDefaults, updatePlayer, updateTeam, toggleTeamOverride, togglePlayerOverride } = useSimulationStore();
 
   const [bypassOverrides, setBypassOverrides] = useState(false);
   const [isOverridesModalOpen, setIsOverridesModalOpen] = useState(false);
@@ -439,7 +439,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   const getTeam = (code: string) => {
     const t = teams.find(t => t.code === code) || teams[0];
-    if (bypassOverrides && staticDefaultTeams.length > 0) {
+    const storeTeam = storeTeams[code];
+    const isTeamOverrideDisabled = storeTeam?.isCustom && storeTeam?.isOverrideDisabled;
+
+    if ((bypassOverrides || isTeamOverrideDisabled) && staticDefaultTeams.length > 0) {
       const defaultTeamData = staticDefaultTeams.find(dt => dt.name === t.name);
       if (defaultTeamData) {
         const minElo = 1276.66;
@@ -458,17 +461,33 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   };
 
   const players = useMemo(() => {
-    return bypassOverrides && Object.keys(staticDefaultPlayers).length > 0
-      ? staticDefaultPlayers
-      : storePlayers;
+    if (bypassOverrides && Object.keys(staticDefaultPlayers).length > 0) {
+      return staticDefaultPlayers;
+    }
+    const result: Record<string, PlayerStats> = { ...storePlayers };
+    if (Object.keys(staticDefaultPlayers).length > 0) {
+      Object.keys(result).forEach((key) => {
+        if (result[key]?.isCustom && result[key]?.isOverrideDisabled) {
+          const defaultPlayer = staticDefaultPlayers[key];
+          if (defaultPlayer) {
+            result[key] = {
+              ...defaultPlayer,
+              isCustom: true,
+              isOverrideDisabled: true,
+            };
+          }
+        }
+      });
+    }
+    return result;
   }, [bypassOverrides, staticDefaultPlayers, storePlayers]);
 
   const customPlayersCount = useMemo(() => {
-    return Object.values(storePlayers || {}).filter(p => p.isCustom).length;
+    return Object.values(storePlayers || {}).filter(p => p.isCustom && !p.isOverrideDisabled).length;
   }, [storePlayers]);
 
   const customTeamsCount = useMemo(() => {
-    return Object.values(storeTeams || {}).filter(t => t.isCustom).length;
+    return Object.values(storeTeams || {}).filter(t => t.isCustom && !t.isOverrideDisabled).length;
   }, [storeTeams]);
 
   const totalOverrides = customPlayersCount + customTeamsCount;
@@ -826,7 +845,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   }, [GROUPS_CONFIG, cupResults]);
 
   const [matches, setMatches] = useState<PredictorMatch[]>(initialMatches);
-  const [useRealScores, setUseRealScores] = useState(false);
+  const [useRealScores, setUseRealScores] = useState(true);
   const [preRealScoresMatches, setPreRealScoresMatches] = useState<PredictorMatch[] | null>(null);
 
   const disableRealScoresState = () => {
@@ -871,12 +890,12 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
       const getCode = (id: string | number, nameEn: string) => {
         const liveTeamIdMap: Record<string, string> = {
-          "1":"MEX","2":"RSA","3":"KOR","4":"CZE","5":"CAN","6":"BIH","7":"QAT","8":"SUI","9":"BRA","10":"MAR","11":"HAI","12":"SCO","13":"USA","14":"PAR","15":"AUS","16":"TUR","17":"GER","18":"CUW","19":"CIV","20":"ECU","21":"NED","22":"JPN","23":"SWE","24":"TUN","25":"BEL","26":"EGY","27":"IRN","28":"NZL","29":"ESP","30":"CPV","31":"KSA","32":"URU","33":"FRA","34":"SEN","35":"IRQ","36":"NOR","37":"ARG","38":"ALG","39":"AUT","40":"JOR","41":"POR","42":"COD","43":"UZB","44":"COL","45":"ENG","46":"CRO","47":"GHA","48":"PAN"
+          "1": "MEX", "2": "RSA", "3": "KOR", "4": "CZE", "5": "CAN", "6": "BIH", "7": "QAT", "8": "SUI", "9": "BRA", "10": "MAR", "11": "HAI", "12": "SCO", "13": "USA", "14": "PAR", "15": "AUS", "16": "TUR", "17": "GER", "18": "CUW", "19": "CIV", "20": "ECU", "21": "NED", "22": "JPN", "23": "SWE", "24": "TUN", "25": "BEL", "26": "EGY", "27": "IRN", "28": "NZL", "29": "ESP", "30": "CPV", "31": "KSA", "32": "URU", "33": "FRA", "34": "SEN", "35": "IRQ", "36": "NOR", "37": "ARG", "38": "ALG", "39": "AUT", "40": "JOR", "41": "POR", "42": "COD", "43": "UZB", "44": "COL", "45": "ENG", "46": "CRO", "47": "GHA", "48": "PAN"
         };
         const mappedCode = liveTeamIdMap[String(id)];
         if (mappedCode) return mappedCode.toUpperCase().trim();
         const targetName = nameEn.toLowerCase().trim();
-        const t = teams.find((x: any) => 
+        const t = teams.find((x: any) =>
           (x.id !== undefined && x.id !== null && String(x.id) === String(id)) ||
           (x.name && targetName && x.name.toLowerCase().trim() === targetName)
         );
@@ -904,12 +923,12 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
     const getCode = (id: string | number, nameEn: string) => {
       const liveTeamIdMap: Record<string, string> = {
-        "1":"MEX","2":"RSA","3":"KOR","4":"CZE","5":"CAN","6":"BIH","7":"QAT","8":"SUI","9":"BRA","10":"MAR","11":"HAI","12":"SCO","13":"USA","14":"PAR","15":"AUS","16":"TUR","17":"GER","18":"CUW","19":"CIV","20":"ECU","21":"NED","22":"JPN","23":"SWE","24":"TUN","25":"BEL","26":"EGY","27":"IRN","28":"NZL","29":"ESP","30":"CPV","31":"KSA","32":"URU","33":"FRA","34":"SEN","35":"IRQ","36":"NOR","37":"ARG","38":"ALG","39":"AUT","40":"JOR","41":"POR","42":"COD","43":"UZB","44":"COL","45":"ENG","46":"CRO","47":"GHA","48":"PAN"
+        "1": "MEX", "2": "RSA", "3": "KOR", "4": "CZE", "5": "CAN", "6": "BIH", "7": "QAT", "8": "SUI", "9": "BRA", "10": "MAR", "11": "HAI", "12": "SCO", "13": "USA", "14": "PAR", "15": "AUS", "16": "TUR", "17": "GER", "18": "CUW", "19": "CIV", "20": "ECU", "21": "NED", "22": "JPN", "23": "SWE", "24": "TUN", "25": "BEL", "26": "EGY", "27": "IRN", "28": "NZL", "29": "ESP", "30": "CPV", "31": "KSA", "32": "URU", "33": "FRA", "34": "SEN", "35": "IRQ", "36": "NOR", "37": "ARG", "38": "ALG", "39": "AUT", "40": "JOR", "41": "POR", "42": "COD", "43": "UZB", "44": "COL", "45": "ENG", "46": "CRO", "47": "GHA", "48": "PAN"
       };
       const mappedCode = liveTeamIdMap[String(id)];
       if (mappedCode) return mappedCode.toUpperCase().trim();
       const targetName = nameEn.toLowerCase().trim();
-      const t = teams.find((x: any) => 
+      const t = teams.find((x: any) =>
         (x.id !== undefined && x.id !== null && String(x.id) === String(id)) ||
         (x.name && targetName && x.name.toLowerCase().trim() === targetName)
       );
@@ -955,10 +974,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     syncKnockoutBracketRef.current = syncKnockoutBracket;
   });
 
+  const [preRealScoresKoWinners, setPreRealScoresKoWinners] = useState<typeof koWinners | null>(null);
+
   const handleToggleRealScores = (checked: boolean) => {
     setUseRealScores(checked);
     if (checked) {
       setPreRealScoresMatches(matches);
+      setPreRealScoresKoWinners(koWinners);
       const updatedMatches = applyRealScores(matches);
       setMatches(updatedMatches);
       if (syncKnockoutBracketRef.current) {
@@ -968,7 +990,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       if (preRealScoresMatches) {
         setMatches(preRealScoresMatches);
       }
+      if (preRealScoresKoWinners) {
+        setKoWinners(preRealScoresKoWinners);
+      }
       setPreRealScoresMatches(null);
+      setPreRealScoresKoWinners(null);
     }
   };
 
@@ -981,6 +1007,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         return prev.homeScore !== m.homeScore || prev.awayScore !== m.awayScore;
       });
       if (hasChanged) {
+        setPreRealScoresMatches((prev) => prev || currentMatches);
         setMatches(updatedMatches);
         if (syncKnockoutBracketRef.current) {
           syncKnockoutBracketRef.current(updatedMatches);
@@ -1077,7 +1104,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const [currentSlot, setCurrentSlot] = useState<number | null>(null);
   const [allPredictions, setAllPredictions] = useState<any[]>([]);
   const [slotNames, setSlotNames] = useState<Record<number, string>>({
-    0: "Official Prediction", 1: "Save 1", 2: "Save 2", 3: "Save 3", 4: "Save 4", 5: "Save 5"
+    0: "User Prediction", 1: "Save 1", 2: "Save 2", 3: "Save 3", 4: "Save 4", 5: "Save 5"
   });
   const [slotDates, setSlotDates] = useState<Record<number, string>>({
     0: "", 1: "", 2: "", 3: "", 4: "", 5: ""
@@ -1331,7 +1358,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   useEffect(() => {
     if (allPredictions.length === 0) return;
 
-    const names: Record<number, string> = { 0: "Official Prediction", 1: "Save 1", 2: "Save 2", 3: "Save 3", 4: "Save 4", 5: "Save 5" };
+    const names: Record<number, string> = { 0: "User Prediction", 1: "Save 1", 2: "Save 2", 3: "Save 3", 4: "Save 4", 5: "Save 5" };
     const dates: Record<number, string> = { 0: "", 1: "", 2: "", 3: "", 4: "", 5: "" };
     const summaries: Record<number, any> = {};
 
@@ -1372,12 +1399,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setSlotSummaries(summaries);
   }, [allPredictions]);
 
+  const hasLoadedInitialPredictions = useRef(false);
+
   // Load predictions from DB on authentication
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || hasLoadedInitialPredictions.current) return;
 
     const fetchUserPredictions = async () => {
       const preds = await fetchAllUserPredictions();
+      hasLoadedInitialPredictions.current = true;
       if (!preds || preds.length === 0) return;
 
       const groupPreds = preds.filter((p: any) => p.type === "MATCH_SCORE");
@@ -1441,7 +1471,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     };
 
     fetchUserPredictions();
-  }, [session]);
+  }, [session?.user?.id]);
 
   const handleLoadFromSlot = async (slotId: number | null) => {
     disableRealScoresState();
@@ -1509,7 +1539,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setThirdWinner(loadedThirdWinner);
     setThirdScores(loadedThirdScores);
     setCurrentSlot(slotId);
-    toast.success(slotId ? `Successfully loaded progress from Save Slot "${slotNames[slotId]}"!` : "Successfully loaded Official Prediction!");
+    toast.success(slotId ? `Successfully loaded progress from Save Slot "${slotNames[slotId]}"!` : "Successfully loaded User Prediction!");
   };
 
   const handleRenameSlot = async (slotId: number, newName: string) => {
@@ -1794,7 +1824,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     }
 
     const metadataSlot = targetSlot !== null ? targetSlot : 0;
-    const slotName = metadataSlot === 0 ? "Official Prediction" : (slotNames[metadataSlot] || `Save Slot ${metadataSlot}`);
+    const slotName = metadataSlot === 0 ? "User Prediction" : (slotNames[metadataSlot] || `Save Slot ${metadataSlot}`);
     const summary = getPredictionSummary(
       updatedMatches,
       activeWinners,
@@ -1963,7 +1993,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       { home: getWinner("I"), away: getWinner("J") },
       { home: getWinner("K"), away: getWinner("L") },
     ];
-  }, [isGroupStageComplete, standings, thirdPlaceStandings]);
+  }, [isGroupStageComplete, standings, thirdPlaceStandings, useRealScores, liveGames, teams]);
 
   const koMatchups = useMemo(() => {
     const matchups: Record<string, { home: string | null; away: string | null }[]> = {
@@ -1990,15 +2020,40 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   }, [r32Teams, koWinners]);
 
   const topTeamsData = useMemo(() => {
+    const isBracketSynced = () => {
+      for (let i = 0; i < 16; i++) {
+        const winner = koWinners.r32[i];
+        if (winner) {
+          const match = r32Teams[i];
+          if (winner !== match.home && winner !== match.away) {
+            return false;
+          }
+        }
+      }
+      return true;
+    };
+
+    const isSynced = isBracketSynced();
+
     const isEliminated = (teamCode: string) => {
-      if (koWinners.final[0] && koWinners.final[0] !== teamCode) return true;
+      if (!isSynced) return false;
+
+      const finalMatch = koMatchups.final[0];
+      const finalWinner = koWinners.final[0];
+
+      if (finalWinner && finalMatch && (finalWinner === finalMatch.home || finalWinner === finalMatch.away)) {
+        if (finalWinner !== teamCode) return true;
+      }
+
       for (const round of ["r32", "r16", "qf", "sf", "final"] as const) {
         for (let i = 0; i < koMatchups[round].length; i++) {
           const match = koMatchups[round][i];
           if (match.home === teamCode || match.away === teamCode) {
             const winner = koWinners[round][i];
-            if (winner !== null && winner !== teamCode) {
-              return true;
+            if (winner !== null && (winner === match.home || winner === match.away)) {
+              if (winner !== teamCode) {
+                return true;
+              }
             }
           }
         }
@@ -2022,8 +2077,16 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     return [...teams]
       .map(t => {
         const eliminated = isTeamEliminated(t.code);
-        // ELO/rating-based win probability
-        const winProb = t.prob.champion;
+
+        // Calculate true live probability
+        let winProb = t.prob.champion;
+        if (eliminated) {
+          winProb = 0;
+        } else if (totalAliveProb > 0) {
+          // Normalize the probability among the remaining alive teams
+          winProb = (t.prob.champion / totalAliveProb) * 100;
+        }
+
         return {
           name: t.name,
           code: t.code,
@@ -2032,14 +2095,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           isEliminated: eliminated
         };
       })
-      .sort((a, b) => {
-        if (a.isEliminated !== b.isEliminated) {
-          return a.isEliminated ? 1 : -1;
-        }
-        return b.winProb - a.winProb;
-      })
+      .sort((a, b) => b.winProb - a.winProb)
       .slice(0, 8);
-  }, [teams, koMatchups, koWinners, r32Teams, isGroupStageComplete]);
+  }, [teams, koMatchups, koWinners, r32Teams, isGroupStageComplete, useRealScores]);
 
   // Computed losers of SF for the 3rd place match
   const sfLosers = useMemo(() => {
@@ -2376,11 +2434,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const computeR32TeamsSync = (currentStandings: Record<string, TeamStanding[]>, thirdPlaces: TeamStanding[]) => {
     const bestThirdPlaces = thirdPlaces.slice(0, 8).map((t) => t.code);
 
-    const getWinner = (grp: string) => currentStandings[grp][0].code;
-    const getRunner = (grp: string) => currentStandings[grp][1].code;
+    const getWinner = (grp: string) => currentStandings[grp]?.[0]?.code || "";
+    const getRunner = (grp: string) => currentStandings[grp]?.[1]?.code || "";
     const getThird = (idx: number) => bestThirdPlaces[idx] || "ARG";
 
-    return [
+    const fallbackPairs = [
       { home: getWinner("A"), away: getThird(7) },
       { home: getRunner("B"), away: getRunner("C") },
       { home: getWinner("C"), away: getThird(6) },
@@ -2398,100 +2456,47 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       { home: getWinner("I"), away: getWinner("J") },
       { home: getWinner("K"), away: getWinner("L") },
     ];
+
+    if (useRealScores && liveGames && liveGames.length > 0) {
+      const liveR32 = liveGames
+        .filter((f: any) => f.isKnockout && f.stageName === "Round of 32")
+        .sort((a, b) => a.match_no - b.match_no);
+
+      if (liveR32.length === 16) {
+        const isValidCode = (c: string) => c && c.length === 3 && !c.match(/Winner|Runner|3rd|TBC|TBD/i);
+
+        return fallbackPairs.map((pair, idx) => {
+          const match = liveR32[idx];
+          if (match) {
+            const liveHomeCode = (match.homeTeamObj?.code || "").trim().toUpperCase();
+            const liveAwayCode = (match.awayTeamObj?.code || "").trim().toUpperCase();
+
+            return {
+              home: isValidCode(liveHomeCode) ? liveHomeCode : pair.home,
+              away: isValidCode(liveAwayCode) ? liveAwayCode : pair.away
+            };
+          }
+          return pair;
+        });
+      }
+    }
+
+    return fallbackPairs;
   };
 
   const syncKnockoutBracket = (currentMatches: PredictorMatch[]) => {
-    const currentStandings = computeStandingsSync(currentMatches);
-    const currentThirdPlaces = computeThirdPlaceStandingsSync(currentStandings);
-    const r32Pairs = computeR32TeamsSync(currentStandings, currentThirdPlaces);
-
-    const updatedWinners = {
+    // Clear the knockout bracket because the group stage standings have changed,
+    // invalidating the previous teams in the bracket. We should not auto-simulate this!
+    setKoWinners({
       r32: Array(16).fill(null),
       r16: Array(8).fill(null),
       qf: Array(4).fill(null),
       sf: Array(2).fill(null),
       final: Array(1).fill(null),
-    };
-    const updatedScores: Record<string, { home: number | ""; away: number | "" }> = {};
-
-    // Simulate R32
-    r32Pairs.forEach((pair, idx) => {
-      if (!pair.home || !pair.away) return;
-      const { hs, as, winner } = simulateKoMatch(pair.home, pair.away);
-      updatedWinners.r32[idx] = winner;
-      updatedScores[`r32-${idx}`] = { home: hs, away: as };
     });
-
-    // R16
-    for (let idx = 0; idx < 8; idx++) {
-      const home = updatedWinners.r32[2 * idx];
-      const away = updatedWinners.r32[2 * idx + 1];
-      if (!home || !away) continue;
-      const { hs, as, winner } = simulateKoMatch(home, away);
-      updatedWinners.r16[idx] = winner;
-      updatedScores[`r16-${idx}`] = { home: hs, away: as };
-    }
-
-    // QF
-    for (let idx = 0; idx < 4; idx++) {
-      const home = updatedWinners.r16[2 * idx];
-      const away = updatedWinners.r16[2 * idx + 1];
-      if (!home || !away) continue;
-      const { hs, as, winner } = simulateKoMatch(home, away);
-      updatedWinners.qf[idx] = winner;
-      updatedScores[`qf-${idx}`] = { home: hs, away: as };
-    }
-
-    // SF
-    for (let idx = 0; idx < 2; idx++) {
-      const home = updatedWinners.qf[2 * idx];
-      const away = updatedWinners.qf[2 * idx + 1];
-      if (!home || !away) continue;
-      const { hs, as, winner } = simulateKoMatch(home, away);
-      updatedWinners.sf[idx] = winner;
-      updatedScores[`sf-${idx}`] = { home: hs, away: as };
-    }
-
-    // Final
-    const homeFinal = updatedWinners.sf[0];
-    const awayFinal = updatedWinners.sf[1];
-    if (homeFinal && awayFinal) {
-      const { hs, as, winner } = simulateKoMatch(homeFinal, awayFinal);
-      updatedWinners.final[0] = winner;
-      updatedScores[`final-0`] = { home: hs, away: as };
-    }
-
-    // 3rd Place Match
-    const homeMatch = { home: updatedWinners.qf[0], away: updatedWinners.qf[1] };
-    const awayMatch = { home: updatedWinners.qf[2], away: updatedWinners.qf[3] };
-    const homeWinner = updatedWinners.sf[0];
-    const awayWinner = updatedWinners.sf[1];
-
-    let homeLoser: string | null = null;
-    let awayLoser: string | null = null;
-
-    if (homeMatch.home && homeMatch.away && homeWinner) {
-      homeLoser = homeWinner === homeMatch.home ? homeMatch.away : homeMatch.home;
-    }
-    if (awayMatch.home && awayMatch.away && awayWinner) {
-      awayLoser = awayWinner === awayMatch.home ? awayMatch.away : awayMatch.home;
-    }
-
-    let simulatedThirdWinner: string | null = null;
-    let simulatedThirdScores: { home: number | ""; away: number | "" } = { home: "", away: "" };
-
-    if (homeLoser && awayLoser) {
-      const { hs, as, winner } = simulateKoMatch(homeLoser, awayLoser);
-      simulatedThirdWinner = winner;
-      simulatedThirdScores = { home: hs, away: as };
-    }
-
-    setKoWinners(updatedWinners);
-    setKoScores(updatedScores);
-    setThirdWinner(simulatedThirdWinner);
-    setThirdScores(simulatedThirdScores);
-
-    saveBulkToDb(currentMatches, updatedWinners, updatedScores, simulatedThirdWinner, simulatedThirdScores);
+    setKoScores({});
+    setThirdWinner(null);
+    setThirdScores({ home: "", away: "" });
   };
 
   const handleWholeTournamentSimulation = () => {
@@ -2958,7 +2963,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             </h1>
             {session?.user?.id && (
               <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30 mt-1">
-                Active Slot: {currentSlot !== null ? slotNames[currentSlot] : "Official Prediction"}
+                Active Slot: {currentSlot !== null ? slotNames[currentSlot] : "User Prediction"}
               </span>
             )}
           </div>
@@ -2983,11 +2988,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             )
           )}
           <label
-            className={`inline-flex min-h-[56px] w-full items-center justify-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto sm:min-w-[180px] ${
-              useRealScores
-                ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
-                : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-700 dark:text-slate-300 dark:hover:bg-white/5"
-            }`}
+            className={`inline-flex min-h-[56px] w-full items-center justify-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto sm:min-w-[180px] ${useRealScores
+              ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+              : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-700 dark:text-slate-300 dark:hover:bg-white/5"
+              }`}
           >
             <input
               type="checkbox"
@@ -2999,18 +3003,17 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
             <div className="flex items-center gap-1.5">
               <Zap className={`h-4 w-4 transition-all duration-300 ${useRealScores ? "text-cyan-500 fill-cyan-500 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)] animate-pulse" : "text-slate-400 dark:text-slate-500"}`} />
               <span className="text-xs font-bold leading-none select-none">
-                Include Real-Time Data ({groupRealPercent}%)
+                Include Real-Time Results ({groupRealPercent}%)
               </span>
             </div>
           </label>
 
           {totalOverrides > 0 && (
             <label
-              className={`inline-flex min-h-[56px] items-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${
-                bypassOverrides
-                  ? "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
-                  : "bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.15)] animate-pulse"
-              }`}
+              className={`inline-flex min-h-[56px] items-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${bypassOverrides
+                ? "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
+                : "bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.15)] animate-pulse"
+                }`}
             >
               <input
                 type="checkbox"
@@ -3026,7 +3029,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               }}>
                 <Award className={`h-4 w-4 ${bypassOverrides ? "text-slate-400" : "text-purple-500 fill-purple-500/20"}`} />
                 <span className="text-xs font-bold leading-none select-none hover:underline">
-                  {!bypassOverrides ? "Custom Stats Applied" : "Custom Stats Bypassed"} ({totalOverrides})
+                  {!bypassOverrides ? "My Customizations Applied" : "Apply My Customizations"} ({totalOverrides})
                 </span>
               </div>
             </label>
@@ -3172,7 +3175,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       {activeTab === "group" && (
         <ScoreTrendGraph
           matches={matches}
-          predictionMatches={useRealScores && preRealScoresMatches ? preRealScoresMatches : matches}
+          predictionMatches={useRealScores ? (preRealScoresMatches || initialMatches) : matches}
           teams={teams}
           liveGames={liveGames}
           liveStadiums={liveStadiums}
@@ -3217,9 +3220,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         <div className="space-y-6">
           {/* Real-life Scores Integrator */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl glass-strong border border-border/40 bg-slate-900/10 dark:bg-black/10 shadow-glass">
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
                 id="use-actual-scores"
                 checked={useRealScores}
                 onChange={(e) => handleToggleRealScores(e.target.checked)}
@@ -3365,7 +3368,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 />
                                 <span className="truncate flex items-center gap-1">
                                   {row.team.name}
-                                  {row.team.isCustom && !bypassOverrides && (
+                                  {row.team.isCustom && !bypassOverrides && !storeTeams[row.team.code]?.isOverrideDisabled && (
                                     <span title="Custom team stats active" className="inline-flex shrink-0">
                                       <Sparkles className="h-3 w-3 text-purple-500 fill-purple-500/20 animate-pulse" />
                                     </span>
@@ -3410,11 +3413,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 })()}
                               </td>
                               <td className="py-1 text-right text-muted-foreground truncate max-w-[100px] flex items-center justify-end gap-1" title={topPlayerDisp}>
-                                <span className={`${topPlayer?.isCustom && !bypassOverrides ? "text-purple-400 font-bold" : "text-neon/90"} font-medium`}>
+                                <span className={`${topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled ? "text-purple-400 font-bold" : "text-neon/90"} font-medium`}>
                                   {topPlayerName || "N/A"}
                                 </span>
                                 {topPlayerRating && <span className="text-[10px] ml-1 text-foreground/50 dark:text-white/40">({topPlayerRating})</span>}
-                                {topPlayer?.isCustom && !bypassOverrides && (
+                                {topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled && (
                                   <span title="Player stats edited" className="inline-flex shrink-0">
                                     <Sparkles className="h-2.5 w-2.5 text-purple-500 fill-purple-500/20" />
                                   </span>
@@ -3456,7 +3459,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               )
                             )}
                             <span className="opacity-40">#{details.matchNumber}</span>
-                            {((storeTeams[m.homeCode]?.isCustom || storeTeams[m.awayCode]?.isCustom) && !bypassOverrides) && (
+                            {(((storeTeams[m.homeCode]?.isCustom && !storeTeams[m.homeCode]?.isOverrideDisabled) || (storeTeams[m.awayCode]?.isCustom && !storeTeams[m.awayCode]?.isOverrideDisabled)) && !bypassOverrides) && (
                               <span className="inline-block text-[7px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 w-fit font-black uppercase tracking-widest leading-none mt-0.5" title="Simulation includes overridden players/stats">
                                 Adjusted
                               </span>
@@ -4354,7 +4357,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                     </div>
 
                     {/* Player Out Dropdown */}
-                    <div className="pt-2">
+                    {/* <div className="pt-2">
                       <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-1">Missing Player Penalty</span>
                       <select
                         value={simHomePlayerOut}
@@ -4368,7 +4371,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </div> */}
                   </div>
 
                   {/* Away Team Modifiers */}
@@ -4389,7 +4392,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                     </div>
 
                     {/* Player Out Dropdown */}
-                    <div className="pt-2">
+                    {/* <div className="pt-2">
                       <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-1">Missing Player Penalty</span>
                       <select
                         value={simAwayPlayerOut}
@@ -4403,7 +4406,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
 
@@ -4594,7 +4597,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       <div className="flex-grow min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           {isOfficial ? (
-                            <span className="text-[10px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-widest bg-cyan-50 dark:bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-800/30">Official</span>
+                            <span className="text-[10px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-widest bg-cyan-50 dark:bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-800/30">User</span>
                           ) : (
                             <span className="text-xs font-mono font-bold text-slate-550 dark:text-slate-400">Slot {slotId}</span>
                           )}
@@ -4630,7 +4633,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           ) : (
                             <div className="flex items-center gap-1.5 min-w-0">
                               <span className={`font-display font-extrabold text-sm truncate ${hasData ? "text-slate-800 dark:text-slate-100" : "text-slate-400 italic dark:text-slate-500"}`}>
-                                {isOfficial ? "Official Active Prediction" : slotNames[slotId]}
+                                {isOfficial ? "User Active Prediction" : slotNames[slotId]}
                               </span>
                               {!isOfficial && (
                                 <button
@@ -4689,7 +4692,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               setSlotToOverwriteConfirm(slotId);
                             } else {
                               saveBulkToDb(matches, koWinners, koScores, thirdWinner, thirdScores, true, isOfficial ? null : slotId);
-                              toast.success(isOfficial ? "Saved to Official Prediction!" : `Progress saved to Slot "${slotNames[slotId]}"!`);
+                              toast.success(isOfficial ? "Saved to User Prediction!" : `Progress saved to Slot "${slotNames[slotId]}"!`);
                             }
                           }}
                           className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 ${hasData
@@ -4717,7 +4720,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                         <div className="flex items-center gap-2">
                           <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 animate-bounce" />
                           <span className="text-xs text-slate-700 dark:text-slate-200 font-medium">
-                            Overwrite <strong className="text-amber-600 dark:text-amber-400">"{isOfficial ? "Official Active Prediction" : slotNames[slotId]}"</strong>? The existing save will be replaced.
+                            Overwrite <strong className="text-amber-600 dark:text-amber-400">"{isOfficial ? "User Active Prediction" : slotNames[slotId]}"</strong>? The existing save will be replaced.
                           </span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -4730,7 +4733,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           <button
                             onClick={async () => {
                               await saveBulkToDb(matches, koWinners, koScores, thirdWinner, thirdScores, true, isOfficial ? null : slotId);
-                              toast.success(isOfficial ? "Saved to Official Prediction!" : `Progress saved to Slot "${slotNames[slotId]}"!`);
+                              toast.success(isOfficial ? "Saved to User Prediction!" : `Progress saved to Slot "${slotNames[slotId]}"!`);
                               setSlotToOverwriteConfirm(null);
                             }}
                             className="px-3.5 py-1 text-[11px] font-black rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 transition hover:brightness-110 active:scale-95"
@@ -4810,7 +4813,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
             {/* Modal Footer */}
             <div className="mt-6 pt-4 border-t border-slate-200 dark:border-white/5 flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-              <span>Active Save Target: <strong className="text-cyan-500 dark:text-cyan-400">{currentSlot ? slotNames[currentSlot] : "Official Prediction"}</strong></span>
+              <span>Active Save Target: <strong className="text-cyan-500 dark:text-cyan-400">{currentSlot ? slotNames[currentSlot] : "User Prediction"}</strong></span>
               <button
                 onClick={() => setIsSavesModalOpen(false)}
                 className="px-4 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-white transition"
@@ -4840,11 +4843,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       <button
                         type="button"
                         onClick={() => setSimScope("whole")}
-                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${
-                          simScope === "whole"
-                            ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
-                            : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
-                        }`}
+                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${simScope === "whole"
+                          ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+                          : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
+                          }`}
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <Trophy className={`h-4 w-4 ${simScope === "whole" ? "text-cyan-500" : "text-slate-400"}`} />
@@ -4859,11 +4861,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       <button
                         type="button"
                         onClick={() => setSimScope("r32")}
-                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${
-                          simScope === "r32"
-                            ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
-                            : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
-                        }`}
+                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${simScope === "r32"
+                          ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+                          : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
+                          }`}
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <Sparkles className={`h-4 w-4 ${simScope === "r32" ? "text-cyan-500" : "text-slate-400"}`} />
@@ -4954,8 +4955,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                     {Object.values(storeTeams || {}).filter(t => t.isCustom).map((t) => {
                       const staticDefault = staticDefaultTeams.find(dt => dt.name === t.Team);
                       return (
-                        <div key={t["Team Code"]} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        <div key={t["Team Code"]} className={`flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 ${t.isOverrideDisabled ? "opacity-55" : ""}`}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={!t.isOverrideDisabled}
+                              onChange={() => toggleTeamOverride(t["Team Code"])}
+                              className="h-4 w-4 rounded border-slate-300 dark:border-white/20 text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0"
+                              title="Enable/Disable this override"
+                            />
                             <CountryFlag
                               code={t["Team Code"]}
                               flag={getTeam(t["Team Code"])?.flag}
@@ -5008,8 +5016,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       const key = `${p["Team Code"]}-${p["Player Name"]}`;
                       const staticDefault = staticDefaultPlayers[key];
                       return (
-                        <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        <div key={key} className={`flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 ${p.isOverrideDisabled ? "opacity-55" : ""}`}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={!p.isOverrideDisabled}
+                              onChange={() => togglePlayerOverride(key)}
+                              className="h-4 w-4 rounded border-slate-300 dark:border-white/20 text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0"
+                              title="Enable/Disable this override"
+                            />
                             <CountryFlag
                               code={p["Team Code"]}
                               flag={getTeam(p["Team Code"])?.flag}

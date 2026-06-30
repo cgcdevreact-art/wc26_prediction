@@ -76,6 +76,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     ] : []),
   ],
   callbacks: {
+    async signIn({ user }) {
+      if (user.email) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: user.email },
+        });
+        if (dbUser?.isBlocked) {
+          return false;
+        }
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
@@ -93,6 +104,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
 
         if (dbUser) {
+          if (dbUser.isBlocked) {
+            // Force logout by returning null session
+            return null as any;
+          }
           let tier = dbUser.subscriptionTier;
 
           // Check if subscription has expired

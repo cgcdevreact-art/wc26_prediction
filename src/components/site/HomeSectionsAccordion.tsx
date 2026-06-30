@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ProbabilityExplorer } from "@/components/site/ProbabilityExplorer";
 import { WildcardCountrySection } from "@/components/site/WildcardCountrySection";
 import { FixturesExplorer } from "@/components/site/FixturesExplorer";
 import { ChevronDown } from "lucide-react";
 
-const DEFAULT_OPEN_SECTIONS = [ "fixtures"];
+const DEFAULT_OPEN_SECTIONS = ["fixtures"];
 export const HOME_SECTION_OPEN_EVENT = "wc26:open-home-section";
 const PROBABILITY_SECTION_VALUE = "probability";
 
@@ -86,35 +88,50 @@ export function HomeSectionsAccordion() {
         const isOpen = openItems.includes(section.value);
 
         return (
-          <AccordionItem
-            key={section.value}
-            value={section.value}
-            id={section.value === PROBABILITY_SECTION_VALUE ? "predict" : section.value === "fixtures" ? "fixtures" : undefined}
-            className="overflow-visible border-none bg-transparent shadow-none"
-          >
-            <AccordionTrigger className="group relative w-full cursor-pointer flex-col justify-between gap-6 border-b border-slate-300/90 pb-6 text-left hover:no-underline dark:border-white/15 sm:flex-row sm:items-end [&>svg]:hidden">
-              <div className="pointer-events-none absolute inset-x-[-2%] -top-6 h-24 rounded-[2.5rem] bg-gradient-to-r from-neon/20 via-cyan-400/18 to-neon-2/20 opacity-0 blur-3xl transition-opacity duration-300 group-hover:opacity-100 dark:from-neon/16 dark:via-cyan-400/14 dark:to-neon-2/16" />
-              <div className="max-w-3xl">
-                <div className="text-xs uppercase tracking-[0.25em] text-neon font-bold">{section.eyebrow}</div>
-                <h2 className="mt-2 font-display text-3xl font-extrabold sm:text-4xl text-foreground dark:text-white tracking-tight">
-                  {section.title}
-                </h2>
-                {section.sub && (
-                  <p className="mt-3 text-muted-foreground text-sm font-normal leading-relaxed">
-                    {section.sub}
-                  </p>
-                )}
-              </div>
-              <div className="relative shrink-0 self-start pt-2 sm:self-auto sm:pt-0">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300/80 bg-white/85 text-foreground/80 shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition group-hover:bg-white group-hover:shadow-[0_0_24px_rgba(6,182,212,0.18)] dark:border-white/12 dark:bg-white/5 dark:group-hover:bg-white/10 dark:group-hover:shadow-[0_0_24px_rgba(178,57,210,0.16)]">
-                  <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${isOpen ? "rotate-180" : "rotate-0"}`} />
-                </span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="[&>div]:pb-0">
-              <div className={section.contentClassName}>{section.content}</div>
-            </AccordionContent>
-          </AccordionItem>
+          <div key={section.value} className="space-y-8">
+            <AccordionItem
+              value={section.value}
+              id={section.value === PROBABILITY_SECTION_VALUE ? "predict" : section.value === "fixtures" ? "fixtures" : undefined}
+              className="overflow-visible border-none bg-transparent shadow-none"
+            >
+              <AccordionTrigger className="group relative w-full cursor-pointer flex-col justify-between gap-6 border-b border-slate-300/90 pb-6 text-left hover:no-underline dark:border-white/15 sm:flex-row sm:items-end [&>svg]:hidden">
+                <div className="pointer-events-none absolute inset-x-[-2%] -top-6 h-24 rounded-[2.5rem] bg-gradient-to-r from-neon/20 via-cyan-400/18 to-neon-2/20 opacity-0 blur-3xl transition-opacity duration-300 group-hover:opacity-100 dark:from-neon/16 dark:via-cyan-400/14 dark:to-neon-2/16" />
+                <div className="max-w-3xl">
+                  <div className="text-xs uppercase tracking-[0.25em] text-neon font-bold">{section.eyebrow}</div>
+                  <h2 className="mt-2 font-display text-3xl font-extrabold sm:text-4xl text-foreground dark:text-white tracking-tight">
+                    {section.title}
+                  </h2>
+                  {section.sub && (
+                    <p className="mt-3 text-muted-foreground text-sm font-normal leading-relaxed">
+                      {section.sub}
+                    </p>
+                  )}
+                </div>
+                <div className="relative shrink-0 self-start pt-2 sm:self-auto sm:pt-0">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300/80 bg-white/85 text-foreground/80 shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition group-hover:bg-white group-hover:shadow-[0_0_24px_rgba(6,182,212,0.18)] dark:border-white/12 dark:bg-white/5 dark:group-hover:bg-white/10 dark:group-hover:shadow-[0_0_24px_rgba(178,57,210,0.16)]">
+                    <ChevronDown className={`w-5 h-5 transition-transform duration-300 ${isOpen ? "rotate-180" : "rotate-0"}`} />
+                  </span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="[&>div]:pb-0">
+                <div className={section.contentClassName}>{section.content}</div>
+              </AccordionContent>
+            </AccordionItem>
+            {section.value === PROBABILITY_SECTION_VALUE ? (
+              <Link
+                href="/predictions/country"
+                className="my-25 block overflow-hidden rounded-2xl border border-black/8 shadow-lg transition-opacity duration-300 hover:opacity-95 dark:border-white/10"
+              >
+                <Image
+                  src="/banner2.png"
+                  alt="FIFA World Cup 2026 banner"
+                  width={1600}
+                  height={500}
+                  className="h-auto w-full"
+                />
+              </Link>
+            ) : null}
+          </div>
         );
       })}
     </Accordion>

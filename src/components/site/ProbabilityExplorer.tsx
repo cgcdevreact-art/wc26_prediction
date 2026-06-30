@@ -249,7 +249,7 @@ export function ProbabilityExplorer() {
                     <div className="flex w-full flex-col items-center justify-center rounded-2xl border border-border bg-muted/60 p-6 text-center shadow-glass relative group overflow-hidden dark:border-white/10 dark:bg-white/[0.04] xl:max-w-sm xl:min-w-[200px] xl:w-auto">
                       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-neon/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-extrabold relative z-10">
-                        Championship Prob
+                        Championship Odds
                       </span>
 
                       <div className="relative flex items-center justify-center my-4 z-10">
@@ -283,7 +283,7 @@ export function ProbabilityExplorer() {
                         </svg>
                         <div className="absolute text-center">
                           <div className="text-2xl font-black font-mono text-foreground leading-none">
-                            {team.prob.champion.toFixed(1)}%
+                            {team.prob.champion > 0 ? (100 / team.prob.champion).toFixed(2) : "-"}
                           </div>
                         </div>
                       </div>

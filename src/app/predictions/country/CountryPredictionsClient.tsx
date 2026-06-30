@@ -5,7 +5,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { useSimulationStore, PlayerStats, TeamStats } from "@/lib/store/simulationStore";
-import { useTeams, useGroupsConfig } from "@/components/TeamsProvider";
+import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
 import { getMatchExpectedGoals, SimTeam } from "@/lib/simulation/model";
 import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check, PencilLine, Lock, Trash2, X, Info, Minus, Plus, Shield, Zap, Coins, Cpu, Award, Route } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,8 @@ function clampRating(value: number, min = 1, max = 99) {
 type SimulationModel = "base" | "advanced" | "pro";
 
 const COUNTRY_SIMULATION_SNAPSHOT_KEY = "wc26_country_last_simulation_v1";
+const TOTAL_TOURNAMENT_MATCHES = 104;
+const GROUP_STAGE_RESULT_KEY_PATTERN = /^[A-L]-\d{2}$/;
 
 type CountrySimulationResults = {
   stages: Record<string, number>;
@@ -80,6 +82,8 @@ type SimulationSnapshot = {
   playersIn: string[];
   playersOut: string[];
   simResults: CountrySimulationResults;
+  useRealScores?: boolean;
+  bypassOverrides?: boolean;
 };
 
 function InfoTooltip({ content }: { content: string }) {
@@ -87,16 +91,16 @@ function InfoTooltip({ content }: { content: string }) {
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <button 
+          <button
             type="button"
-            onClick={(e) => e.stopPropagation()} 
+            onClick={(e) => e.stopPropagation()}
             className="inline-block ml-1.5 align-middle cursor-help select-none bg-transparent border-none p-0 outline-none focus:outline-none"
           >
             <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-slate-900 dark:hover:text-white transition-colors" />
           </button>
         </TooltipTrigger>
-        <TooltipContent 
-          side="top" 
+        <TooltipContent
+          side="top"
           className="max-w-[200px] bg-slate-950 text-white border border-white/10 px-2.5 py-1.5 text-[11px] font-medium normal-case tracking-normal leading-normal text-center shadow-xl rounded-lg z-50"
         >
           {content}
@@ -144,9 +148,10 @@ export default function CountryPredictionsClient({
   initialPlayers: PlayerStats[],
   flagMap: Record<string, string>
 }) {
-  const { isInitialized, initializeData, players: storePlayers, teams: storeTeams, selectedModel, setSelectedModel, resetToDefaults, updatePlayer, updateTeam, syncData } = useSimulationStore();
+  const { isInitialized, initializeData, players: storePlayers, teams: storeTeams, selectedModel, setSelectedModel, resetToDefaults, updatePlayer, updateTeam, syncData, toggleTeamOverride, togglePlayerOverride } = useSimulationStore();
   const appTeams = useTeams();
   const GROUPS_CONFIG = useGroupsConfig();
+  const cupResults = useCupResults();
   const { theme } = useTheme();
   const { data: session } = useSession();
   const router = useRouter();
@@ -158,6 +163,8 @@ export default function CountryPredictionsClient({
   const [zoomScale, setZoomScale] = useState(85);
 
   const [bypassOverrides, setBypassOverrides] = useState(false);
+  const [useRealScores, setUseRealScores] = useState(true);
+  const [liveFixtures, setLiveFixtures] = useState<any[]>([]);
   const [isOverridesModalOpen, setIsOverridesModalOpen] = useState(false);
   const [staticDefaultPlayers, setStaticDefaultPlayers] = useState<Record<string, any>>({});
   const [staticDefaultTeams, setStaticDefaultTeams] = useState<any[]>([]);
@@ -182,20 +189,43 @@ export default function CountryPredictionsClient({
   }, []);
 
   const players = useMemo(() => {
-    return bypassOverrides && Object.keys(staticDefaultPlayers).length > 0
-      ? staticDefaultPlayers
-      : storePlayers;
+    if (bypassOverrides && Object.keys(staticDefaultPlayers).length > 0) {
+      return staticDefaultPlayers;
+    }
+    const result: Record<string, PlayerStats> = { ...storePlayers };
+    if (Object.keys(staticDefaultPlayers).length > 0) {
+      Object.keys(result).forEach((key) => {
+        if (result[key]?.isCustom && result[key]?.isOverrideDisabled) {
+          const defaultPlayer = staticDefaultPlayers[key];
+          if (defaultPlayer) {
+            result[key] = {
+              ...defaultPlayer,
+              isCustom: true,
+              isOverrideDisabled: true,
+            };
+          }
+        }
+      });
+    }
+    return result;
   }, [bypassOverrides, staticDefaultPlayers, storePlayers]);
 
   const customPlayersCount = useMemo(() => {
-    return Object.values(storePlayers || {}).filter(p => p.isCustom).length;
+    return Object.values(storePlayers || {}).filter(p => p.isCustom && !p.isOverrideDisabled).length;
   }, [storePlayers]);
 
   const customTeamsCount = useMemo(() => {
-    return Object.values(storeTeams || {}).filter(t => t.isCustom).length;
+    return Object.values(storeTeams || {}).filter(t => t.isCustom && !t.isOverrideDisabled).length;
   }, [storeTeams]);
 
   const totalOverrides = customPlayersCount + customTeamsCount;
+
+  const groupRealPercent = useMemo(() => {
+    const completed = Object.entries(cupResults).filter(
+      ([matchKey, result]) => GROUP_STAGE_RESULT_KEY_PATTERN.test(matchKey) && !!result,
+    ).length;
+    return Math.round((completed / TOTAL_TOURNAMENT_MATCHES) * 100);
+  }, [cupResults]);
 
   const handleResetAllOverrides = async () => {
     if (session?.user?.id) {
@@ -409,6 +439,8 @@ export default function CountryPredictionsClient({
       setCustomPlayerRatingDelta(data.customPlayerRatingDelta ?? 0);
       setPlayersIn(data.playersIn ?? []);
       setPlayersOut(data.playersOut ?? []);
+      setUseRealScores(!!data.useRealScores);
+      setBypassOverrides(!!data.bypassOverrides);
 
       if (data.simResults) {
         setSimResults(data.simResults);
@@ -422,6 +454,8 @@ export default function CountryPredictionsClient({
           playersIn: data.playersIn ?? [],
           playersOut: data.playersOut ?? [],
           simResults: data.simResults,
+          useRealScores: !!data.useRealScores,
+          bypassOverrides: !!data.bypassOverrides,
         });
       } else {
         const reconstructedStages = data.stages || {
@@ -449,6 +483,8 @@ export default function CountryPredictionsClient({
           playersIn: data.playersIn ?? [],
           playersOut: data.playersOut ?? [],
           simResults: reconstructedResults,
+          useRealScores: !!data.useRealScores,
+          bypassOverrides: !!data.bypassOverrides,
         });
       }
 
@@ -659,10 +695,14 @@ export default function CountryPredictionsClient({
     Promise.all([
       fetch("/api/teams").then((res) => res.json()),
       fetch("/api/players").then((res) => res.json()),
-    ]).then(([teamsData, playersData]) => {
+      fetch("/api/fixtures").then((res) => res.json()).catch(() => ({ fixtures: [] })),
+    ]).then(([teamsData, playersData, fixturesData]) => {
       syncData(teamsData, playersData);
+      if (fixturesData && fixturesData.fixtures) {
+        setLiveFixtures(fixturesData.fixtures);
+      }
     }).catch((err) => {
-      console.error("Failed to sync teams/players in CountryPredictionsClient", err);
+      console.error("Failed to sync teams/players/fixtures in CountryPredictionsClient", err);
       initializeData(initialTeams, initialPlayers);
     });
     let localList: CustomCountry[] = [];
@@ -788,9 +828,7 @@ export default function CountryPredictionsClient({
     return searchParams.get("wildcard") === "true" || !!activeCustomCountry;
   }, [searchParams, activeCustomCountry]);
 
-  const effectiveCode = useMemo(() => {
-    return activeCustomCountry ? activeCustomCountry.replacedCode : selectedCode;
-  }, [activeCustomCountry, selectedCode]);
+  const effectiveCode = selectedCode;
 
   const selectedTeam = useMemo(() => {
     if (activeCustomCountry) {
@@ -826,13 +864,14 @@ export default function CountryPredictionsClient({
     if (custom) {
       const isSelected = (custom.replacedCode === effectiveCode) || (custom.code === effectiveCode);
       return {
-        code: custom.replacedCode,
+        code: custom.code,
         name: custom.name,
         flag: custom.flag,
         elo: isSelected ? customElo : custom.elo,
         attack: isSelected ? customAttack : custom.attack,
         defense: isSelected ? customDefense : custom.defense,
         power: appTeams.find((t) => t.code === custom.baselineCode)?.power || 75,
+        baselineCode: custom.baselineCode,
       };
     }
     const appTeam = appTeams.find((t) => t.code === code);
@@ -842,7 +881,10 @@ export default function CountryPredictionsClient({
       let attackVal = isSelected ? customAttack : appTeam.attack;
       let defenseVal = isSelected ? customDefense : appTeam.defense;
 
-      if (bypassOverrides && staticDefaultTeams.length > 0) {
+      const storeTeam = storeTeams[code];
+      const isTeamOverrideDisabled = storeTeam?.isCustom && storeTeam?.isOverrideDisabled;
+
+      if ((bypassOverrides || isTeamOverrideDisabled) && staticDefaultTeams.length > 0) {
         const defaultTeamData = staticDefaultTeams.find(dt => dt.name === appTeam.name);
         if (defaultTeamData) {
           eloVal = isSelected ? customElo : defaultTeamData.elo;
@@ -887,34 +929,48 @@ export default function CountryPredictionsClient({
   const [playersIn, setPlayersIn] = useState<string[]>([]);
   const [playersOut, setPlayersOut] = useState<string[]>([]);
 
-  const prevSelectedCodeRef = useRef<string | null>(null);
   const isSnapshotRestoredRef = useRef<boolean>(false);
+  const lastOverrideStateRef = useRef<{ isOverrideDisabled: boolean; isCustom: boolean; selectedCode: string } | null>(null);
 
   useEffect(() => {
-    if (ignoreResetRef.current) {
-      prevSelectedCodeRef.current = selectedCode;
-      return;
-    }
+    if (!selectedTeam || !isInitialized) return;
     if (!hasRestoredSimulationSnapshot.current) return;
-    if (!selectedTeam) return;
 
-    if (isSnapshotRestoredRef.current && prevSelectedCodeRef.current === null) {
-      prevSelectedCodeRef.current = selectedCode;
-      isSnapshotRestoredRef.current = false;
+    const storeTeam = storeTeams[selectedCode];
+    const isOverrideDisabled = storeTeam?.isOverrideDisabled ?? false;
+    const isCustom = storeTeam?.isCustom ?? false;
+
+    if (ignoreResetRef.current) {
+      lastOverrideStateRef.current = { isOverrideDisabled, isCustom, selectedCode };
       return;
     }
 
-    if (prevSelectedCodeRef.current !== selectedCode) {
-      setCustomElo(Math.round(selectedTeam.elo));
-      setCustomAttack(formatTeamScaleRating(selectedTeam.attack));
-      setCustomDefense(formatTeamScaleRating(selectedTeam.defense));
-      setCustomPlayerRatingDelta(0);
-      setPlayersIn([]);
-      setPlayersOut([]);
-      setSimResults(null);
+    if (
+      lastOverrideStateRef.current === null ||
+      lastOverrideStateRef.current.selectedCode !== selectedCode ||
+      lastOverrideStateRef.current.isOverrideDisabled !== isOverrideDisabled ||
+      lastOverrideStateRef.current.isCustom !== isCustom
+    ) {
+      if (storeTeam && !isOverrideDisabled) {
+        if (storeTeam.elo !== undefined) setCustomElo(Math.round(storeTeam.elo));
+        if (storeTeam.attack !== undefined) setCustomAttack(formatTeamScaleRating(storeTeam.attack));
+        if (storeTeam.defense !== undefined) setCustomDefense(formatTeamScaleRating(storeTeam.defense));
+      } else {
+        setCustomElo(Math.round(selectedTeam.elo));
+        setCustomAttack(formatTeamScaleRating(selectedTeam.attack));
+        setCustomDefense(formatTeamScaleRating(selectedTeam.defense));
+      }
+
+      if (lastOverrideStateRef.current?.selectedCode !== selectedCode) {
+        setCustomPlayerRatingDelta(0);
+        setPlayersIn([]);
+        setPlayersOut([]);
+        setSimResults(null);
+      }
+
+      lastOverrideStateRef.current = { isOverrideDisabled, isCustom, selectedCode };
     }
-    prevSelectedCodeRef.current = selectedCode;
-  }, [selectedCode, selectedTeam]);
+  }, [selectedCode, selectedTeam, storeTeams, isInitialized]);
 
   useEffect(() => {
     if (ignoreResetRef.current) return;
@@ -953,6 +1009,19 @@ export default function CountryPredictionsClient({
         return;
       }
 
+      const ELIMINATED_TEAMS = new Set(["KOR", "IRN", "UZB", "TUN", "HAI", "TUR", "SCO", "NZL", "PAN"]);
+      const hasEliminated = snapshot.simResults?.mockTournament?.r32?.some((m: any) => {
+        // Do not clear the snapshot if the eliminated team is the selected team itself
+        const homeElim = m.home !== snapshot.selectedCode && ELIMINATED_TEAMS.has(m.home);
+        const awayElim = m.away !== snapshot.selectedCode && ELIMINATED_TEAMS.has(m.away);
+        return homeElim || awayElim;
+      });
+      if (hasEliminated) {
+        localStorage.removeItem(COUNTRY_SIMULATION_SNAPSHOT_KEY);
+        hasRestoredSimulationSnapshot.current = true;
+        return;
+      }
+
       const requestedTeam = (searchParams.get("team") || searchParams.get("country") || snapshot.selectedCode)
         .trim()
         .toUpperCase();
@@ -985,6 +1054,8 @@ export default function CountryPredictionsClient({
       setPlayersOut(snapshot.playersOut ?? []);
       setSimResults(snapshot.simResults);
       setSaveSuccess(true);
+      if (snapshot.useRealScores !== undefined) setUseRealScores(snapshot.useRealScores);
+      if (snapshot.bypassOverrides !== undefined) setBypassOverrides(snapshot.bypassOverrides);
 
       setTimeout(() => {
         ignoreResetRef.current = false;
@@ -1115,419 +1186,509 @@ export default function CountryPredictionsClient({
 
     try {
 
-    const iterations = 1000;
-    const CHUNK_SIZE = 50;
+      const iterations = 1000;
+      const CHUNK_SIZE = 50;
 
-    const stageCounts: Record<string, number> = {
-      group: 0,
-      r32: 0,
-      r16: 0,
-      qf: 0,
-      sf: 0,
-      final: 0,
-      champion: 0
-    };
-
-    const stageOpponents: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>> = {
-      group: {},
-      r32: {},
-      r16: {},
-      qf: {},
-      sf: {},
-      final: {}
-    };
-
-    const simulateKo = (home: string, away: string) => {
-      const homeTeam = getTeam(home);
-      const awayTeam = getTeam(away);
-      const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, customizedPlayers, selectedModel);
-      let hs = getPoisson(homeLambda);
-      let as = getPoisson(awayLambda);
-      if (hs === as) {
-        if (Math.random() > 0.5) hs += 1;
-        else as += 1;
-      }
-      return { hs, as, winner: hs > as ? home : away };
-    };
-
-    const hasDistinctKnownTeams = (teams: (string | null | undefined)[], expectedSize?: number) => {
-      const normalized = teams.filter((team): team is string => typeof team === "string" && team.length > 0);
-      if (expectedSize !== undefined && normalized.length !== expectedSize) {
-        return false;
-      }
-      return new Set(normalized).size === normalized.length;
-    };
-
-    const mergeStageOpponentStats = (
-      target: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>>,
-      source: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>>,
-    ) => {
-      Object.entries(source).forEach(([stage, opponents]) => {
-        Object.entries(opponents).forEach(([opponent, values]) => {
-          if (!target[stage][opponent]) {
-            target[stage][opponent] = { count: 0, gfSum: 0, gaSum: 0, wins: 0 };
-          }
-          target[stage][opponent].count += values.count;
-          target[stage][opponent].gfSum += values.gfSum;
-          target[stage][opponent].gaSum += values.gaSum;
-          target[stage][opponent].wins += values.wins;
-        });
-      });
-    };
-
-    let bestScore = -1;
-    let bestMockTournament: any = null;
-
-    for (let start = 0; start < iterations; start += CHUNK_SIZE) {
-      await new Promise<void>((resolve, reject) => {
-        setTimeout(() => {
-          try {
-            const end = Math.min(start + CHUNK_SIZE, iterations);
-          iterationLoop: for (let iteration = start; iteration < end; iteration++) {
-            let currentScore = 0;
-            const iterationStageCounts: Record<string, number> = {
-              group: 0,
-              r32: 0,
-              r16: 0,
-              qf: 0,
-              sf: 0,
-              final: 0,
-              champion: 0
-            };
-            const iterationStageOpponents: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>> = {
-              group: {},
-              r32: {},
-              r16: {},
-              qf: {},
-              sf: {},
-              final: {}
-            };
-            const trackIterationMatch = (stage: string, team: string, opponent: string, gf: number, ga: number, won: boolean) => {
-              if (team !== effectiveCode) return;
-              if (!iterationStageOpponents[stage][opponent]) {
-                iterationStageOpponents[stage][opponent] = { count: 0, gfSum: 0, gaSum: 0, wins: 0 };
-              }
-              iterationStageOpponents[stage][opponent].count += 1;
-              iterationStageOpponents[stage][opponent].gfSum += gf;
-              iterationStageOpponents[stage][opponent].gaSum += ga;
-              if (won) iterationStageOpponents[stage][opponent].wins += 1;
-            };
-
-            // Mock Tournament tracking for this iteration
-            const currentMock: any = {
-              groups: {},
-              r32: [],
-              r16: [],
-              qf: [],
-              sf: [],
-              final: null
-            };
-
-            // Group Stage Simulation
-            const groupStandings: Record<string, { code: string; pts: number; gd: number; gf: number; elo: number }[]> = {};
-
-            Object.entries(GROUPS_CONFIG).forEach(([groupName, groupTeams]) => {
-              const standings = groupTeams.map(code => ({
-                code,
-                pts: 0,
-                gd: 0,
-                gf: 0,
-                elo: getTeam(code).elo || 1500
-              }));
-
-              const playMatch = (t1Idx: number, t2Idx: number) => {
-                const t1 = getTeam(standings[t1Idx].code);
-                const t2 = getTeam(standings[t2Idx].code);
-                const { homeLambda, awayLambda } = getMatchExpectedGoals(t1, t2, customizedPlayers, selectedModel);
-                const hs = getPoisson(homeLambda);
-                const as = getPoisson(awayLambda);
-
-                standings[t1Idx].gf += hs;
-                standings[t1Idx].gd += (hs - as);
-                standings[t2Idx].gf += as;
-                standings[t2Idx].gd += (as - hs);
-
-                if (hs > as) {
-                  standings[t1Idx].pts += 3;
-                  trackIterationMatch("group", t1.code, t2.code, hs, as, true);
-                  trackIterationMatch("group", t2.code, t1.code, as, hs, false);
-                } else if (hs < as) {
-                  standings[t2Idx].pts += 3;
-                  trackIterationMatch("group", t1.code, t2.code, hs, as, false);
-                  trackIterationMatch("group", t2.code, t1.code, as, hs, true);
-                } else {
-                  standings[t1Idx].pts += 1;
-                  standings[t2Idx].pts += 1;
-                  trackIterationMatch("group", t1.code, t2.code, hs, as, false);
-                  trackIterationMatch("group", t2.code, t1.code, as, hs, false);
-                }
-              };
-
-              // 6 fixtures:
-              playMatch(0, 1);
-              playMatch(2, 3);
-              playMatch(0, 2);
-              playMatch(1, 3);
-              playMatch(3, 0);
-              playMatch(1, 2);
-
-              standings.sort((a, b) => {
-                if (b.pts !== a.pts) return b.pts - a.pts;
-                if (b.gd !== a.gd) return b.gd - a.gd;
-                if (b.gf !== a.gf) return b.gf - a.gf;
-                return b.elo - a.elo;
-              });
-
-              groupStandings[groupName] = standings;
-              currentMock.groups[groupName] = standings;
-            });
-
-            iterationStageCounts.group += 1;
-
-            // Rank thirds
-            const thirds = Object.entries(groupStandings).map(([_, stand]) => stand[2]);
-            thirds.sort((a, b) => {
-              if (b.pts !== a.pts) return b.pts - a.pts;
-              if (b.gd !== a.gd) return b.gd - a.gd;
-              if (b.gf !== a.gf) return b.gf - a.gf;
-              return b.elo - a.elo;
-            });
-            const bestThirds = thirds.slice(0, 8);
-
-            const getWinner = (g: string) => groupStandings[g]?.[0]?.code || "";
-            const getRunner = (g: string) => groupStandings[g]?.[1]?.code || "";
-            const getThird = (idx: number) => bestThirds[idx]?.code || "ARG";
-
-            const qualifiedTeams = Array.from(new Set([
-              ...Object.keys(GROUPS_CONFIG).flatMap((groupKey) => [getWinner(groupKey), getRunner(groupKey)]),
-              ...bestThirds.map((team) => team.code),
-            ].filter(Boolean)));
-
-            // Generate R32 pairings
-            const rawR32Pairings = [
-              { home: getWinner("A"), away: getThird(7) },
-              { home: getRunner("B"), away: getRunner("C") },
-              { home: getWinner("C"), away: getThird(6) },
-              { home: getRunner("D"), away: getRunner("E") },
-              { home: getWinner("E"), away: getThird(5) },
-              { home: getRunner("F"), away: getRunner("G") },
-              { home: getWinner("G"), away: getThird(4) },
-              { home: getRunner("H"), away: getRunner("I") },
-              { home: getWinner("B"), away: getThird(3) },
-              { home: getRunner("A"), away: getRunner("J") },
-              { home: getWinner("D"), away: getThird(2) },
-              { home: getRunner("K"), away: getRunner("L") },
-              { home: getWinner("F"), away: getThird(1) },
-              { home: getWinner("H"), away: getThird(0) },
-              { home: getWinner("I"), away: getWinner("J") },
-              { home: getWinner("K"), away: getWinner("L") },
-            ];
-
-            const assignedTeams = new Set<string>();
-            const takeReplacementTeam = (otherTeam?: string) => {
-              const replacement = qualifiedTeams.find((teamCode) => !assignedTeams.has(teamCode) && teamCode !== otherTeam);
-              if (replacement) {
-                assignedTeams.add(replacement);
-              }
-              return replacement || "";
-            };
-
-            const r32Pairings = rawR32Pairings.map((pair) => {
-              let home = pair.home;
-              if (!home || assignedTeams.has(home)) {
-                home = takeReplacementTeam();
-              } else {
-                assignedTeams.add(home);
-              }
-
-              let away = pair.away;
-              if (!away || away === home || assignedTeams.has(away)) {
-                away = takeReplacementTeam(home);
-              } else {
-                assignedTeams.add(away);
-              }
-
-              if (away === home) {
-                away = takeReplacementTeam(home);
-              }
-
-              return { home, away };
-            }).filter((pair) => pair.home && pair.away && pair.home !== pair.away);
-
-            const r32Participants = r32Pairings.flatMap((pair) => [pair.home, pair.away]);
-            if (r32Pairings.length !== 16 || !hasDistinctKnownTeams(r32Participants, 32)) {
-              continue iterationLoop;
-            }
-
-            // Check if selected country is in R32
-            const inR32 = r32Pairings.some(p => p.home === effectiveCode || p.away === effectiveCode);
-            if (inR32) currentScore = 1;
-            if (inR32) iterationStageCounts.r32 += 1;
-
-            // Simulate R32
-            const r16Teams: string[] = [];
-            r32Pairings.forEach((pair) => {
-              const { hs, as, winner } = simulateKo(pair.home, pair.away);
-              r16Teams.push(winner);
-              currentMock.r32.push({ home: pair.home, away: pair.away, hs, as, winner });
-              if (inR32) {
-                trackIterationMatch("r32", pair.home, pair.away, hs, as, winner === pair.home);
-                trackIterationMatch("r32", pair.away, pair.home, as, hs, winner === pair.away);
-              }
-            });
-            if (!hasDistinctKnownTeams(r16Teams, 16)) {
-              continue iterationLoop;
-            }
-
-            // Check if selected country is in R16
-            const inR16 = r16Teams.includes(effectiveCode);
-            if (inR16) currentScore = 2;
-            if (inR16) iterationStageCounts.r16 += 1;
-
-            // Simulate R16
-            const qfTeams: string[] = [];
-            for (let i = 0; i < 8; i++) {
-              const home = r16Teams[2 * i];
-              const away = r16Teams[2 * i + 1];
-              if (!home || !away || home === away) {
-                continue iterationLoop;
-              }
-              const { hs, as, winner } = simulateKo(home, away);
-              qfTeams.push(winner);
-              currentMock.r16.push({ home, away, hs, as, winner });
-              if (inR16) {
-                trackIterationMatch("r16", home, away, hs, as, winner === home);
-                trackIterationMatch("r16", away, home, as, hs, winner === away);
-              }
-            }
-            if (!hasDistinctKnownTeams(qfTeams, 8)) {
-              continue iterationLoop;
-            }
-
-            // Check QF
-            const inQF = qfTeams.includes(effectiveCode);
-            if (inQF) currentScore = 3;
-            if (inQF) iterationStageCounts.qf += 1;
-
-            // Simulate QF
-            const sfTeams: string[] = [];
-            for (let i = 0; i < 4; i++) {
-              const home = qfTeams[2 * i];
-              const away = qfTeams[2 * i + 1];
-              if (!home || !away || home === away) {
-                continue iterationLoop;
-              }
-              const { hs, as, winner } = simulateKo(home, away);
-              sfTeams.push(winner);
-              currentMock.qf.push({ home, away, hs, as, winner });
-              if (inQF) {
-                trackIterationMatch("qf", home, away, hs, as, winner === home);
-                trackIterationMatch("qf", away, home, as, hs, winner === away);
-              }
-            }
-            if (!hasDistinctKnownTeams(sfTeams, 4)) {
-              continue iterationLoop;
-            }
-
-            // Check SF
-            const inSF = sfTeams.includes(effectiveCode);
-            if (inSF) currentScore = 4;
-            if (inSF) iterationStageCounts.sf += 1;
-
-            // Simulate SF
-            const finalTeams: string[] = [];
-            for (let i = 0; i < 2; i++) {
-              const home = sfTeams[2 * i];
-              const away = sfTeams[2 * i + 1];
-              if (!home || !away || home === away) {
-                continue iterationLoop;
-              }
-              const { hs, as, winner } = simulateKo(home, away);
-              finalTeams.push(winner);
-              currentMock.sf.push({ home, away, hs, as, winner });
-              if (inSF) {
-                trackIterationMatch("sf", home, away, hs, as, winner === home);
-                trackIterationMatch("sf", away, home, as, hs, winner === away);
-              }
-            }
-            if (!hasDistinctKnownTeams(finalTeams, 2)) {
-              continue iterationLoop;
-            }
-
-            // Check Final
-            const inFinal = finalTeams.includes(effectiveCode);
-            if (inFinal) currentScore = 5;
-            if (inFinal) iterationStageCounts.final += 1;
-
-            // Simulate Final
-            const homeTeam = finalTeams[0];
-            const awayTeam = finalTeams[1];
-            if (!homeTeam || !awayTeam || homeTeam === awayTeam) {
-              continue iterationLoop;
-            }
-            const { hs, as, winner } = simulateKo(homeTeam, awayTeam);
-            currentMock.final = { home: homeTeam, away: awayTeam, hs, as, winner };
-            if (inFinal) {
-              trackIterationMatch("final", homeTeam, awayTeam, hs, as, winner === homeTeam);
-              trackIterationMatch("final", awayTeam, homeTeam, as, hs, winner === awayTeam);
-            }
-
-            if (winner === effectiveCode) {
-              iterationStageCounts.champion += 1;
-              currentScore = 6;
-            }
-
-            Object.entries(iterationStageCounts).forEach(([stage, count]) => {
-              stageCounts[stage] += count;
-            });
-            mergeStageOpponentStats(stageOpponents, iterationStageOpponents);
-
-            // Keep best mock tournament
-            if (currentScore > bestScore) {
-              bestScore = currentScore;
-              bestMockTournament = currentMock;
-            }
-          } // end chunk loop
-            setSimProgress(Math.floor((end / iterations) * 100));
-            resolve();
-          } catch (e) {
-            reject(e);
-          }
-        }, 0);
-      }); // end Promise
-    } // end main loop
-
-    if (!bestMockTournament) {
-      // Generate a fallback result from partial data instead of throwing
-      console.warn("Simulation produced no valid full brackets, using partial stage data.");
-      bestMockTournament = {
-        groups: {},
-        r32: [],
-        r16: [],
-        qf: [],
-        sf: [],
-        final: null,
+      const stageCounts: Record<string, number> = {
+        group: 0,
+        r32: 0,
+        r16: 0,
+        qf: 0,
+        sf: 0,
+        final: 0,
+        champion: 0
       };
-    }
 
-    const nextResults = {
-      stages: stageCounts,
-      opponents: stageOpponents,
-      mockTournament: bestMockTournament
-    };
+      const stageOpponents: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>> = {
+        group: {},
+        r32: {},
+        r16: {},
+        qf: {},
+        sf: {},
+        final: {}
+      };
 
-    setSimResults(nextResults);
-    persistSimulationSnapshot({
-      selectedCode,
-      selectedModel,
-      customElo,
-      customAttack,
-      customDefense,
-      customPlayerRatingDelta,
-      playersIn,
-      playersOut,
-      simResults: nextResults,
-    });
+      const simulateKo = (home: string, away: string) => {
+        const homeTeam = getTeam(home);
+        const awayTeam = getTeam(away);
+        const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, customizedPlayers, selectedModel);
+        let hs = getPoisson(homeLambda);
+        let as = getPoisson(awayLambda);
+        if (hs === as) {
+          if (Math.random() > 0.5) hs += 1;
+          else as += 1;
+        }
+        return { hs, as, winner: hs > as ? home : away };
+      };
+
+      const hasDistinctKnownTeams = (teams: (string | null | undefined)[], expectedSize?: number) => {
+        const normalized = teams.filter((team): team is string => typeof team === "string" && team.length > 0);
+        if (expectedSize !== undefined && normalized.length !== expectedSize) {
+          return false;
+        }
+        return new Set(normalized).size === normalized.length;
+      };
+
+      const mergeStageOpponentStats = (
+        target: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>>,
+        source: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>>,
+      ) => {
+        Object.entries(source).forEach(([stage, opponents]) => {
+          Object.entries(opponents).forEach(([opponent, values]) => {
+            if (!target[stage][opponent]) {
+              target[stage][opponent] = { count: 0, gfSum: 0, gaSum: 0, wins: 0 };
+            }
+            target[stage][opponent].count += values.count;
+            target[stage][opponent].gfSum += values.gfSum;
+            target[stage][opponent].gaSum += values.gaSum;
+            target[stage][opponent].wins += values.wins;
+          });
+        });
+      };
+
+      let bestScore = -1;
+      let bestMockTournament: any = null;
+
+      for (let start = 0; start < iterations; start += CHUNK_SIZE) {
+        await new Promise<void>((resolve, reject) => {
+          setTimeout(() => {
+            try {
+              const end = Math.min(start + CHUNK_SIZE, iterations);
+              iterationLoop: for (let iteration = start; iteration < end; iteration++) {
+                let currentScore = 0;
+                const iterationStageCounts: Record<string, number> = {
+                  group: 0,
+                  r32: 0,
+                  r16: 0,
+                  qf: 0,
+                  sf: 0,
+                  final: 0,
+                  champion: 0
+                };
+                const iterationStageOpponents: Record<string, Record<string, { count: number; gfSum: number; gaSum: number; wins: number }>> = {
+                  group: {},
+                  r32: {},
+                  r16: {},
+                  qf: {},
+                  sf: {},
+                  final: {}
+                };
+                const trackIterationMatch = (stage: string, team: string, opponent: string, gf: number, ga: number, won: boolean) => {
+                  if (team !== effectiveCode) return;
+                  if (!iterationStageOpponents[stage][opponent]) {
+                    iterationStageOpponents[stage][opponent] = { count: 0, gfSum: 0, gaSum: 0, wins: 0 };
+                  }
+                  iterationStageOpponents[stage][opponent].count += 1;
+                  iterationStageOpponents[stage][opponent].gfSum += gf;
+                  iterationStageOpponents[stage][opponent].gaSum += ga;
+                  if (won) iterationStageOpponents[stage][opponent].wins += 1;
+                };
+
+                // Mock Tournament tracking for this iteration
+                const currentMock: any = {
+                  groups: {},
+                  r32: [],
+                  r16: [],
+                  qf: [],
+                  sf: [],
+                  final: null
+                };
+
+                // Group Stage Simulation
+                const groupStandings: Record<string, { code: string; pts: number; gd: number; gf: number; elo: number }[]> = {};
+
+                Object.entries(GROUPS_CONFIG).forEach(([groupName, groupTeams]) => {
+                  const standings = groupTeams.map(rawCode => {
+                    const code = (activeCustomCountry && activeCustomCountry.replacedCode === rawCode) ? activeCustomCountry.code : rawCode;
+                    return {
+                      code,
+                      pts: 0,
+                      gd: 0,
+                      gf: 0,
+                      elo: getTeam(code).elo || 1500
+                    };
+                  });
+
+                  const playMatch = (t1Idx: number, t2Idx: number, matchIndex: number) => {
+                    const t1 = getTeam(standings[t1Idx].code);
+                    const t2 = getTeam(standings[t2Idx].code);
+
+                    const isSelectedMatch = t1.code === effectiveCode || t2.code === effectiveCode;
+
+                    if (useRealScores && !isSelectedMatch) {
+                      const cupKey = `${groupName}-${String(matchIndex).padStart(2, "0")}`;
+                      const result = cupResults[cupKey];
+                      if (result) {
+                        const hs = result.homeGoals;
+                        const as = result.awayGoals;
+                        standings[t1Idx].gf += hs;
+                        standings[t1Idx].gd += (hs - as);
+                        standings[t2Idx].gf += as;
+                        standings[t2Idx].gd += (as - hs);
+
+                        if (hs > as) {
+                          standings[t1Idx].pts += 3;
+                          trackIterationMatch("group", t1.code, t2.code, hs, as, true);
+                          trackIterationMatch("group", t2.code, t1.code, as, hs, false);
+                        } else if (hs < as) {
+                          standings[t2Idx].pts += 3;
+                          trackIterationMatch("group", t1.code, t2.code, hs, as, false);
+                          trackIterationMatch("group", t2.code, t1.code, as, hs, true);
+                        } else {
+                          standings[t1Idx].pts += 1;
+                          standings[t2Idx].pts += 1;
+                          trackIterationMatch("group", t1.code, t2.code, hs, as, false);
+                          trackIterationMatch("group", t2.code, t1.code, as, hs, false);
+                        }
+                        return;
+                      }
+                    }
+
+                    const { homeLambda, awayLambda } = getMatchExpectedGoals(t1, t2, customizedPlayers, selectedModel);
+                    const hs = getPoisson(homeLambda);
+                    const as = getPoisson(awayLambda);
+
+                    standings[t1Idx].gf += hs;
+                    standings[t1Idx].gd += (hs - as);
+                    standings[t2Idx].gf += as;
+                    standings[t2Idx].gd += (as - hs);
+
+                    if (hs > as) {
+                      standings[t1Idx].pts += 3;
+                      trackIterationMatch("group", t1.code, t2.code, hs, as, true);
+                      trackIterationMatch("group", t2.code, t1.code, as, hs, false);
+                    } else if (hs < as) {
+                      standings[t2Idx].pts += 3;
+                      trackIterationMatch("group", t1.code, t2.code, hs, as, false);
+                      trackIterationMatch("group", t2.code, t1.code, as, hs, true);
+                    } else {
+                      standings[t1Idx].pts += 1;
+                      standings[t2Idx].pts += 1;
+                      trackIterationMatch("group", t1.code, t2.code, hs, as, false);
+                      trackIterationMatch("group", t2.code, t1.code, as, hs, false);
+                    }
+                  };
+
+                  // 6 fixtures:
+                  playMatch(0, 1, 1);
+                  playMatch(2, 3, 2);
+                  playMatch(0, 2, 3);
+                  playMatch(1, 3, 4);
+                  playMatch(3, 0, 5);
+                  playMatch(1, 2, 6);
+
+                  standings.sort((a, b) => {
+                    if (b.pts !== a.pts) return b.pts - a.pts;
+                    if (b.gd !== a.gd) return b.gd - a.gd;
+                    if (b.gf !== a.gf) return b.gf - a.gf;
+                    return b.elo - a.elo;
+                  });
+
+                  groupStandings[groupName] = standings;
+                  currentMock.groups[groupName] = standings;
+                });
+
+                iterationStageCounts.group += 1;
+
+                // Rank thirds
+                const thirds = Object.entries(groupStandings).map(([_, stand]) => stand[2]);
+                thirds.sort((a, b) => {
+                  if (b.pts !== a.pts) return b.pts - a.pts;
+                  if (b.gd !== a.gd) return b.gd - a.gd;
+                  if (b.gf !== a.gf) return b.gf - a.gf;
+                  return b.elo - a.elo;
+                });
+                const bestThirds = thirds.slice(0, 8);
+
+                const getWinner = (g: string) => groupStandings[g]?.[0]?.code || "";
+                const getRunner = (g: string) => groupStandings[g]?.[1]?.code || "";
+                const getThird = (idx: number) => bestThirds[idx]?.code || "ARG";
+
+                const qualifiedTeams = Array.from(new Set([
+                  ...Object.keys(GROUPS_CONFIG).flatMap((groupKey) => [getWinner(groupKey), getRunner(groupKey)]),
+                  ...bestThirds.map((team) => team.code),
+                ].filter(Boolean)));
+
+                // Generate R32 pairings
+                const baseR32Pairings = [
+                  { home: getWinner("A"), away: getThird(7) },
+                  { home: getRunner("B"), away: getRunner("C") },
+                  { home: getWinner("C"), away: getThird(6) },
+                  { home: getRunner("D"), away: getRunner("E") },
+                  { home: getWinner("E"), away: getThird(5) },
+                  { home: getRunner("F"), away: getRunner("G") },
+                  { home: getWinner("G"), away: getThird(4) },
+                  { home: getRunner("H"), away: getRunner("I") },
+                  { home: getWinner("B"), away: getThird(3) },
+                  { home: getRunner("A"), away: getRunner("J") },
+                  { home: getWinner("D"), away: getThird(2) },
+                  { home: getRunner("K"), away: getRunner("L") },
+                  { home: getWinner("F"), away: getThird(1) },
+                  { home: getWinner("H"), away: getThird(0) },
+                  { home: getWinner("I"), away: getWinner("J") },
+                  { home: getWinner("K"), away: getWinner("L") },
+                ];
+
+                let rawR32Pairings = [...baseR32Pairings];
+                if (useRealScores && liveFixtures && liveFixtures.length > 0) {
+                  const liveR32 = liveFixtures
+                    .filter((f: any) => f.isKnockout && f.stageName === "Round of 32")
+                    .sort((a, b) => a.match_no - b.match_no);
+
+                  if (liveR32.length === 16) {
+                    const isValidCode = (c: string) => c && c.length === 3 && !c.match(/Winner|Runner|3rd|TBC|TBD/i);
+
+                    rawR32Pairings = baseR32Pairings.map((pair, idx) => {
+                      const match = liveR32[idx];
+                      if (match) {
+                        const liveHomeCode = (match.homeTeamObj?.code || match.homeTeamCode || "").trim().toUpperCase();
+                        const liveAwayCode = (match.awayTeamObj?.code || match.awayTeamCode || "").trim().toUpperCase();
+
+                        let home = isValidCode(liveHomeCode) ? liveHomeCode : pair.home;
+                        let away = isValidCode(liveAwayCode) ? liveAwayCode : pair.away;
+
+                        // If the simulated slot qualified the selected team, preserve the selected team
+                        // even if they were eliminated in real life!
+                        if (pair.home === effectiveCode) {
+                          home = effectiveCode;
+                        }
+                        if (pair.away === effectiveCode) {
+                          away = effectiveCode;
+                        }
+
+                        if (activeCustomCountry) {
+                          if (home === activeCustomCountry.replacedCode) {
+                            home = activeCustomCountry.code;
+                          }
+                          if (away === activeCustomCountry.replacedCode) {
+                            away = activeCustomCountry.code;
+                          }
+                        }
+
+                        return { home, away };
+                      }
+                      return pair;
+                    });
+                  }
+                }
+
+                const assignedTeams = new Set<string>();
+                const takeReplacementTeam = (otherTeam?: string) => {
+                  const replacement = qualifiedTeams.find((teamCode) => !assignedTeams.has(teamCode) && teamCode !== otherTeam);
+                  if (replacement) {
+                    assignedTeams.add(replacement);
+                  }
+                  return replacement || "";
+                };
+
+                const r32Pairings = rawR32Pairings.map((pair) => {
+                  let home = pair.home;
+                  if (!home || assignedTeams.has(home)) {
+                    home = takeReplacementTeam();
+                  } else {
+                    assignedTeams.add(home);
+                  }
+
+                  let away = pair.away;
+                  if (!away || away === home || assignedTeams.has(away)) {
+                    away = takeReplacementTeam(home);
+                  } else {
+                    assignedTeams.add(away);
+                  }
+
+                  if (away === home) {
+                    away = takeReplacementTeam(home);
+                  }
+
+                  return { home, away };
+                }).filter((pair) => pair.home && pair.away && pair.home !== pair.away);
+
+                const r32Participants = r32Pairings.flatMap((pair) => [pair.home, pair.away]);
+                if (r32Pairings.length !== 16 || !hasDistinctKnownTeams(r32Participants, 32)) {
+                  if (iteration === start) {
+                    console.warn("R32 pairings check failed for iteration", iteration, {
+                      pairingsLength: r32Pairings.length,
+                      participantsSize: new Set(r32Participants.filter(Boolean)).size,
+                      expectedParticipantsSize: 32,
+                      r32Pairings: r32Pairings,
+                      qualifiedTeamsCount: qualifiedTeams.length,
+                      qualifiedTeams: qualifiedTeams
+                    });
+                  }
+                  continue iterationLoop;
+                }
+
+                // Check if selected country is in R32
+                const inR32 = r32Pairings.some(p => p.home === effectiveCode || p.away === effectiveCode);
+                if (inR32) currentScore = 1;
+                if (inR32) iterationStageCounts.r32 += 1;
+
+                // Simulate R32
+                const r16Teams: string[] = [];
+                r32Pairings.forEach((pair) => {
+                  const { hs, as, winner } = simulateKo(pair.home, pair.away);
+                  r16Teams.push(winner);
+                  currentMock.r32.push({ home: pair.home, away: pair.away, hs, as, winner });
+                  if (inR32) {
+                    trackIterationMatch("r32", pair.home, pair.away, hs, as, winner === pair.home);
+                    trackIterationMatch("r32", pair.away, pair.home, as, hs, winner === pair.away);
+                  }
+                });
+                if (!hasDistinctKnownTeams(r16Teams, 16)) {
+                  continue iterationLoop;
+                }
+
+                // Check if selected country is in R16
+                const inR16 = r16Teams.includes(effectiveCode);
+                if (inR16) currentScore = 2;
+                if (inR16) iterationStageCounts.r16 += 1;
+
+                // Simulate R16
+                const qfTeams: string[] = [];
+                for (let i = 0; i < 8; i++) {
+                  const home = r16Teams[2 * i];
+                  const away = r16Teams[2 * i + 1];
+                  if (!home || !away || home === away) {
+                    continue iterationLoop;
+                  }
+                  const { hs, as, winner } = simulateKo(home, away);
+                  qfTeams.push(winner);
+                  currentMock.r16.push({ home, away, hs, as, winner });
+                  if (inR16) {
+                    trackIterationMatch("r16", home, away, hs, as, winner === home);
+                    trackIterationMatch("r16", away, home, as, hs, winner === away);
+                  }
+                }
+                if (!hasDistinctKnownTeams(qfTeams, 8)) {
+                  continue iterationLoop;
+                }
+
+                // Check QF
+                const inQF = qfTeams.includes(effectiveCode);
+                if (inQF) currentScore = 3;
+                if (inQF) iterationStageCounts.qf += 1;
+
+                // Simulate QF
+                const sfTeams: string[] = [];
+                for (let i = 0; i < 4; i++) {
+                  const home = qfTeams[2 * i];
+                  const away = qfTeams[2 * i + 1];
+                  if (!home || !away || home === away) {
+                    continue iterationLoop;
+                  }
+                  const { hs, as, winner } = simulateKo(home, away);
+                  sfTeams.push(winner);
+                  currentMock.qf.push({ home, away, hs, as, winner });
+                  if (inQF) {
+                    trackIterationMatch("qf", home, away, hs, as, winner === home);
+                    trackIterationMatch("qf", away, home, as, hs, winner === away);
+                  }
+                }
+                if (!hasDistinctKnownTeams(sfTeams, 4)) {
+                  continue iterationLoop;
+                }
+
+                // Check SF
+                const inSF = sfTeams.includes(effectiveCode);
+                if (inSF) currentScore = 4;
+                if (inSF) iterationStageCounts.sf += 1;
+
+                // Simulate SF
+                const finalTeams: string[] = [];
+                for (let i = 0; i < 2; i++) {
+                  const home = sfTeams[2 * i];
+                  const away = sfTeams[2 * i + 1];
+                  if (!home || !away || home === away) {
+                    continue iterationLoop;
+                  }
+                  const { hs, as, winner } = simulateKo(home, away);
+                  finalTeams.push(winner);
+                  currentMock.sf.push({ home, away, hs, as, winner });
+                  if (inSF) {
+                    trackIterationMatch("sf", home, away, hs, as, winner === home);
+                    trackIterationMatch("sf", away, home, as, hs, winner === away);
+                  }
+                }
+                if (!hasDistinctKnownTeams(finalTeams, 2)) {
+                  continue iterationLoop;
+                }
+
+                // Check Final
+                const inFinal = finalTeams.includes(effectiveCode);
+                if (inFinal) currentScore = 5;
+                if (inFinal) iterationStageCounts.final += 1;
+
+                // Simulate Final
+                const homeTeam = finalTeams[0];
+                const awayTeam = finalTeams[1];
+                if (!homeTeam || !awayTeam || homeTeam === awayTeam) {
+                  continue iterationLoop;
+                }
+                const { hs, as, winner } = simulateKo(homeTeam, awayTeam);
+                currentMock.final = { home: homeTeam, away: awayTeam, hs, as, winner };
+                if (inFinal) {
+                  trackIterationMatch("final", homeTeam, awayTeam, hs, as, winner === homeTeam);
+                  trackIterationMatch("final", awayTeam, homeTeam, as, hs, winner === awayTeam);
+                }
+
+                if (winner === effectiveCode) {
+                  iterationStageCounts.champion += 1;
+                  currentScore = 6;
+                }
+
+                Object.entries(iterationStageCounts).forEach(([stage, count]) => {
+                  stageCounts[stage] += count;
+                });
+                mergeStageOpponentStats(stageOpponents, iterationStageOpponents);
+
+                // Keep best mock tournament
+                if (currentScore > bestScore) {
+                  bestScore = currentScore;
+                  bestMockTournament = currentMock;
+                }
+              } // end chunk loop
+              setSimProgress(Math.floor((end / iterations) * 100));
+              resolve();
+            } catch (e) {
+              reject(e);
+            }
+          }, 0);
+        }); // end Promise
+      } // end main loop
+
+      if (!bestMockTournament) {
+        // Generate a fallback result from partial data instead of throwing
+        console.warn("Simulation produced no valid full brackets, using partial stage data.");
+        bestMockTournament = {
+          groups: {},
+          r32: [],
+          r16: [],
+          qf: [],
+          sf: [],
+          final: null,
+        };
+      }
+
+      const nextResults = {
+        stages: stageCounts,
+        opponents: stageOpponents,
+        mockTournament: bestMockTournament
+      };
+
+      setSimResults(nextResults);
+      persistSimulationSnapshot({
+        selectedCode,
+        selectedModel,
+        customElo,
+        customAttack,
+        customDefense,
+        customPlayerRatingDelta,
+        playersIn,
+        playersOut,
+        simResults: nextResults,
+        useRealScores,
+        bypassOverrides,
+      });
     } catch (err) {
       console.error("Country simulation failed:", err);
       toast.error("Simulation failed before results could render. Please try again.");
@@ -1555,7 +1716,7 @@ export default function CountryPredictionsClient({
         name: selectedTeam.name,
         flag: selectedTeam.flag,
         elo: Math.round(selectedTeam.elo),
-        championProb: Math.round((simResults.stages.champion / 1000) * 100),
+        championProb: Number(((simResults.stages.champion / 1000) * 100).toFixed(2)),
         stages: simResults.stages,
         modelName: selectedModel,
         customElo: customElo,
@@ -1565,7 +1726,89 @@ export default function CountryPredictionsClient({
         customPlayerRatingDelta: customPlayerRatingDelta,
         playersIn: playersIn,
         playersOut: playersOut,
+        playersInNames: playersIn.map(id => storePlayers[id]?.['Player Name'] || id),
+        playersOutNames: playersOut.map(id => storePlayers[id]?.['Player Name'] || id),
+        activeOverridesSummary: {
+          teams: Object.values(storeTeams || {})
+            .filter(t => (t.isCustom || (t as any).isCustom) && !t.isOverrideDisabled && (t['Team Code'] || (t as any).code) !== selectedTeam.code)
+            .map(t => {
+              const code = t['Team Code'] || (t as any).code;
+              return {
+                code: code,
+                name: appTeams.find(x => x.code === code)?.name || t['Team'] || (t as any).name || code
+              };
+            }),
+          players: (() => {
+            const list: { name: string; teamCode: string; teamName: string; detail: string }[] = [];
+            const seen = new Set<string>();
+
+            const pushUnique = (item: { name: string; teamCode: string; teamName: string; detail: string }) => {
+              const key = `${item.teamCode}-${item.name}`;
+              if (seen.has(key)) return;
+              seen.add(key);
+              list.push(item);
+            };
+
+            // 1. Base custom player rating modifications from storePlayers
+            Object.values(storePlayers || {})
+              .filter(p => p.isCustom && !p.isOverrideDisabled)
+              .forEach(p => {
+                const teamCode = p['Team Code'] || (p as any).teamCode || "";
+                pushUnique({
+                  name: p['Player Name'] || (p as any).name || "",
+                  teamCode: teamCode,
+                  teamName: appTeams.find(x => x.code === teamCode)?.name || p['Team'] || (p as any).teamName || teamCode,
+                  detail: `Rating: ${p['Overall Rating'] || (p as any).rating || ""}`
+                });
+              });
+
+            // 2. Simulated team squad availability edits - playersIn (Fit)
+            playersIn.forEach(id => {
+              const p = storePlayers[id];
+              const teamCode = selectedTeam.code;
+              const name = p ? (p['Player Name'] || (p as any).name || id) : id;
+              pushUnique({
+                name: name,
+                teamCode: teamCode,
+                teamName: selectedTeam.name,
+                detail: "Fit"
+              });
+            });
+
+            // 3. Simulated team squad availability edits - playersOut (Injured)
+            playersOut.forEach(id => {
+              const p = storePlayers[id];
+              const teamCode = selectedTeam.code;
+              const name = p ? (p['Player Name'] || (p as any).name || id) : id;
+              pushUnique({
+                name: name,
+                teamCode: teamCode,
+                teamName: selectedTeam.name,
+                detail: "Injured"
+              });
+            });
+
+            return list;
+          })()
+        },
         simResults: simResults,
+        useRealScores: useRealScores,
+        bypassOverrides: bypassOverrides,
+        isWildcard: !!activeCustomCountry,
+        baselineCode: activeCustomCountry?.baselineCode || null,
+        replacedCode: activeCustomCountry?.replacedCode || null,
+        baselineName: activeCustomCountry ? (appTeams.find(t => t.code === activeCustomCountry.baselineCode)?.name || activeCustomCountry.baselineCode) : null,
+        replacedName: activeCustomCountry ? (appTeams.find(t => t.code === activeCustomCountry.replacedCode)?.name || activeCustomCountry.replacedCode) : null,
+        hasCustomStats: !bypassOverrides && (
+          customPlayersCount > 0 ||
+          customTeamsCount > 0 ||
+          customElo !== Math.round(selectedTeam.elo) ||
+          customAttack !== formatTeamScaleRating(selectedTeam.attack) ||
+          customDefense !== formatTeamScaleRating(selectedTeam.defense) ||
+          customPlayerRatingDelta !== 0 ||
+          playersIn.length > 0 ||
+          playersOut.length > 0
+        ),
         path: pathStepInfo.map(step => ({
           stage: step.stage,
           opponentCode: step.opponent?.code || null,
@@ -1724,8 +1967,11 @@ export default function CountryPredictionsClient({
     ] as const;
 
     let currentCode = effectiveCode;
+    let isEliminated = false;
 
     return stagesOrdered.flatMap((stage) => {
+      if (isEliminated) return [];
+
       const stageMatches =
         stage.key === "final"
           ? simResults.mockTournament.final
@@ -1758,12 +2004,18 @@ export default function CountryPredictionsClient({
         expectedScore: `${gf} - ${ga}`,
       };
 
-      currentCode = match.winner;
+      if (match.winner !== currentCode) {
+        isEliminated = true;
+      } else {
+        currentCode = match.winner;
+      }
       return [step];
     });
   }, [effectiveCode, simResults]);
 
-  const selectedGroup = Object.entries(GROUPS_CONFIG).find(([_, list]) => list.includes(effectiveCode))?.[0] || "-";
+  const selectedGroup = Object.entries(GROUPS_CONFIG).find(([_, list]) => {
+    return list.includes(effectiveCode) || (activeCustomCountry && list.includes(activeCustomCountry.replacedCode));
+  })?.[0] || "-";
   const wildcardBaselineName = activeCustomCountry
     ? appTeams.find((team) => team.code === activeCustomCountry.baselineCode)?.name || activeCustomCountry.baselineCode
     : null;
@@ -1841,13 +2093,32 @@ export default function CountryPredictionsClient({
             )}
           </div>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <label
+              className={`inline-flex min-h-[56px] items-center gap-3 rounded-2xl border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${useRealScores
+                  ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+                  : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
+                }`}
+            >
+              <input
+                type="checkbox"
+                checked={useRealScores}
+                onChange={(e) => setUseRealScores(e.target.checked)}
+                className="h-5 w-5 rounded-md border-slate-300 dark:border-white/20 bg-slate-100 dark:bg-slate-800 text-cyan-600 focus:ring-cyan-500 cursor-pointer accent-cyan-500"
+              />
+              <div className="flex items-center gap-1.5">
+                <Zap className={`h-4 w-4 transition-all duration-300 ${useRealScores ? "text-cyan-500 fill-cyan-500 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)] animate-pulse" : "text-slate-400 dark:text-slate-500"}`} />
+                <span className="text-xs font-bold leading-none select-none">
+                  Include Real-Time Results ({groupRealPercent}%)
+                </span>
+              </div>
+            </label>
+
             {totalOverrides > 0 && (
               <label
-                className={`inline-flex min-h-[56px] items-center gap-3 rounded-2xl border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${
-                  bypassOverrides
+                className={`inline-flex min-h-[56px] items-center gap-3 rounded-2xl border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${bypassOverrides
                     ? "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
                     : "bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.15)] animate-pulse"
-                }`}
+                  }`}
               >
                 <input
                   type="checkbox"
@@ -1863,7 +2134,7 @@ export default function CountryPredictionsClient({
                 }}>
                   <Award className={`h-4 w-4 ${bypassOverrides ? "text-slate-400" : "text-purple-500 fill-purple-500/20"}`} />
                   <span className="text-xs font-bold leading-none select-none hover:underline">
-                    {!bypassOverrides ? "Custom Stats Applied" : "Custom Stats Bypassed"} ({totalOverrides})
+                    {!bypassOverrides ? "My Customizations Applied" : "Apply My Customizations"} ({totalOverrides})
                   </span>
                 </div>
               </label>
@@ -1947,10 +2218,15 @@ export default function CountryPredictionsClient({
                                   <PencilLine className="w-3.5 h-3.5 text-cyan-600 dark:text-neon shrink-0 animate-pulse" />
                                 )}
                               </div>
-                              <div className="mt-1 min-h-[1.25rem]">
-                                {"isCustom" in t && t.isCustom ? (
+                              <div className="mt-1 min-h-[1.25rem] flex items-center">
+                                {"isCustom" in t && t.isCustom && t.code.startsWith("CC_") ? (
                                   <span className="inline-flex max-w-full rounded-full border border-fuchsia-200 bg-fuchsia-50 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] text-fuchsia-700 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10 dark:text-fuchsia-300 sm:text-[9px]">
                                     Replaced with {t.replacedName}
+                                  </span>
+                                ) : "isCustom" in t && t.isCustom && !t.code.startsWith("CC_") ? (
+                                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+                                    <span>{t.code}</span>
+                                    <span className="text-[7px] px-1 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 lowercase tracking-normal">custom</span>
                                   </span>
                                 ) : (
                                   <span className="inline-flex text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
@@ -2273,13 +2549,13 @@ export default function CountryPredictionsClient({
                   {simResults && (
                     <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                       {session ? (
-                        <button
+                        <div
+                          role="button"
                           onClick={handleSavePrediction}
-                          disabled={isSaving || isSimulating || saveSuccess}
                           className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all ${saveSuccess
                             ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 cursor-not-allowed opacity-80"
                             : "border border-transparent bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] text-white shadow-[0_10px_25px_rgba(44,124,135,0.2)] hover:opacity-95 active:scale-95 disabled:opacity-50"
-                            }`}
+                            } ${isSaving || isSimulating || saveSuccess ? 'opacity-50 pointer-events-none' : ''}`}
                         >
                           {isSaving ? (
                             <>
@@ -2297,15 +2573,16 @@ export default function CountryPredictionsClient({
                               <span>Save to Predictions</span>
                             </>
                           )}
-                        </button>
+                        </div>
                       ) : (
-                        <button
+                        <div
+                          role="button"
                           onClick={() => openAuthModal("signin")}
-                          className="flex items-center gap-2 bg-gradient-to-r from-cyan-50 to-fuchsia-50 border border-cyan-300 hover:from-cyan-100 hover:to-fuchsia-100 text-slate-900 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 dark:from-neon/20 dark:to-neon-2/20 dark:border-neon/30 dark:hover:from-neon/30 dark:hover:to-neon-2/30 dark:text-white"
+                          className="flex items-center gap-2 bg-gradient-to-r from-cyan-50 to-fuchsia-50 border border-cyan-300 hover:from-cyan-100 hover:to-fuchsia-100 text-slate-900 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 dark:from-neon/20 dark:to-neon-2/20 dark:border-neon/30 dark:hover:from-neon/30 dark:hover:to-neon-2/30 dark:text-white cursor-pointer"
                         >
                           <User className="w-3.5 h-3.5 text-neon-2" />
                           <span>Sign In to Save</span>
-                        </button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -2385,7 +2662,7 @@ export default function CountryPredictionsClient({
                     <div className="relative group mx-auto flex w-full max-w-sm shrink-0 flex-col items-center justify-center overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/10 dark:bg-white/[0.02] dark:shadow-glass 2xl:mx-0 2xl:min-w-[200px]">
                       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-cyan-100/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 dark:to-neon/5" />
                       <span className="text-[10px] uppercase tracking-wider text-slate-700 dark:text-muted-foreground font-extrabold relative z-10">
-                        Championship Prob
+                        Championship Odds
                       </span>
 
                       <div className="relative flex items-center justify-center my-4 z-10">
@@ -2419,7 +2696,7 @@ export default function CountryPredictionsClient({
                         </svg>
                         <div className="absolute text-center">
                           <div className="text-xl font-black font-mono text-slate-950 dark:text-foreground leading-none">
-                            {championProbability.toFixed(1)}%
+                            {championProbability > 0 ? Math.min(100, 100 / championProbability).toFixed(2) : "-"}
                           </div>
                         </div>
                       </div>
@@ -2502,90 +2779,95 @@ export default function CountryPredictionsClient({
           </Accordion>
 
           {/* Dual Charts Row */}
-          <div className="grid items-stretch gap-6 md:grid-cols-2">
+          <div className="grid items-start gap-6 md:grid-cols-2">
             {/* Radar Attributes Card */}
-            <div className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
-              <div className="px-6 pt-6 pb-3">
-                <div>
-                  <div className="font-display font-bold text-base text-foreground">Performance Attributes</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</div>
-                </div>
-              </div>
-              <div className="flex-1 px-6 pb-6">
-                <div className="flex justify-end mb-6">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30">
-                    Attributes
-                  </span>
-                </div>
-                <div className="flex h-64 min-h-[280px] items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={radarData} outerRadius={85}>
-                      <PolarGrid stroke={activeTheme === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.14)"} />
-                      <PolarAngleAxis dataKey="axis" tick={{ fill: activeTheme === "light" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.6)", fontSize: 10, fontFamily: "var(--font-display)" }} />
-                      <Radar dataKey="v" stroke="var(--color-neon)" fill="var(--color-neon)" fillOpacity={activeTheme === "light" ? 0.35 : 0.2} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
+            <Accordion type="single" collapsible defaultValue="performance" className="relative flex flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="performance" className="border-none flex flex-col">
+                <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
+                  <div className="text-left">
+                    <div className="font-display font-bold text-base text-foreground">Performance Attributes</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Statistical profile comparison vs model baseline</div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="flex-1 px-6 pb-6">
+                  <div className="flex justify-end mb-6">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded-full dark:text-neon dark:bg-neon/10 dark:border-neon/30">
+                      Attributes
+                    </span>
+                  </div>
+                  <div className="flex h-[300px] items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={radarData} outerRadius={85}>
+                        <PolarGrid stroke={activeTheme === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.14)"} />
+                        <PolarAngleAxis dataKey="axis" tick={{ fill: activeTheme === "light" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.6)", fontSize: 10, fontFamily: "var(--font-display)" }} />
+                        <Radar dataKey="v" stroke="var(--color-neon)" fill="var(--color-neon)" fillOpacity={activeTheme === "light" ? 0.35 : 0.2} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
             {/* Squad Quality Tiers Card */}
-            <div className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
-              <div className="px-6 pt-6 pb-3">
-                <div>
-                  <div className="font-display font-bold text-base text-foreground">Squad Quality Tiers</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</div>
-                </div>
-              </div>
-              <div className="flex-1 px-6 pb-6">
-                <div className="flex justify-end mb-6">
-                  <span className="self-start rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-fuchsia-700 dark:border-neon-2/30 dark:bg-neon-2/10 dark:text-neon-2">
-                    Squad Profile
-                  </span>
-                </div>
-
-                <div className="mt-6 flex flex-col gap-6">
-                  <div className="flex min-h-[140px] w-full flex-col justify-center items-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/5 dark:bg-white/[0.02]">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</span>
-                    <span className="mt-2 text-5xl font-black font-mono text-foreground">
-                      {squadStats.avgRating || "--"}
-                      {squadStats.avgRating ? <span className="text-2xl align-top">%</span> : null}
+            <Accordion type="single" collapsible defaultValue="squad-quality" className="relative flex flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="squad-quality" className="border-none flex flex-col">
+                <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
+                  <div className="text-left">
+                    <div className="font-display font-bold text-base text-foreground">Squad Quality Tiers</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Distribution of squad players across rating tiers</div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="flex-1 px-6 pb-6">
+                  <div className="flex justify-end mb-6">
+                    <span className="self-start rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-fuchsia-700 dark:border-neon-2/30 dark:bg-neon-2/10 dark:text-neon-2">
+                      Squad Profile
                     </span>
-                    <span className="mt-3 text-sm font-semibold text-emerald-700 dark:text-neon">{squadStats.total} Players</span>
                   </div>
 
-                  <div className="space-y-4 w-full">
-                    {squadTiers.map((tier) => (
-                      <div key={tier.label} className="flex items-center gap-3 w-full">
-                        <div className="text-xs font-semibold text-foreground w-28 shrink-0 truncate">
-                          {tier.label}
+                  <div className="mt-6 flex flex-col gap-6">
+                    <div className="flex min-h-[140px] w-full flex-col justify-center items-center rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/5 dark:bg-white/[0.02]">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Avg Rating</span>
+                      <span className="mt-2 text-5xl font-black font-mono text-foreground">
+                        {squadStats.avgRating || "--"}
+                        {squadStats.avgRating ? <span className="text-2xl align-top">%</span> : null}
+                      </span>
+                      <span className="mt-3 text-sm font-semibold text-emerald-700 dark:text-neon">{squadStats.total} Players</span>
+                    </div>
+
+                    <div className="space-y-4 w-full">
+                      {squadTiers.map((tier) => (
+                        <div key={tier.label} className="flex items-center gap-3 w-full">
+                          <div className="text-xs font-semibold text-foreground w-28 shrink-0 truncate">
+                            {tier.label}
+                          </div>
+                          <div className="flex-1 h-3 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/8">
+                            <div
+                              className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
+                              style={{ width: `${Math.max(tier.pct, tier.count > 0 ? 4 : 0)}%` }}
+                            />
+                          </div>
+                          <div className="w-20 shrink-0 text-right font-mono text-xs font-bold tabular-nums text-foreground">
+                            {tier.count}
+                            <span className="ml-1.5 text-[10px] text-muted-foreground font-medium">({tier.pct}%)</span>
+                          </div>
                         </div>
-                        <div className="flex-1 h-3 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/8">
-                          <div
-                            className={`h-full rounded-full bg-gradient-to-r ${tier.color} transition-all duration-700`}
-                            style={{ width: `${Math.max(tier.pct, tier.count > 0 ? 4 : 0)}%` }}
-                          />
-                        </div>
-                        <div className="w-20 shrink-0 text-right font-mono text-xs font-bold tabular-nums text-foreground">
-                          {tier.count}
-                          <span className="ml-1.5 text-[10px] text-muted-foreground font-medium">({tier.pct}%)</span>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
 
-          <div className="rounded-[2rem] bg-white border border-slate-200 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900">
-            <div className="px-6 pt-6 pb-3">
-              <div>
-                <div className="font-display font-bold text-lg text-foreground">Expected Path to Glory</div>
-                <div className="text-xs text-muted-foreground mt-0.5">Calculated dynamically from the most common matchups and scores across all simulations.</div>
-              </div>
-            </div>
-            <div className="px-6 pb-6">
+          <Accordion type="single" collapsible defaultValue="expected-path" className="rounded-[2rem] bg-white border border-slate-200 shadow-[0_16px_40px_rgba(15,23,42,0.06)] relative dark:border-white/10 dark:bg-slate-900 mt-6">
+            <AccordionItem value="expected-path" className="border-none">
+              <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
+                <div className="text-left">
+                  <div className="font-display font-bold text-lg text-foreground">Expected Path to Glory</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Calculated dynamically from the most common matchups and scores across all simulations.</div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-6 pb-6">
                 <div className="flex justify-end border-b border-slate-200 pb-5 mb-6 dark:border-white/5">
                   <div className="text-[10px] uppercase bg-cyan-50 border border-cyan-200 text-cyan-700 px-3.5 py-1.5 rounded-full font-bold self-start sm:self-auto shadow-sm dark:bg-neon/10 dark:border-neon/30 dark:text-neon">
                     Model: {formattedModelName}
@@ -2671,8 +2953,9 @@ export default function CountryPredictionsClient({
                     </div>
                   </div>
                 )}
-            </div>
-          </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
       </div>
 
@@ -2775,263 +3058,263 @@ export default function CountryPredictionsClient({
                     </div>
 
                     {/* Bracket Content Row */}
-                    <div 
+                    <div
                       className="flex items-start justify-start min-w-max gap-12 px-4 transition-transform duration-300 origin-top-left"
                       style={{ zoom: zoomScale / 100 }}
                     >
-                    {/* R32 Column */}
-                    <div className="flex flex-col shrink-0">
-                      {simResults.mockTournament.r32.map((m: any, i: number) => {
-                        const home = getTeam(m.home);
-                        const away = getTeam(m.away);
-                        const isHomeWinner = m.winner === m.home;
-                        const isAwayWinner = m.winner === m.away;
-                        const homeBg = getBracketRowClasses(m.home, isHomeWinner);
-                        const awayBg = getBracketRowClasses(m.away, isAwayWinner);
+                      {/* R32 Column */}
+                      <div className="flex flex-col shrink-0">
+                        {simResults.mockTournament.r32.map((m: any, i: number) => {
+                          const home = getTeam(m.home);
+                          const away = getTeam(m.away);
+                          const isHomeWinner = m.winner === m.home;
+                          const isAwayWinner = m.winner === m.away;
+                          const homeBg = getBracketRowClasses(m.home, isHomeWinner);
+                          const awayBg = getBracketRowClasses(m.away, isAwayWinner);
 
-                        return (
-                          <div key={i} className="h-[130px] flex items-center justify-center relative group/match">
-                            <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-border dark:border-white/10 bg-background dark:bg-[#070c1b] hover:border-[#00c6ff]/40 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
-                              <div className="bg-black/5 dark:bg-black/40 px-3 py-1.5 text-[9px] font-bold text-[#00c6ff] tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
-                                <span>MATCH {i + 1}</span>
-                              </div>
-                              <div className="flex flex-col p-1 gap-1">
-                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                    <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
-                                    {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
-                                  </div>
-                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
-                                </div>
-                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                    <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
-                                    {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
-                                  </div>
-                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
-                                </div>
-                              </div>
-                            </div>
-                            {/* Connectors */}
-                            {(i % 2 === 0) ? (
-                              <div className="absolute top-1/2 right-[-24px] w-6 h-[65px] border-t border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-tr-xl -z-10 transition-colors" />
-                            ) : (
-                              <div className="absolute bottom-1/2 right-[-24px] w-6 h-[65px] border-b border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-br-xl -z-10 transition-colors" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* R16 Column */}
-                    <div className="flex flex-col shrink-0">
-                      {simResults.mockTournament.r16.map((m: any, i: number) => {
-                        const home = getTeam(m.home);
-                        const away = getTeam(m.away);
-                        const isHomeWinner = m.winner === m.home;
-                        const isAwayWinner = m.winner === m.away;
-                        const homeBg = getBracketRowClasses(m.home, isHomeWinner);
-                        const awayBg = getBracketRowClasses(m.away, isAwayWinner);
-
-                        return (
-                          <div key={i} className="h-[260px] flex items-center justify-center relative group/match">
-                            <div className="absolute top-1/2 left-[-24px] w-6 h-px bg-border dark:bg-white/10 group-hover/match:bg-[#00c6ff]/30 -z-10 transition-colors -translate-y-1/2" />
-                            <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-border dark:border-white/10 bg-background dark:bg-[#070c1b] hover:border-[#00c6ff]/40 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
-                              <div className="bg-black/5 dark:bg-black/40 px-3 py-1.5 text-[9px] font-bold text-[#00c6ff] tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
-                                <span>R16 MATCH {i + 1}</span>
-                              </div>
-                              <div className="flex flex-col p-1 gap-1">
-                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                    <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
-                                    {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
-                                  </div>
-                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
-                                </div>
-                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                    <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
-                                    {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
-                                  </div>
-                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
-                                </div>
-                              </div>
-                            </div>
-                            {/* Connectors */}
-                            {(i % 2 === 0) ? (
-                              <div className="absolute top-1/2 right-[-24px] w-6 h-[130px] border-t border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-tr-xl -z-10 transition-colors" />
-                            ) : (
-                              <div className="absolute bottom-1/2 right-[-24px] w-6 h-[130px] border-b border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-br-xl -z-10 transition-colors" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* QF Column */}
-                    <div className="flex flex-col shrink-0">
-                      {simResults.mockTournament.qf.map((m: any, i: number) => {
-                        const home = getTeam(m.home);
-                        const away = getTeam(m.away);
-                        const isHomeWinner = m.winner === m.home;
-                        const isAwayWinner = m.winner === m.away;
-                        const homeBg = getBracketRowClasses(m.home, isHomeWinner);
-                        const awayBg = getBracketRowClasses(m.away, isAwayWinner);
-
-                        return (
-                          <div key={i} className="h-[520px] flex items-center justify-center relative group/match">
-                            <div className="absolute top-1/2 left-[-24px] w-6 h-px bg-border dark:bg-white/10 group-hover/match:bg-[#00c6ff]/30 -z-10 transition-colors -translate-y-1/2" />
-                            <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-border dark:border-white/10 bg-background dark:bg-[#070c1b] hover:border-[#00c6ff]/40 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
-                              <div className="bg-black/5 dark:bg-black/40 px-3 py-1.5 text-[9px] font-bold text-[#00c6ff] tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
-                                <span>QF MATCH {i + 1}</span>
-                              </div>
-                              <div className="flex flex-col p-1 gap-1">
-                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                    <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
-                                    {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
-                                  </div>
-                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
-                                </div>
-                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                    <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
-                                    {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
-                                  </div>
-                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
-                                </div>
-                              </div>
-                            </div>
-                            {/* Connectors */}
-                            {(i % 2 === 0) ? (
-                              <div className="absolute top-1/2 right-[-24px] w-6 h-[260px] border-t border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-tr-xl -z-10 transition-colors" />
-                            ) : (
-                              <div className="absolute bottom-1/2 right-[-24px] w-6 h-[260px] border-b border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-br-xl -z-10 transition-colors" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* SF Column */}
-                    <div className="flex flex-col shrink-0">
-                      {simResults.mockTournament.sf.map((m: any, i: number) => {
-                        const home = getTeam(m.home);
-                        const away = getTeam(m.away);
-                        const isHomeWinner = m.winner === m.home;
-                        const isAwayWinner = m.winner === m.away;
-                        const homeBg = getBracketRowClasses(m.home, isHomeWinner);
-                        const awayBg = getBracketRowClasses(m.away, isAwayWinner);
-
-                        return (
-                          <div key={i} className="h-[1040px] flex items-center justify-center relative group/match">
-                            <div className="absolute top-1/2 left-[-24px] w-6 h-px bg-border dark:bg-white/10 group-hover/match:bg-[#00c6ff]/30 -z-10 transition-colors -translate-y-1/2" />
-                            <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-border dark:border-white/10 bg-background dark:bg-[#070c1b] hover:border-[#00c6ff]/40 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
-                              <div className="bg-black/5 dark:bg-black/40 px-3 py-1.5 text-[9px] font-bold text-[#00c6ff] tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
-                                <span>SF MATCH {i + 1}</span>
-                              </div>
-                              <div className="flex flex-col p-1 gap-1">
-                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                    <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
-                                    {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
-                                  </div>
-                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
-                                </div>
-                                <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                    <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                    <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
-                                    {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
-                                  </div>
-                                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
-                                </div>
-                              </div>
-                            </div>
-                            {/* Connectors */}
-                            {(i % 2 === 0) ? (
-                              <div className="absolute top-1/2 right-[-24px] w-6 h-[520px] border-t border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-tr-xl -z-10 transition-colors" />
-                            ) : (
-                              <div className="absolute bottom-1/2 right-[-24px] w-6 h-[520px] border-b border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-br-xl -z-10 transition-colors" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Final Column */}
-                    <div className="h-[2080px] w-56 relative shrink-0">
-                      {simResults.mockTournament.final ? (
-                        <>
-                          {/* High fidelity Champion Showcase */}
-                          <div className="absolute top-[780px] -translate-y-1/2 left-0 right-0 flex flex-col items-center p-8 bg-gradient-to-br from-[#1e1b4b]/20 dark:from-[#1e1b4b]/80 to-[#311042]/20 dark:to-[#311042]/80 rounded-3xl border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.1)] z-20 hover:border-yellow-500/50 transition-all duration-500 group px-2">
-                            <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl" />
-                            <Trophy className="w-20 h-20 text-yellow-500 dark:text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.5)] mb-4 animate-float" />
-                            <div className="text-[10px] font-bold text-yellow-600 dark:text-yellow-500 tracking-widest uppercase mb-2">World Cup Champion</div>
-                            <div className="flex items-center gap-3 mt-2">
-                              <CountryFlag
-                                code={getTeam(simResults.mockTournament.final.winner).code}
-                                flag={getTeam(simResults.mockTournament.final.winner).flag}
-                                name={getTeam(simResults.mockTournament.final.winner).name}
-                                className="h-10 w-14 drop-shadow-md"
-                                emojiClassName="text-4xl drop-shadow-md select-none"
-                              />
-                              <span className="text-xl font-black text-foreground dark:text-white tracking-tight">{getTeam(simResults.mockTournament.final.winner).name}</span>
-                            </div>
-                          </div>
-
-                          {/* World Cup Final section positioned and centered at the midpoint */}
-                          <div className="absolute top-[1040px] -translate-y-1/2 left-0 right-0 flex flex-col items-center">
-                            <div className="absolute bottom-full mb-3 text-[10px] uppercase font-bold text-yellow-600 dark:text-yellow-500 tracking-widest pb-1 border-b border-border dark:border-white/10 text-center w-56">
-                              World Cup Final
-                            </div>
-
-                            {/* Final Match Card wrapper that aligns perfectly with SF connector midpoint */}
-                            <div className="relative group/match">
-                              <div className="absolute top-1/2 left-[-24px] w-6 h-px bg-border dark:bg-white/10 -z-10 -translate-y-1/2" />
-
-                              {/* Final Match Card */}
-                              <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-yellow-500/30 bg-background dark:bg-[#070c1b] hover:border-yellow-500/60 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
-                                <div className="bg-black/5 dark:bg-black/60 px-3 py-1.5 text-[9px] font-bold text-yellow-600 dark:text-yellow-500 tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
-                                  <span>FINAL</span>
+                          return (
+                            <div key={i} className="h-[130px] flex items-center justify-center relative group/match">
+                              <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-border dark:border-white/10 bg-background dark:bg-[#070c1b] hover:border-[#00c6ff]/40 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
+                                <div className="bg-black/5 dark:bg-black/40 px-3 py-1.5 text-[9px] font-bold text-[#00c6ff] tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
+                                  <span>MATCH {i + 1}</span>
                                 </div>
                                 <div className="flex flex-col p-1 gap-1">
-                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.home, simResults.mockTournament.final.winner === simResults.mockTournament.final.home, "gold")}`}>
+                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
                                     <div className="flex items-center gap-2 overflow-hidden">
-                                      <CountryFlag code={getTeam(simResults.mockTournament.final.home).code} flag={getTeam(simResults.mockTournament.final.home).flag} name={getTeam(simResults.mockTournament.final.home).name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.home).name}</span>
-                                      {simResults.mockTournament.final.winner === simResults.mockTournament.final.home && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
+                                      <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
+                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                     </div>
-                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(simResults.mockTournament.final.home)}`}>{simResults.mockTournament.final.hs}</span>
+                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
                                   </div>
-                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.away, simResults.mockTournament.final.winner === simResults.mockTournament.final.away, "gold")}`}>
+                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
                                     <div className="flex items-center gap-2 overflow-hidden">
-                                      <CountryFlag code={getTeam(simResults.mockTournament.final.away).code} flag={getTeam(simResults.mockTournament.final.away).flag} name={getTeam(simResults.mockTournament.final.away).name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
-                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.away).name}</span>
-                                      {simResults.mockTournament.final.winner === simResults.mockTournament.final.away && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
+                                      <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
+                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
                                     </div>
-                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(simResults.mockTournament.final.away)}`}>{simResults.mockTournament.final.as}</span>
+                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Connectors */}
+                              {(i % 2 === 0) ? (
+                                <div className="absolute top-1/2 right-[-24px] w-6 h-[65px] border-t border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-tr-xl -z-10 transition-colors" />
+                              ) : (
+                                <div className="absolute bottom-1/2 right-[-24px] w-6 h-[65px] border-b border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-br-xl -z-10 transition-colors" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* R16 Column */}
+                      <div className="flex flex-col shrink-0">
+                        {simResults.mockTournament.r16.map((m: any, i: number) => {
+                          const home = getTeam(m.home);
+                          const away = getTeam(m.away);
+                          const isHomeWinner = m.winner === m.home;
+                          const isAwayWinner = m.winner === m.away;
+                          const homeBg = getBracketRowClasses(m.home, isHomeWinner);
+                          const awayBg = getBracketRowClasses(m.away, isAwayWinner);
+
+                          return (
+                            <div key={i} className="h-[260px] flex items-center justify-center relative group/match">
+                              <div className="absolute top-1/2 left-[-24px] w-6 h-px bg-border dark:bg-white/10 group-hover/match:bg-[#00c6ff]/30 -z-10 transition-colors -translate-y-1/2" />
+                              <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-border dark:border-white/10 bg-background dark:bg-[#070c1b] hover:border-[#00c6ff]/40 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
+                                <div className="bg-black/5 dark:bg-black/40 px-3 py-1.5 text-[9px] font-bold text-[#00c6ff] tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
+                                  <span>R16 MATCH {i + 1}</span>
+                                </div>
+                                <div className="flex flex-col p-1 gap-1">
+                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
+                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
+                                    </div>
+                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
+                                  </div>
+                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
+                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
+                                    </div>
+                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Connectors */}
+                              {(i % 2 === 0) ? (
+                                <div className="absolute top-1/2 right-[-24px] w-6 h-[130px] border-t border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-tr-xl -z-10 transition-colors" />
+                              ) : (
+                                <div className="absolute bottom-1/2 right-[-24px] w-6 h-[130px] border-b border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-br-xl -z-10 transition-colors" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* QF Column */}
+                      <div className="flex flex-col shrink-0">
+                        {simResults.mockTournament.qf.map((m: any, i: number) => {
+                          const home = getTeam(m.home);
+                          const away = getTeam(m.away);
+                          const isHomeWinner = m.winner === m.home;
+                          const isAwayWinner = m.winner === m.away;
+                          const homeBg = getBracketRowClasses(m.home, isHomeWinner);
+                          const awayBg = getBracketRowClasses(m.away, isAwayWinner);
+
+                          return (
+                            <div key={i} className="h-[520px] flex items-center justify-center relative group/match">
+                              <div className="absolute top-1/2 left-[-24px] w-6 h-px bg-border dark:bg-white/10 group-hover/match:bg-[#00c6ff]/30 -z-10 transition-colors -translate-y-1/2" />
+                              <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-border dark:border-white/10 bg-background dark:bg-[#070c1b] hover:border-[#00c6ff]/40 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
+                                <div className="bg-black/5 dark:bg-black/40 px-3 py-1.5 text-[9px] font-bold text-[#00c6ff] tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
+                                  <span>QF MATCH {i + 1}</span>
+                                </div>
+                                <div className="flex flex-col p-1 gap-1">
+                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
+                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
+                                    </div>
+                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
+                                  </div>
+                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
+                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
+                                    </div>
+                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Connectors */}
+                              {(i % 2 === 0) ? (
+                                <div className="absolute top-1/2 right-[-24px] w-6 h-[260px] border-t border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-tr-xl -z-10 transition-colors" />
+                              ) : (
+                                <div className="absolute bottom-1/2 right-[-24px] w-6 h-[260px] border-b border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-br-xl -z-10 transition-colors" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* SF Column */}
+                      <div className="flex flex-col shrink-0">
+                        {simResults.mockTournament.sf.map((m: any, i: number) => {
+                          const home = getTeam(m.home);
+                          const away = getTeam(m.away);
+                          const isHomeWinner = m.winner === m.home;
+                          const isAwayWinner = m.winner === m.away;
+                          const homeBg = getBracketRowClasses(m.home, isHomeWinner);
+                          const awayBg = getBracketRowClasses(m.away, isAwayWinner);
+
+                          return (
+                            <div key={i} className="h-[1040px] flex items-center justify-center relative group/match">
+                              <div className="absolute top-1/2 left-[-24px] w-6 h-px bg-border dark:bg-white/10 group-hover/match:bg-[#00c6ff]/30 -z-10 transition-colors -translate-y-1/2" />
+                              <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-border dark:border-white/10 bg-background dark:bg-[#070c1b] hover:border-[#00c6ff]/40 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
+                                <div className="bg-black/5 dark:bg-black/40 px-3 py-1.5 text-[9px] font-bold text-[#00c6ff] tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
+                                  <span>SF MATCH {i + 1}</span>
+                                </div>
+                                <div className="flex flex-col p-1 gap-1">
+                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${homeBg}`}>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      <CountryFlag code={home.code} flag={home.flag} name={home.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{home.name}</span>
+                                      {isHomeWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
+                                    </div>
+                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.home)}`}>{m.hs}</span>
+                                  </div>
+                                  <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${awayBg}`}>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      <CountryFlag code={away.code} flag={away.flag} name={away.name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                      <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{away.name}</span>
+                                      {isAwayWinner && <Check className="w-3.5 h-3.5 text-[#00c6ff] shrink-0" />}
+                                    </div>
+                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(m.away)}`}>{m.as}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Connectors */}
+                              {(i % 2 === 0) ? (
+                                <div className="absolute top-1/2 right-[-24px] w-6 h-[520px] border-t border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-tr-xl -z-10 transition-colors" />
+                              ) : (
+                                <div className="absolute bottom-1/2 right-[-24px] w-6 h-[520px] border-b border-r border-border dark:border-white/10 group-hover/match:border-[#00c6ff]/30 rounded-br-xl -z-10 transition-colors" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Final Column */}
+                      <div className="h-[2080px] w-56 relative shrink-0">
+                        {simResults.mockTournament.final ? (
+                          <>
+                            {/* High fidelity Champion Showcase */}
+                            <div className="absolute top-[780px] -translate-y-1/2 left-0 right-0 flex flex-col items-center p-8 bg-gradient-to-br from-[#1e1b4b]/20 dark:from-[#1e1b4b]/80 to-[#311042]/20 dark:to-[#311042]/80 rounded-3xl border border-yellow-500/20 shadow-[0_0_30px_rgba(234,179,8,0.1)] z-20 hover:border-yellow-500/50 transition-all duration-500 group px-2">
+                              <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl" />
+                              <Trophy className="w-20 h-20 text-yellow-500 dark:text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.5)] mb-4 animate-float" />
+                              <div className="text-[10px] font-bold text-yellow-600 dark:text-yellow-500 tracking-widest uppercase mb-2">World Cup Champion</div>
+                              <div className="flex items-center gap-3 mt-2">
+                                <CountryFlag
+                                  code={getTeam(simResults.mockTournament.final.winner).code}
+                                  flag={getTeam(simResults.mockTournament.final.winner).flag}
+                                  name={getTeam(simResults.mockTournament.final.winner).name}
+                                  className="h-10 w-14 drop-shadow-md"
+                                  emojiClassName="text-4xl drop-shadow-md select-none"
+                                />
+                                <span className="text-xl font-black text-foreground dark:text-white tracking-tight">{getTeam(simResults.mockTournament.final.winner).name}</span>
+                              </div>
+                            </div>
+
+                            {/* World Cup Final section positioned and centered at the midpoint */}
+                            <div className="absolute top-[1040px] -translate-y-1/2 left-0 right-0 flex flex-col items-center">
+                              <div className="absolute bottom-full mb-3 text-[10px] uppercase font-bold text-yellow-600 dark:text-yellow-500 tracking-widest pb-1 border-b border-border dark:border-white/10 text-center w-56">
+                                World Cup Final
+                              </div>
+
+                              {/* Final Match Card wrapper that aligns perfectly with SF connector midpoint */}
+                              <div className="relative group/match">
+                                <div className="absolute top-1/2 left-[-24px] w-6 h-px bg-border dark:bg-white/10 -z-10 -translate-y-1/2" />
+
+                                {/* Final Match Card */}
+                                <div className="flex flex-col w-56 h-[120px] rounded-xl overflow-hidden shadow-sm dark:shadow-lg border border-yellow-500/30 bg-background dark:bg-[#070c1b] hover:border-yellow-500/60 hover:scale-[1.02] transition-all duration-300 group shrink-0 relative">
+                                  <div className="bg-black/5 dark:bg-black/60 px-3 py-1.5 text-[9px] font-bold text-yellow-600 dark:text-yellow-500 tracking-widest uppercase flex justify-between border-b border-border dark:border-white/5">
+                                    <span>FINAL</span>
+                                  </div>
+                                  <div className="flex flex-col p-1 gap-1">
+                                    <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.home, simResults.mockTournament.final.winner === simResults.mockTournament.final.home, "gold")}`}>
+                                      <div className="flex items-center gap-2 overflow-hidden">
+                                        <CountryFlag code={getTeam(simResults.mockTournament.final.home).code} flag={getTeam(simResults.mockTournament.final.home).flag} name={getTeam(simResults.mockTournament.final.home).name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                        <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.home).name}</span>
+                                        {simResults.mockTournament.final.winner === simResults.mockTournament.final.home && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
+                                      </div>
+                                      <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(simResults.mockTournament.final.home)}`}>{simResults.mockTournament.final.hs}</span>
+                                    </div>
+                                    <div className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors ${getBracketRowClasses(simResults.mockTournament.final.away, simResults.mockTournament.final.winner === simResults.mockTournament.final.away, "gold")}`}>
+                                      <div className="flex items-center gap-2 overflow-hidden">
+                                        <CountryFlag code={getTeam(simResults.mockTournament.final.away).code} flag={getTeam(simResults.mockTournament.final.away).flag} name={getTeam(simResults.mockTournament.final.away).name} className="h-4 w-5 drop-shadow-md" emojiClassName="text-sm drop-shadow-md select-none" />
+                                        <span className="text-[11px] font-bold text-foreground dark:text-white truncate w-24">{getTeam(simResults.mockTournament.final.away).name}</span>
+                                        {simResults.mockTournament.final.winner === simResults.mockTournament.final.away && <Check className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
+                                      </div>
+                                      <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${getBracketScoreClasses(simResults.mockTournament.final.away)}`}>{simResults.mockTournament.final.as}</span>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
                             </div>
+                          </>
+                        ) : (
+                          <div className="absolute top-[1040px] -translate-y-1/2 left-0 right-0 text-center text-xs font-medium text-slate-400 dark:text-muted-foreground">
+                            No final matches computed
                           </div>
-                        </>
-                      ) : (
-                        <div className="absolute top-[1040px] -translate-y-1/2 left-0 right-0 text-center text-xs font-medium text-slate-400 dark:text-muted-foreground">
-                          No final matches computed
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
                 </>
               )}
             </div>
@@ -3213,8 +3496,15 @@ export default function CountryPredictionsClient({
                     {Object.values(storeTeams || {}).filter(t => t.isCustom).map((t) => {
                       const staticDefault = staticDefaultTeams.find(dt => dt.name === t.Team);
                       return (
-                        <div key={t["Team Code"]} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        <div key={t["Team Code"]} className={`flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 ${t.isOverrideDisabled ? "opacity-55" : ""}`}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={!t.isOverrideDisabled}
+                              onChange={() => toggleTeamOverride(t["Team Code"])}
+                              className="h-4 w-4 rounded border-slate-300 dark:border-white/20 text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0"
+                              title="Enable/Disable this override"
+                            />
                             <CountryFlag
                               code={t["Team Code"]}
                               flag={getTeam(t["Team Code"])?.flag}
@@ -3267,8 +3557,15 @@ export default function CountryPredictionsClient({
                       const key = `${p["Team Code"]}-${p["Player Name"]}`;
                       const staticDefault = staticDefaultPlayers[key];
                       return (
-                        <div key={key} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        <div key={key} className={`flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 ${p.isOverrideDisabled ? "opacity-55" : ""}`}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={!p.isOverrideDisabled}
+                              onChange={() => togglePlayerOverride(key)}
+                              className="h-4 w-4 rounded border-slate-300 dark:border-white/20 text-purple-600 focus:ring-purple-500 cursor-pointer shrink-0"
+                              title="Enable/Disable this override"
+                            />
                             <CountryFlag
                               code={p["Team Code"]}
                               flag={getTeam(p["Team Code"])?.flag}

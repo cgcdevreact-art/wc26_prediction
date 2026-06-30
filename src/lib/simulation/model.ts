@@ -10,6 +10,7 @@ export interface SimTeam {
   attack: number;
   defense: number;
   power?: number;
+  baselineCode?: string;
 }
 
 // Calculate the expected goals (Lambda) for a match based on the selected model
@@ -57,6 +58,9 @@ export function getMatchExpectedGoals(
     return { homeLambda, awayLambda };
   }
 
+  const homeCode = homeTeam.baselineCode || homeTeam.code;
+  const awayCode = awayTeam.baselineCode || awayTeam.code;
+
   // Helper to calculate average squad player rating
   const getAvgPlayerRating = (teamCode: string) => {
     const teamPlayers = Object.values(players).filter(p => p["Team Code"] === teamCode);
@@ -68,8 +72,8 @@ export function getMatchExpectedGoals(
     return sum / teamPlayers.length;
   };
 
-  const homeAvgRating = getAvgPlayerRating(homeTeam.code);
-  const awayAvgRating = getAvgPlayerRating(awayTeam.code);
+  const homeAvgRating = getAvgPlayerRating(homeCode);
+  const awayAvgRating = getAvgPlayerRating(awayCode);
 
   // 2. Advanced Model: Base + Overall Player Rating ratio
   homeLambda = homeLambda * (homeAvgRating / awayAvgRating);
@@ -122,8 +126,8 @@ export function getMatchExpectedGoals(
     return { attackMod, defenseMod };
   };
 
-  const homeAspects = getTeamAspects(homeTeam.code);
-  const awayAspects = getTeamAspects(awayTeam.code);
+  const homeAspects = getTeamAspects(homeCode);
+  const awayAspects = getTeamAspects(awayCode);
 
   // 3. Pro Model: Advanced + All player aspects ratio
   homeLambda = homeLambda * (homeAspects.attackMod / awayAspects.defenseMod);

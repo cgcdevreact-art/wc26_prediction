@@ -161,7 +161,8 @@ export default function TeamsClient({
   }, [search, sortedTeams]);
 
   const getTeamPlayers = (teamCode: string) => {
-    return Object.values(players)
+    const sourcePlayers = Object.keys(players).length > 0 ? Object.values(players) : initialPlayers;
+    return sourcePlayers
       .filter((p) => p["Team Code"] === teamCode)
       .sort((a, b) => {
         const ratingA = parseInt(a["Overall Rating"]?.replace("%", "") || "0", 10);
@@ -181,8 +182,11 @@ export default function TeamsClient({
         name: team.name,
         flag: team.flag || flagMap[team.code] || "🏳️",
         playersCount: teamPlayers.length || Number(teamRecord?.Players || 0),
-        eliteCount: Number(teamRecord?.Elite || 0),
-        strongCount: Number(teamRecord?.["Very Strong"] || 0),
+        eliteCount: teamPlayers.filter(p => parseInt(p["Overall Rating"]?.replace("%", "") || "0", 10) >= 90).length,
+        strongCount: teamPlayers.filter(p => {
+          const r = parseInt(p["Overall Rating"]?.replace("%", "") || "0", 10);
+          return r >= 85 && r <= 89;
+        }).length,
         topPlayerName: topPlayer ? topPlayer["Name on Shirt"] || topPlayer["Player Name"] || "N/A" : "N/A",
         topPlayerRating: topPlayer?.["Overall Rating"] || "",
         rank: team.rank,
@@ -836,7 +840,7 @@ export default function TeamsClient({
                         } : undefined}
                       >
                         <span className={`inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
-                          {team.Elite || "0"}
+                          {getTeamPlayers(team["Team Code"]).filter(p => parseInt(p["Overall Rating"]?.replace("%", "") || "0", 10) >= 90).length}
                         </span>
                       </td>
                       <td
@@ -848,7 +852,10 @@ export default function TeamsClient({
                         } : undefined}
                       >
                         <span className={`inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
-                          {team["Very Strong"] || "0"}
+                          {getTeamPlayers(team["Team Code"]).filter(p => {
+                            const r = parseInt(p["Overall Rating"]?.replace("%", "") || "0", 10);
+                            return r >= 85 && r <= 89;
+                          }).length}
                         </span>
                       </td>
                       <td
