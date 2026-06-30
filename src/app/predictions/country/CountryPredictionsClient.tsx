@@ -2662,7 +2662,7 @@ export default function CountryPredictionsClient({
                     <div className="relative group mx-auto flex w-full max-w-sm shrink-0 flex-col items-center justify-center overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-50 p-6 text-center shadow-sm dark:border-white/10 dark:bg-white/[0.02] dark:shadow-glass 2xl:mx-0 2xl:min-w-[200px]">
                       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-cyan-100/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 dark:to-neon/5" />
                       <span className="text-[10px] uppercase tracking-wider text-slate-700 dark:text-muted-foreground font-extrabold relative z-10">
-                        Championship Prob
+                        Championship Odds
                       </span>
 
                       <div className="relative flex items-center justify-center my-4 z-10">
@@ -2696,7 +2696,7 @@ export default function CountryPredictionsClient({
                         </svg>
                         <div className="absolute text-center">
                           <div className="text-xl font-black font-mono text-slate-950 dark:text-foreground leading-none">
-                            {championProbability.toFixed(1)}%
+                            {championProbability > 0 ? (100 / championProbability).toFixed(2) : "-"}
                           </div>
                         </div>
                       </div>

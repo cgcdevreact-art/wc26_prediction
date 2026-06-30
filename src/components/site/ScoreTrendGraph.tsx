@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   ResponsiveContainer,
   BarChart,
@@ -11,9 +12,11 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { Plus, X, Search, TrendingUp } from "lucide-react";
+import { Plus, X, Search, TrendingUp, Maximize2, Minimize2, Crown } from "lucide-react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
+import { UpgradeModal } from "@/components/site/UpgradeModal";
 
 interface PredictorMatch {
   id: string;
@@ -54,6 +57,12 @@ const PILL_STYLES = [
   "bg-fuchsia-500/12 text-fuchsia-700 border-fuchsia-500/35 dark:bg-fuchsia-500/18 dark:text-fuchsia-300 dark:border-fuchsia-400/30",
   "bg-emerald-500/12 text-emerald-700 border-emerald-500/35 dark:bg-emerald-500/18 dark:text-emerald-300 dark:border-emerald-400/30",
   "bg-amber-500/12 text-amber-700 border-amber-500/35 dark:bg-amber-500/18 dark:text-amber-300 dark:border-amber-400/30",
+  "bg-blue-500/12 text-blue-700 border-blue-500/35 dark:bg-blue-500/18 dark:text-blue-300 dark:border-blue-400/30",
+  "bg-rose-500/12 text-rose-700 border-rose-500/35 dark:bg-rose-500/18 dark:text-rose-300 dark:border-rose-400/30",
+  "bg-violet-500/12 text-violet-700 border-violet-500/35 dark:bg-violet-500/18 dark:text-violet-300 dark:border-violet-400/30",
+  "bg-orange-500/12 text-orange-700 border-orange-500/35 dark:bg-orange-500/18 dark:text-orange-300 dark:border-orange-400/30",
+  "bg-lime-500/12 text-lime-700 border-lime-500/35 dark:bg-lime-500/18 dark:text-lime-300 dark:border-lime-400/30",
+  "bg-pink-500/12 text-pink-700 border-pink-500/35 dark:bg-pink-500/18 dark:text-pink-300 dark:border-pink-400/30",
 ];
 
 function hasStartedLiveGame(game: any): boolean {
@@ -98,6 +107,13 @@ export function ScoreTrendGraph({
   liveStadiums,
   getGroupMatchDetails,
 }: ScoreTrendGraphProps) {
+  const { data: session } = useSession();
+  const subscriptionTier = (session?.user?.subscriptionTier || "free").toLowerCase();
+
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const maxSelections = isExpanded ? 10 : 4;
+
   // Pre-select first 4 teams of Group A as defaults
   const [selectedTeamCodes, setSelectedTeamCodes] = useState<string[]>(() => {
     return ["MEX", "RSA", "KOR", "CZE"];
@@ -130,8 +146,8 @@ export function ScoreTrendGraph({
     if (selectedTeamCodes.includes(code)) {
       setSelectedTeamCodes((prev) => prev.filter((c) => c !== code));
     } else {
-      if (selectedTeamCodes.length >= 4) {
-        toast.warning("You can select a maximum of 4 countries to compare.");
+      if (selectedTeamCodes.length >= maxSelections) {
+        toast.warning(`You can select a maximum of ${maxSelections} countries to compare.`);
         return;
       }
       setSelectedTeamCodes((prev) => [...prev, code]);
@@ -208,33 +224,70 @@ export function ScoreTrendGraph({
     teams,
   ]);
 
-  return (
-    <div className="glass-strong mb-6 rounded-2xl border border-border/40 p-6 shadow-glass space-y-6">
+  const content = (
+    <div className={`glass-strong mb-6 border border-border/40 p-6 shadow-glass space-y-6 ${isExpanded ? "fixed inset-0 z-[100] m-0 rounded-none bg-background/95 backdrop-blur-xl overflow-y-auto" : "rounded-2xl"}`}>
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-4">
         <div>
-          <h3 className="font-display font-bold text-xl flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-neon animate-pulse" />
-            Points Progression Trend
-          </h3>
+          <div className="flex items-center gap-3">
+            <h3 className="font-display font-bold text-xl flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-neon animate-pulse" />
+              Points Progression Trend
+            </h3>
+            {isExpanded && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30 flex items-center gap-1">
+                <Crown className="h-3 w-3" /> PRO VIEW
+              </span>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             Compare real match points against simulated or predicted totals by country.
           </p>
         </div>
 
         {/* Action button */}
-        <div className="relative" ref={selectorRef}>
+        <div className="flex items-center gap-2 relative" ref={selectorRef}>
+          {!isExpanded ? (
+            <button
+              onClick={() => {
+                if (subscriptionTier === "free") {
+                  setUpgradeModalOpen(true);
+                } else {
+                  setIsExpanded(true);
+                }
+              }}
+              className="flex items-center justify-center p-2 rounded-xl border border-amber-500/30 hover:border-amber-500 bg-amber-500/5 hover:bg-amber-500/10 text-amber-500 transition group relative"
+              title="Pro View (Compare up to 10 countries)"
+            >
+              <Maximize2 className="h-4 w-4" />
+              <Crown className="absolute -top-2 -right-2 h-3.5 w-3.5 text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setIsExpanded(false);
+                // Truncate back to 4 when closing
+                if (selectedTeamCodes.length > 4) {
+                  setSelectedTeamCodes(prev => prev.slice(0, 4));
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-xl border border-rose-500/30 hover:border-rose-500 bg-rose-500/5 hover:bg-rose-500/10 text-rose-500 transition"
+            >
+              <Minimize2 className="h-3.5 w-3.5" /> Close Pro View
+            </button>
+          )}
+
           <button
             onClick={() => setIsSelectorOpen((prev) => !prev)}
             className="flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl border border-cyan-500/30 hover:border-cyan-500 bg-cyan-500/5 hover:bg-cyan-500/10 text-cyan-500 dark:text-cyan-400 transition"
           >
             <Plus className="h-3.5 w-3.5" />
-            Select Countries ({selectedTeamCodes.length}/4)
+            Select Countries ({selectedTeamCodes.length}/{maxSelections})
           </button>
 
           {/* Search Dropdown Selector */}
           {isSelectorOpen && (
-            <div className="absolute right-0 mt-2 w-72 max-h-96 overflow-y-auto glass-strong border border-border/60 rounded-xl p-3 shadow-xl z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
+            <div className="absolute top-full right-0 mt-2 w-72 max-h-96 overflow-y-auto glass-strong border border-border/60 rounded-xl p-3 shadow-xl z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
               <div className="relative mb-2">
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                 <input
@@ -316,7 +369,7 @@ export function ScoreTrendGraph({
 
       {/* Grouped Bar Chart */}
       {selectedTeamCodes.length > 0 && (
-        <div className="h-64 sm:h-80 w-full bg-card dark:bg-black/25 border border-border/60 p-4 rounded-2xl">
+        <div className={`${isExpanded ? "h-[60vh]" : "h-64 sm:h-80"} w-full bg-card dark:bg-black/25 border border-border/60 p-4 rounded-2xl`}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
@@ -385,5 +438,16 @@ export function ScoreTrendGraph({
         </div>
       )}
     </div>
+  );
+
+  return (
+    <>
+      {isExpanded && typeof document !== "undefined" ? createPortal(content, document.body) : content}
+      <UpgradeModal 
+        isOpen={upgradeModalOpen} 
+        onClose={() => setUpgradeModalOpen(false)} 
+        reason="plus" 
+      />
+    </>
   );
 }

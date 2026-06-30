@@ -748,7 +748,11 @@ export default function SavedPredictionsClient() {
                               {data.modelName || "base"}
                             </td>
                             <td className="py-3.5 px-4 font-bold text-foreground">
-                              {Number(data.championProb || 0).toFixed(1)}
+                              {(() => {
+                                const ch = data.stages?.champion ?? (data.championProb * 10 || 0);
+                                const prob = ch / 10;
+                                return prob > 0 ? (100 / prob).toFixed(2) : "-";
+                              })()}
                             </td>
                             <td className="py-3.5 px-4 whitespace-nowrap">
                               <div className="flex flex-col gap-0.5">
@@ -1110,7 +1114,7 @@ export default function SavedPredictionsClient() {
                                           <div className={`space-y-1.5 max-w-[180px] ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
                                             <div className="flex items-center justify-between text-xs font-black font-mono">
                                               <span className={isBest ? "text-cyan-600 dark:text-neon text-sm" : "text-foreground"}>
-                                                {prob.toFixed(1)}
+                                                {prob > 0 ? (100 / prob).toFixed(2) : "-"}
                                               </span>
                                               {isBest && (
                                                 <span className="text-[9px] font-extrabold text-cyan-600 dark:text-neon uppercase tracking-wide bg-cyan-500/15 dark:bg-neon/20 px-1 py-0.2 rounded flex items-center gap-0.5">
