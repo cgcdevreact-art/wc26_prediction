@@ -974,10 +974,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     syncKnockoutBracketRef.current = syncKnockoutBracket;
   });
 
+  const [preRealScoresKoWinners, setPreRealScoresKoWinners] = useState<typeof koWinners | null>(null);
+
   const handleToggleRealScores = (checked: boolean) => {
     setUseRealScores(checked);
     if (checked) {
       setPreRealScoresMatches(matches);
+      setPreRealScoresKoWinners(koWinners);
       const updatedMatches = applyRealScores(matches);
       setMatches(updatedMatches);
       if (syncKnockoutBracketRef.current) {
@@ -987,7 +990,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       if (preRealScoresMatches) {
         setMatches(preRealScoresMatches);
       }
+      if (preRealScoresKoWinners) {
+        setKoWinners(preRealScoresKoWinners);
+      }
       setPreRealScoresMatches(null);
+      setPreRealScoresKoWinners(null);
     }
   };
 
@@ -1000,6 +1007,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         return prev.homeScore !== m.homeScore || prev.awayScore !== m.awayScore;
       });
       if (hasChanged) {
+        setPreRealScoresMatches((prev) => prev || currentMatches);
         setMatches(updatedMatches);
         if (syncKnockoutBracketRef.current) {
           syncKnockoutBracketRef.current(updatedMatches);
@@ -2009,15 +2017,40 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   }, [r32Teams, koWinners]);
 
   const topTeamsData = useMemo(() => {
+    const isBracketSynced = () => {
+      for (let i = 0; i < 16; i++) {
+        const winner = koWinners.r32[i];
+        if (winner) {
+          const match = r32Teams[i];
+          if (winner !== match.home && winner !== match.away) {
+            return false;
+          }
+        }
+      }
+      return true;
+    };
+
+    const isSynced = isBracketSynced();
+
     const isEliminated = (teamCode: string) => {
-      if (koWinners.final[0] && koWinners.final[0] !== teamCode) return true;
+      if (!isSynced) return false;
+      
+      const finalMatch = koMatchups.final[0];
+      const finalWinner = koWinners.final[0];
+      
+      if (finalWinner && finalMatch && (finalWinner === finalMatch.home || finalWinner === finalMatch.away)) {
+        if (finalWinner !== teamCode) return true;
+      }
+
       for (const round of ["r32", "r16", "qf", "sf", "final"] as const) {
         for (let i = 0; i < koMatchups[round].length; i++) {
           const match = koMatchups[round][i];
           if (match.home === teamCode || match.away === teamCode) {
             const winner = koWinners[round][i];
-            if (winner !== null && winner !== teamCode) {
-              return true;
+            if (winner !== null && (winner === match.home || winner === match.away)) {
+              if (winner !== teamCode) {
+                return true;
+              }
             }
           }
         }
@@ -2041,8 +2074,16 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     return [...teams]
       .map(t => {
         const eliminated = isTeamEliminated(t.code);
-        // ELO/rating-based win probability
-        const winProb = t.prob.champion;
+        
+        // Calculate true live probability
+        let winProb = t.prob.champion;
+        if (eliminated) {
+          winProb = 0;
+        } else if (totalAliveProb > 0) {
+          // Normalize the probability among the remaining alive teams
+          winProb = (t.prob.champion / totalAliveProb) * 100;
+        }
+
         return {
           name: t.name,
           code: t.code,
@@ -2051,15 +2092,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           isEliminated: eliminated
         };
       })
-      .sort((a, b) => {
-        if (useRealScores) {
-          return b.winProb - a.winProb;
-        }
-        if (a.isEliminated !== b.isEliminated) {
-          return a.isEliminated ? 1 : -1;
-        }
-        return b.winProb - a.winProb;
-      })
+      .sort((a, b) => b.winProb - a.winProb)
       .slice(0, 8);
   }, [teams, koMatchups, koWinners, r32Teams, isGroupStageComplete, useRealScores]);
 
@@ -2449,97 +2482,18 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   };
 
   const syncKnockoutBracket = (currentMatches: PredictorMatch[]) => {
-    const currentStandings = computeStandingsSync(currentMatches);
-    const currentThirdPlaces = computeThirdPlaceStandingsSync(currentStandings);
-    const r32Pairs = computeR32TeamsSync(currentStandings, currentThirdPlaces);
-
-    const updatedWinners = {
+    // Clear the knockout bracket because the group stage standings have changed,
+    // invalidating the previous teams in the bracket. We should not auto-simulate this!
+    setKoWinners({
       r32: Array(16).fill(null),
       r16: Array(8).fill(null),
       qf: Array(4).fill(null),
       sf: Array(2).fill(null),
       final: Array(1).fill(null),
-    };
-    const updatedScores: Record<string, { home: number | ""; away: number | "" }> = {};
-
-    // Simulate R32
-    r32Pairs.forEach((pair, idx) => {
-      if (!pair.home || !pair.away) return;
-      const { hs, as, winner } = simulateKoMatch(pair.home, pair.away);
-      updatedWinners.r32[idx] = winner;
-      updatedScores[`r32-${idx}`] = { home: hs, away: as };
     });
-
-    // R16
-    for (let idx = 0; idx < 8; idx++) {
-      const home = updatedWinners.r32[2 * idx];
-      const away = updatedWinners.r32[2 * idx + 1];
-      if (!home || !away) continue;
-      const { hs, as, winner } = simulateKoMatch(home, away);
-      updatedWinners.r16[idx] = winner;
-      updatedScores[`r16-${idx}`] = { home: hs, away: as };
-    }
-
-    // QF
-    for (let idx = 0; idx < 4; idx++) {
-      const home = updatedWinners.r16[2 * idx];
-      const away = updatedWinners.r16[2 * idx + 1];
-      if (!home || !away) continue;
-      const { hs, as, winner } = simulateKoMatch(home, away);
-      updatedWinners.qf[idx] = winner;
-      updatedScores[`qf-${idx}`] = { home: hs, away: as };
-    }
-
-    // SF
-    for (let idx = 0; idx < 2; idx++) {
-      const home = updatedWinners.qf[2 * idx];
-      const away = updatedWinners.qf[2 * idx + 1];
-      if (!home || !away) continue;
-      const { hs, as, winner } = simulateKoMatch(home, away);
-      updatedWinners.sf[idx] = winner;
-      updatedScores[`sf-${idx}`] = { home: hs, away: as };
-    }
-
-    // Final
-    const homeFinal = updatedWinners.sf[0];
-    const awayFinal = updatedWinners.sf[1];
-    if (homeFinal && awayFinal) {
-      const { hs, as, winner } = simulateKoMatch(homeFinal, awayFinal);
-      updatedWinners.final[0] = winner;
-      updatedScores[`final-0`] = { home: hs, away: as };
-    }
-
-    // 3rd Place Match
-    const homeMatch = { home: updatedWinners.qf[0], away: updatedWinners.qf[1] };
-    const awayMatch = { home: updatedWinners.qf[2], away: updatedWinners.qf[3] };
-    const homeWinner = updatedWinners.sf[0];
-    const awayWinner = updatedWinners.sf[1];
-
-    let homeLoser: string | null = null;
-    let awayLoser: string | null = null;
-
-    if (homeMatch.home && homeMatch.away && homeWinner) {
-      homeLoser = homeWinner === homeMatch.home ? homeMatch.away : homeMatch.home;
-    }
-    if (awayMatch.home && awayMatch.away && awayWinner) {
-      awayLoser = awayWinner === awayMatch.home ? awayMatch.away : awayMatch.home;
-    }
-
-    let simulatedThirdWinner: string | null = null;
-    let simulatedThirdScores: { home: number | ""; away: number | "" } = { home: "", away: "" };
-
-    if (homeLoser && awayLoser) {
-      const { hs, as, winner } = simulateKoMatch(homeLoser, awayLoser);
-      simulatedThirdWinner = winner;
-      simulatedThirdScores = { home: hs, away: as };
-    }
-
-    setKoWinners(updatedWinners);
-    setKoScores(updatedScores);
-    setThirdWinner(simulatedThirdWinner);
-    setThirdScores(simulatedThirdScores);
-
-    saveBulkToDb(currentMatches, updatedWinners, updatedScores, simulatedThirdWinner, simulatedThirdScores);
+    setKoScores({});
+    setThirdWinner(null);
+    setThirdScores({ home: "", away: "" });
   };
 
   const handleWholeTournamentSimulation = () => {
@@ -3220,7 +3174,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       {activeTab === "group" && (
         <ScoreTrendGraph
           matches={matches}
-          predictionMatches={useRealScores && preRealScoresMatches ? preRealScoresMatches : matches}
+          predictionMatches={useRealScores ? (preRealScoresMatches || initialMatches) : matches}
           teams={teams}
           liveGames={liveGames}
           liveStadiums={liveStadiums}
@@ -4642,7 +4596,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                       <div className="flex-grow min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           {isOfficial ? (
-                            <span className="text-[10px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-widest bg-cyan-50 dark:bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-800/30">Official</span>
+                            <span className="text-[10px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-widest bg-cyan-50 dark:bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-200 dark:border-cyan-800/30">User</span>
                           ) : (
                             <span className="text-xs font-mono font-bold text-slate-550 dark:text-slate-400">Slot {slotId}</span>
                           )}

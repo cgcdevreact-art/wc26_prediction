@@ -13,15 +13,16 @@ export function ModelGuideAccordion() {
     <div className="rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-[0_20px_50px_rgba(15,23,42,0.06)] backdrop-blur-md dark:border-white/5 dark:bg-slate-900/60 overflow-hidden">
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="model-guide" className="border-none">
-          <AccordionTrigger className="px-5 py-5 hover:no-underline sm:px-8 sm:py-6">
-            <div className="flex w-full flex-col gap-4 pr-2 text-left sm:pr-4 lg:flex-row lg:items-start lg:justify-between">
+          <AccordionTrigger className="px-5 py-4 hover:no-underline sm:px-8 sm:py-4.5">
+            <div className="flex w-full flex-col gap-3 pr-2 text-left sm:pr-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-2xl text-left">
-                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-600 dark:text-neon">
-                  Model Guide
-                </div>
-                <h2 className="mt-1 max-w-[12ch] font-display text-3xl font-black tracking-tight text-slate-900 dark:text-white sm:max-w-none">
+                <h2 className="mt-0.5 max-w-[12ch] font-display text-[1.35rem] font-black tracking-tight text-slate-900 dark:text-white sm:max-w-none sm:text-[1.65rem]">
                   How to use the simulation models
                 </h2>
+                <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-muted-foreground sm:text-[13px]">
+                  Move through the tournament in steps. Switch prediction engines to apply squad analytics or granular
+                  player-level simulations.
+                </p>
               </div>
 
               <Link
@@ -35,10 +36,6 @@ export function ModelGuideAccordion() {
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-5 pb-8 pt-0 sm:px-8">
-            <p className="text-sm text-muted-foreground mb-8 leading-relaxed max-w-2xl">
-              Move through the tournament in steps. Switch prediction engines to apply squad analytics or granular player-level simulations.
-            </p>
-
             <div className="grid gap-6 md:grid-cols-3">
               {/* Step 1 */}
               <div className="group relative overflow-hidden rounded-[2rem] border border-emerald-200/80 bg-emerald-50/20 p-6 dark:border-emerald-500/10 dark:bg-emerald-500/[0.02] text-left flex flex-col justify-between transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/[0.02] hover:border-emerald-500/30">

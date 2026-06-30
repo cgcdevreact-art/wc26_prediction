@@ -828,9 +828,7 @@ export default function CountryPredictionsClient({
     return searchParams.get("wildcard") === "true" || !!activeCustomCountry;
   }, [searchParams, activeCustomCountry]);
 
-  const effectiveCode = useMemo(() => {
-    return activeCustomCountry ? activeCustomCountry.replacedCode : selectedCode;
-  }, [activeCustomCountry, selectedCode]);
+  const effectiveCode = selectedCode;
 
   const selectedTeam = useMemo(() => {
     if (activeCustomCountry) {
@@ -866,13 +864,14 @@ export default function CountryPredictionsClient({
     if (custom) {
       const isSelected = (custom.replacedCode === effectiveCode) || (custom.code === effectiveCode);
       return {
-        code: custom.replacedCode,
+        code: custom.code,
         name: custom.name,
         flag: custom.flag,
         elo: isSelected ? customElo : custom.elo,
         attack: isSelected ? customAttack : custom.attack,
         defense: isSelected ? customDefense : custom.defense,
         power: appTeams.find((t) => t.code === custom.baselineCode)?.power || 75,
+        baselineCode: custom.baselineCode,
       };
     }
     const appTeam = appTeams.find((t) => t.code === code);
@@ -1011,9 +1010,12 @@ export default function CountryPredictionsClient({
       }
 
       const ELIMINATED_TEAMS = new Set(["KOR", "IRN", "UZB", "TUN", "HAI", "TUR", "SCO", "NZL", "PAN"]);
-      const hasEliminated = snapshot.simResults?.mockTournament?.r32?.some((m: any) => 
-        ELIMINATED_TEAMS.has(m.home) || ELIMINATED_TEAMS.has(m.away)
-      );
+      const hasEliminated = snapshot.simResults?.mockTournament?.r32?.some((m: any) => {
+        // Do not clear the snapshot if the eliminated team is the selected team itself
+        const homeElim = m.home !== snapshot.selectedCode && ELIMINATED_TEAMS.has(m.home);
+        const awayElim = m.away !== snapshot.selectedCode && ELIMINATED_TEAMS.has(m.away);
+        return homeElim || awayElim;
+      });
       if (hasEliminated) {
         localStorage.removeItem(COUNTRY_SIMULATION_SNAPSHOT_KEY);
         hasRestoredSimulationSnapshot.current = true;
@@ -1296,19 +1298,24 @@ export default function CountryPredictionsClient({
             const groupStandings: Record<string, { code: string; pts: number; gd: number; gf: number; elo: number }[]> = {};
 
             Object.entries(GROUPS_CONFIG).forEach(([groupName, groupTeams]) => {
-              const standings = groupTeams.map(code => ({
-                code,
-                pts: 0,
-                gd: 0,
-                gf: 0,
-                elo: getTeam(code).elo || 1500
-              }));
+              const standings = groupTeams.map(rawCode => {
+                const code = (activeCustomCountry && activeCustomCountry.replacedCode === rawCode) ? activeCustomCountry.code : rawCode;
+                return {
+                  code,
+                  pts: 0,
+                  gd: 0,
+                  gf: 0,
+                  elo: getTeam(code).elo || 1500
+                };
+              });
 
               const playMatch = (t1Idx: number, t2Idx: number, matchIndex: number) => {
                 const t1 = getTeam(standings[t1Idx].code);
                 const t2 = getTeam(standings[t2Idx].code);
 
-                if (useRealScores) {
+                const isSelectedMatch = t1.code === effectiveCode || t2.code === effectiveCode;
+
+                if (useRealScores && !isSelectedMatch) {
                   const cupKey = `${groupName}-${String(matchIndex).padStart(2, "0")}`;
                   const result = cupResults[cupKey];
                   if (result) {
@@ -1437,10 +1444,28 @@ export default function CountryPredictionsClient({
                     const liveHomeCode = (match.homeTeamObj?.code || match.homeTeamCode || "").trim().toUpperCase();
                     const liveAwayCode = (match.awayTeamObj?.code || match.awayTeamCode || "").trim().toUpperCase();
 
-                    return {
-                      home: isValidCode(liveHomeCode) ? liveHomeCode : pair.home,
-                      away: isValidCode(liveAwayCode) ? liveAwayCode : pair.away
-                    };
+                    let home = isValidCode(liveHomeCode) ? liveHomeCode : pair.home;
+                    let away = isValidCode(liveAwayCode) ? liveAwayCode : pair.away;
+
+                    // If the simulated slot qualified the selected team, preserve the selected team
+                    // even if they were eliminated in real life!
+                    if (pair.home === effectiveCode) {
+                      home = effectiveCode;
+                    }
+                    if (pair.away === effectiveCode) {
+                      away = effectiveCode;
+                    }
+
+                    if (activeCustomCountry) {
+                      if (home === activeCustomCountry.replacedCode) {
+                        home = activeCustomCountry.code;
+                      }
+                      if (away === activeCustomCountry.replacedCode) {
+                        away = activeCustomCountry.code;
+                      }
+                    }
+
+                    return { home, away };
                   }
                   return pair;
                 });
@@ -1480,6 +1505,16 @@ export default function CountryPredictionsClient({
 
             const r32Participants = r32Pairings.flatMap((pair) => [pair.home, pair.away]);
             if (r32Pairings.length !== 16 || !hasDistinctKnownTeams(r32Participants, 32)) {
+              if (iteration === start) {
+                console.warn("R32 pairings check failed for iteration", iteration, {
+                  pairingsLength: r32Pairings.length,
+                  participantsSize: new Set(r32Participants.filter(Boolean)).size,
+                  expectedParticipantsSize: 32,
+                  r32Pairings: r32Pairings,
+                  qualifiedTeamsCount: qualifiedTeams.length,
+                  qualifiedTeams: qualifiedTeams
+                });
+              }
               continue iterationLoop;
             }
 
@@ -1932,8 +1967,11 @@ export default function CountryPredictionsClient({
     ] as const;
 
     let currentCode = effectiveCode;
+    let isEliminated = false;
 
     return stagesOrdered.flatMap((stage) => {
+      if (isEliminated) return [];
+
       const stageMatches =
         stage.key === "final"
           ? simResults.mockTournament.final
@@ -1966,12 +2004,18 @@ export default function CountryPredictionsClient({
         expectedScore: `${gf} - ${ga}`,
       };
 
-      currentCode = match.winner;
+      if (match.winner !== currentCode) {
+        isEliminated = true;
+      } else {
+        currentCode = match.winner;
+      }
       return [step];
     });
   }, [effectiveCode, simResults]);
 
-  const selectedGroup = Object.entries(GROUPS_CONFIG).find(([_, list]) => list.includes(effectiveCode))?.[0] || "-";
+  const selectedGroup = Object.entries(GROUPS_CONFIG).find(([_, list]) => {
+    return list.includes(effectiveCode) || (activeCustomCountry && list.includes(activeCustomCountry.replacedCode));
+  })?.[0] || "-";
   const wildcardBaselineName = activeCustomCountry
     ? appTeams.find((team) => team.code === activeCustomCountry.baselineCode)?.name || activeCustomCountry.baselineCode
     : null;
@@ -2507,13 +2551,13 @@ export default function CountryPredictionsClient({
                   {simResults && (
                     <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                       {session ? (
-                        <button
+                        <div
+                          role="button"
                           onClick={handleSavePrediction}
-                          disabled={isSaving || isSimulating || saveSuccess}
                           className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all ${saveSuccess
                             ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 cursor-not-allowed opacity-80"
                             : "border border-transparent bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] text-white shadow-[0_10px_25px_rgba(44,124,135,0.2)] hover:opacity-95 active:scale-95 disabled:opacity-50"
-                            }`}
+                            } ${isSaving || isSimulating || saveSuccess ? 'opacity-50 pointer-events-none' : ''}`}
                         >
                           {isSaving ? (
                             <>
@@ -2531,15 +2575,16 @@ export default function CountryPredictionsClient({
                               <span>Save to Predictions</span>
                             </>
                           )}
-                        </button>
+                        </div>
                       ) : (
-                        <button
+                        <div
+                          role="button"
                           onClick={() => openAuthModal("signin")}
-                          className="flex items-center gap-2 bg-gradient-to-r from-cyan-50 to-fuchsia-50 border border-cyan-300 hover:from-cyan-100 hover:to-fuchsia-100 text-slate-900 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 dark:from-neon/20 dark:to-neon-2/20 dark:border-neon/30 dark:hover:from-neon/30 dark:hover:to-neon-2/30 dark:text-white"
+                          className="flex items-center gap-2 bg-gradient-to-r from-cyan-50 to-fuchsia-50 border border-cyan-300 hover:from-cyan-100 hover:to-fuchsia-100 text-slate-900 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 dark:from-neon/20 dark:to-neon-2/20 dark:border-neon/30 dark:hover:from-neon/30 dark:hover:to-neon-2/30 dark:text-white cursor-pointer"
                         >
                           <User className="w-3.5 h-3.5 text-neon-2" />
                           <span>Sign In to Save</span>
-                        </button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -2736,10 +2781,10 @@ export default function CountryPredictionsClient({
           </Accordion>
 
           {/* Dual Charts Row */}
-          <div className="grid items-stretch gap-6 md:grid-cols-2">
+          <div className="grid items-start gap-6 md:grid-cols-2">
             {/* Radar Attributes Card */}
-            <Accordion type="single" collapsible defaultValue="performance" className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
-              <AccordionItem value="performance" className="border-none flex flex-col h-full">
+            <Accordion type="single" collapsible defaultValue="performance" className="relative flex flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="performance" className="border-none flex flex-col">
                 <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
                   <div className="text-left">
                     <div className="font-display font-bold text-base text-foreground">Performance Attributes</div>
@@ -2752,7 +2797,7 @@ export default function CountryPredictionsClient({
                       Attributes
                     </span>
                   </div>
-                  <div className="flex h-64 min-h-[280px] items-center justify-center">
+                  <div className="flex h-[300px] items-center justify-center">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={radarData} outerRadius={85}>
                         <PolarGrid stroke={activeTheme === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.14)"} />
@@ -2766,8 +2811,8 @@ export default function CountryPredictionsClient({
             </Accordion>
 
             {/* Squad Quality Tiers Card */}
-            <Accordion type="single" collapsible defaultValue="squad-quality" className="relative flex h-full flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
-              <AccordionItem value="squad-quality" className="border-none flex flex-col h-full">
+            <Accordion type="single" collapsible defaultValue="squad-quality" className="relative flex flex-col rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:border-white/10 dark:bg-slate-900">
+              <AccordionItem value="squad-quality" className="border-none flex flex-col">
                 <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
                   <div className="text-left">
                     <div className="font-display font-bold text-base text-foreground">Squad Quality Tiers</div>
