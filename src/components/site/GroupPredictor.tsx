@@ -1399,12 +1399,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setSlotSummaries(summaries);
   }, [allPredictions]);
 
+  const hasLoadedInitialPredictions = useRef(false);
+
   // Load predictions from DB on authentication
   useEffect(() => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || hasLoadedInitialPredictions.current) return;
 
     const fetchUserPredictions = async () => {
       const preds = await fetchAllUserPredictions();
+      hasLoadedInitialPredictions.current = true;
       if (!preds || preds.length === 0) return;
 
       const groupPreds = preds.filter((p: any) => p.type === "MATCH_SCORE");
@@ -1468,7 +1471,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     };
 
     fetchUserPredictions();
-  }, [session]);
+  }, [session?.user?.id]);
 
   const handleLoadFromSlot = async (slotId: number | null) => {
     disableRealScoresState();
