@@ -114,10 +114,21 @@ export function ScoreTrendGraph({
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const maxSelections = isExpanded ? 10 : 4;
 
-  // Pre-select first 4 teams of Group A as defaults
+  const [hasManuallySelected, setHasManuallySelected] = useState(false);
   const [selectedTeamCodes, setSelectedTeamCodes] = useState<string[]>(() => {
-    return ["MEX", "RSA", "KOR", "CZE"];
+    if (teams && teams.length > 0) {
+      const shuffled = [...teams].sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, 4).map((t) => t.code);
+    }
+    return [];
   });
+
+  useEffect(() => {
+    if (teams && teams.length > 0 && selectedTeamCodes.length === 0 && !hasManuallySelected) {
+      const shuffled = [...teams].sort(() => 0.5 - Math.random());
+      setSelectedTeamCodes(shuffled.slice(0, 4).map((t) => t.code));
+    }
+  }, [teams, selectedTeamCodes, hasManuallySelected]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
@@ -141,8 +152,8 @@ export function ScoreTrendGraph({
     return teams.find((t) => t.code === code) || { code, name: code, flag: "🏳️" };
   };
 
-  // Toggle selection
   const handleToggleTeam = (code: string) => {
+    setHasManuallySelected(true);
     if (selectedTeamCodes.includes(code)) {
       setSelectedTeamCodes((prev) => prev.filter((c) => c !== code));
     } else {
@@ -354,7 +365,10 @@ export function ScoreTrendGraph({
                 />
                 <span>{team.name}</span>
                 <button
-                  onClick={() => setSelectedTeamCodes((prev) => prev.filter((c) => c !== code))}
+                  onClick={() => {
+                    setHasManuallySelected(true);
+                    setSelectedTeamCodes((prev) => prev.filter((c) => c !== code));
+                  }}
                   className="ml-0.5 text-current/70 transition hover:text-rose-500"
                 >
                   <X className="h-3.5 w-3.5" />
