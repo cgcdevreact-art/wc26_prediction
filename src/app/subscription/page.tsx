@@ -485,11 +485,11 @@ export default function SubscriptionPage() {
                     Checkout Confirmation
                   </div>
                   <DialogTitle className="font-display text-2xl font-bold tracking-tight text-foreground dark:text-white">
-                    Confirm your {pendingTier === "pro" ? "Expert" : "Advanced"} upgrade
+                    Confirm your upgrade
                   </DialogTitle>
-                  <DialogDescription className="max-w-md text-sm leading-relaxed text-muted-foreground">
+                  {/* <DialogDescription className="max-w-md text-sm leading-relaxed text-muted-foreground">
                     Before we send you to payment, please confirm that you agree to the plan terms and recurring billing details.
-                  </DialogDescription>
+                  </DialogDescription> */}
                 </DialogHeader>
 
                 <div className="mt-6 rounded-2xl border border-slate-200/60 bg-white/70 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] backdrop-blur-sm dark:border-white/5 dark:bg-slate-900/20">
