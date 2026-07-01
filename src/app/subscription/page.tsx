@@ -414,7 +414,26 @@ export default function SubscriptionPage() {
 
                 {/* Call to Action button */}
                 <div className="relative z-10 mt-auto">
-                  {isCurrent ? (
+                  {!session ? (
+                    <button
+                      onClick={() => {
+                        router.push(buildAuthModalHref({
+                          pathname,
+                          search: searchParams.toString(),
+                          mode: "signin",
+                          callbackUrl: pathname,
+                        }));
+                      }}
+                      className={`w-full rounded-xl py-3 text-sm font-bold text-center transition duration-200 active:scale-95 flex items-center justify-center gap-2 cursor-pointer ${tier.id === "plus"
+                        ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20 hover:opacity-90"
+                        : tier.id === "pro"
+                          ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/20 hover:opacity-90"
+                          : "bg-muted hover:bg-muted/80 text-foreground dark:bg-white/10 dark:hover:bg-white/20 dark:text-white"
+                        }`}
+                    >
+                      Sign In
+                    </button>
+                  ) : isCurrent ? (
                     <div className="w-full rounded-xl bg-muted dark:bg-white/5 border border-border dark:border-white/10 py-3 text-center text-sm font-semibold text-muted-foreground">
                       Current Plan
                     </div>

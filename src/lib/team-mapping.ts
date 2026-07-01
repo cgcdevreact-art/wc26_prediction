@@ -45,7 +45,7 @@ export const TEAM_INFO: Record<string, TeamMapping> = {
   "Qatar": { code: "QAT", flag: "🇶🇦", confederation: "AFC" },
   "Iraq": { code: "IRQ", flag: "🇮🇶", confederation: "AFC" },
   "South Africa": { code: "RSA", flag: "🇿🇦", confederation: "CAF" },
-  "Saudi Arabia": { code: "SAU", flag: "🇸🇦", confederation: "AFC" },
+  "Saudi Arabia": { code: "KSA", flag: "🇸🇦", confederation: "AFC" },
   "Jordan": { code: "JOR", flag: "🇯🇴", confederation: "AFC" },
   "Bosnia and Herzegovina": { code: "BIH", flag: "🇧🇦", confederation: "UEFA" },
   "Cape Verde": { code: "CPV", flag: "🇨🇻", confederation: "CAF" },
