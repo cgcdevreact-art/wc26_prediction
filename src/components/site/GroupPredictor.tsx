@@ -5506,8 +5506,8 @@ function EditScoreModal({
     return staticDefault;
   };
 
-  const tHome = getTeam(homeCode);
-  const tAway = getTeam(awayCode);
+  const tHome = getTeam(homeCode) as any;
+  const tAway = getTeam(awayCode) as any;
 
   const getTeamPlayers = (teamCode: string) => {
     return Object.values(players)
@@ -5519,26 +5519,26 @@ function EditScoreModal({
       });
   };
 
-  const homeTopPlayer = getTeamPlayers(homeCode)[0];
-  const awayTopPlayer = getTeamPlayers(awayCode)[0];
+  const homeTopPlayer = getTeamPlayers(homeCode)[0] as any;
+  const awayTopPlayer = getTeamPlayers(awayCode)[0] as any;
 
   // expected goals (lambdas)
-  const { homeLambda: baseHomeLambda, awayLambda: baseAwayLambda } = useMemo(() => {
+  const { homeLambda: baseHomeLambda, awayLambda: baseAwayLambda }: { homeLambda: number; awayLambda: number } = useMemo(() => {
     if (!tHome || !tAway) return { homeLambda: 0, awayLambda: 0 };
     return getMatchExpectedGoals(tHome, tAway, players, selectedModel);
   }, [tHome, tAway, players, selectedModel]);
 
-  const homeLambda = useMemo(() => {
+  const homeLambda: number = useMemo(() => {
     if (homeScore === "" || isNaN(parseFloat(homeScore))) return baseHomeLambda;
     return Math.max(0.1, parseFloat(homeScore));
   }, [homeScore, baseHomeLambda]);
 
-  const awayLambda = useMemo(() => {
+  const awayLambda: number = useMemo(() => {
     if (awayScore === "" || isNaN(parseFloat(awayScore))) return baseAwayLambda;
     return Math.max(0.1, parseFloat(awayScore));
   }, [awayScore, baseAwayLambda]);
 
-  const probs = useMemo(() => {
+  const probs: { homeWin: number; awayWin: number } = useMemo(() => {
     if (!tHome || !tAway) return { homeWin: 0, awayWin: 0 };
     
     const poissonPdf = (lambda: number, k: number) => {
@@ -5547,8 +5547,12 @@ function EditScoreModal({
       return (Math.pow(lambda, k) * Math.exp(-lambda)) / fact;
     };
 
-    const homeP = Array.from({ length: 8 }, (_, k) => poissonPdf(homeLambda, k));
-    const awayP = Array.from({ length: 8 }, (_, k) => poissonPdf(awayLambda, k));
+    const homeP: number[] = [];
+    const awayP: number[] = [];
+    for (let k = 0; k < 8; k++) {
+      homeP.push(poissonPdf(homeLambda, k));
+      awayP.push(poissonPdf(awayLambda, k));
+    }
 
     let pHomeWin = 0;
     let pDraw = 0;
@@ -5727,11 +5731,11 @@ function EditScoreModal({
         <div className="space-y-1">
           <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-muted-foreground">
             <span>WIN PROBABILITY</span>
-            <span className="text-neon">{probs.homeWin}% VS {probs.awayWin}%</span>
+            <span className="text-neon">{(probs.homeWin as any)}% VS {(probs.awayWin as any)}%</span>
           </div>
           <div className="w-full flex h-2 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800">
-            <div className="bg-gradient-to-r from-neon to-neon-2 transition-all duration-300" style={{ width: `${probs.homeWin}%` }} />
-            <div className="bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-300" style={{ width: `${probs.awayWin}%` }} />
+            <div className="bg-gradient-to-r from-neon to-neon-2 transition-all duration-300" style={{ width: `${(probs.homeWin as any)}%` }} />
+            <div className="bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-300" style={{ width: `${(probs.awayWin as any)}%` }} />
           </div>
         </div>
 
