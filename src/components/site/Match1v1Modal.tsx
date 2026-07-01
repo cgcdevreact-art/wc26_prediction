@@ -24,8 +24,9 @@ interface Match1v1ModalProps {
   awayLambda: number;
   matchDetails: {
     date: string;
-    time: string;
+    time?: string;
     venue: string;
+    matchNumber?: number;
   };
   onSimulate: () => void;
   isRealData: boolean;
