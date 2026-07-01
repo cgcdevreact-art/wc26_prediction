@@ -488,6 +488,7 @@ export default function CountryPredictionsClient({
         });
       }
 
+      loadedPredictionRef.current = true;
       setSaveSuccess(true);
       toast.success(`Loaded saved simulation for ${data.name}!`);
 
@@ -640,6 +641,7 @@ export default function CountryPredictionsClient({
   const hasInitializedCustomizer = useRef(false);
   const hasRestoredSimulationSnapshot = useRef(false);
   const ignoreResetRef = useRef(false);
+  const loadedPredictionRef = useRef(false);
   const deletedCustomCodesRef = useRef<Set<string>>(new Set());
   const formattedModelName = selectedModel ? selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1) : "";
   const activePlan = (subscriptionTier || session?.user?.subscriptionTier || "free").toLowerCase();
@@ -941,6 +943,12 @@ export default function CountryPredictionsClient({
     const isCustom = storeTeam?.isCustom ?? false;
 
     if (ignoreResetRef.current) {
+      lastOverrideStateRef.current = { isOverrideDisabled, isCustom, selectedCode };
+      return;
+    }
+
+    if (loadedPredictionRef.current) {
+      loadedPredictionRef.current = false;
       lastOverrideStateRef.current = { isOverrideDisabled, isCustom, selectedCode };
       return;
     }
