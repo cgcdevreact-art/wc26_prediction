@@ -5327,7 +5327,7 @@ interface KnockoutMatchCardProps {
   onScoreChange: (side: "home" | "away", val: string) => void;
   onSelectWinner: (code: string) => void;
   onSimulateClick: () => void;
-  on1v1Click: () => void;
+  on1v1Click?: () => void;
   label: string;
   lockedMessage?: string;
   onEditScoreClick?: () => void;
