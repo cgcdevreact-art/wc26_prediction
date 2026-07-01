@@ -2077,6 +2077,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
     const isTeamEliminated = (teamCode: string) => {
       if (!isQualified(teamCode)) return true;
+      if (activeTab === "group") return false;
       return isEliminated(teamCode);
     };
 
@@ -2106,7 +2107,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       })
       .sort((a, b) => b.winProb - a.winProb)
       .slice(0, 8);
-  }, [teams, koMatchups, koWinners, r32Teams, isGroupStageComplete, useRealScores]);
+  }, [teams, koMatchups, koWinners, r32Teams, isGroupStageComplete, useRealScores, activeTab]);
 
   // Computed losers of SF for the 3rd place match
   const sfLosers = useMemo(() => {
@@ -4110,15 +4111,6 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   onSelectWinner={(code) => handleSelectKoWinner("sf", realIdx, code)}
                                   onSimulateClick={() => handleOpenSimulator({
                                     type: "knockout",
-                                    round: "sf",
-                                    matchIndex: realIdx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: koScores[`sf-${realIdx}`]?.home ?? "",
-                                    awayScore: koScores[`sf-${realIdx}`]?.away ?? "",
-                                    details: KO_DETAILS.sf[realIdx]
-                                  })}
-                                  on1v1Click={() => setSelected1v1Match({
                                     round: "sf",
                                     matchIndex: realIdx,
                                     homeCode: m.home!,
