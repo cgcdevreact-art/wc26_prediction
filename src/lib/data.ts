@@ -83,7 +83,7 @@ export const GROUPS_CONFIG: Record<string, string[]> = {
   E: [ 'GER', 'CUW', 'CIV', 'ECU' ],
   F: [ 'NED', 'JPN', 'SWE', 'TUN' ],
   G: [ 'BEL', 'EGY', 'IRN', 'NZL' ],
-  H: [ 'ESP', 'CPV', 'SAU', 'URU' ],
+  H: [ 'ESP', 'CPV', 'KSA', 'URU' ],
   I: [ 'FRA', 'SEN', 'IRQ', 'NOR' ],
   J: [ 'ARG', 'ALG', 'AUT', 'JOR' ],
   K: [ 'POR', 'COD', 'UZB', 'COL' ],
@@ -91,7 +91,16 @@ export const GROUPS_CONFIG: Record<string, string[]> = {
 };
 
 const TEAM_CODE_ALIASES: Record<string, string> = {
-  KSA: "SAU",
+  SAU: "KSA",
+  URY: "URU",
+  DEU: "GER",
+  HRV: "CRO",
+  CHE: "SUI",
+  PRY: "PAR",
+  ZAF: "RSA",
+  NLD: "NED",
+  PRT: "POR",
+  DZA: "ALG",
 };
 
 export async function getTeams() {
@@ -308,7 +317,12 @@ export async function getPlayers() {
   let defaultPlayers: any[] = [];
   try {
     const playersData = fs.readFileSync(playersPath, "utf8");
-    defaultPlayers = JSON.parse(playersData);
+    defaultPlayers = JSON.parse(playersData).map((p: any) => {
+      if (p["Team Code"] && TEAM_CODE_ALIASES[p["Team Code"]]) {
+        p["Team Code"] = TEAM_CODE_ALIASES[p["Team Code"]];
+      }
+      return p;
+    });
   } catch (e) {
     console.error("Failed to load players.json", e);
     return [];

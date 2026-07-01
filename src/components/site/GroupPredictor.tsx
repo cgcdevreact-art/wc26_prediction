@@ -12,6 +12,7 @@ import { getMatchExpectedGoals } from "@/lib/simulation/model";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { UpgradeModal } from "./UpgradeModal";
 import { ScoreTrendGraph } from "./ScoreTrendGraph";
+import { Match1v1Modal } from "./Match1v1Modal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
 import { CountryFlag } from "@/components/ui/CountryFlag";
@@ -167,9 +168,7 @@ function getGroupMatchDetails(
 
   const normalizeCode = (c: string) => {
     if (!c) return "";
-    const clean = c.toUpperCase().trim();
-    if (clean === "KSA") return "SAU";
-    return clean;
+    return c.toUpperCase().trim();
   };
 
   const getCode = (id: string | number, nameEn: string) => {
@@ -880,7 +879,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
     const targetH = home.toUpperCase().trim();
     const targetA = away.toUpperCase().trim();
-    const normalizeCode = (c: string) => (c === "KSA" ? "SAU" : c);
+    const normalizeCode = (c: string) => c;
     const predH = normalizeCode(targetH);
     const predA = normalizeCode(targetA);
 
@@ -1145,6 +1144,16 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     id?: string;
     round?: string;
     matchIndex?: number;
+    homeCode: string;
+    awayCode: string;
+    homeScore: number | "";
+    awayScore: number | "";
+    details: { date: string; time?: string; matchNumber?: number; venue: string };
+  } | null>(null);
+
+  const [selected1v1Match, setSelected1v1Match] = useState<{
+    round: string;
+    matchIndex: number;
     homeCode: string;
     awayCode: string;
     homeScore: number | "";
@@ -3358,7 +3367,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   {idx + 1}
                                 </span>
                               </td>
-                              <td className="py-1 truncate flex items-center gap-1.5 max-w-[90px]">
+                              <td className="py-1 truncate flex items-center gap-1.5 w-full sm:min-w-[120px]">
                                 <CountryFlag
                                   code={row.team.code}
                                   flag={row.team.flag}
@@ -3366,7 +3375,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
                                   emojiClassName="text-base shrink-0 leading-none"
                                 />
-                                <span className="truncate flex items-center gap-1">
+                                <span className="truncate flex items-center gap-1" title={row.team.name}>
                                   {row.team.name}
                                   {row.team.isCustom && !bypassOverrides && !storeTeams[row.team.code]?.isOverrideDisabled && (
                                     <span title="Custom team stats active" className="inline-flex shrink-0">
@@ -3786,6 +3795,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   awayScore: koScores[`r32-${idx}`]?.away ?? "",
                                   details: KO_DETAILS.r32[idx]
                                 })}
+                                on1v1Click={() => setSelected1v1Match({
+                                  round: "r32",
+                                  matchIndex: idx,
+                                  homeCode: m.home!,
+                                  awayCode: m.away!,
+                                  homeScore: koScores[`r32-${idx}`]?.home ?? "",
+                                  awayScore: koScores[`r32-${idx}`]?.away ?? "",
+                                  details: KO_DETAILS.r32[idx]
+                                })}
                                 label={`Match ${idx + 1}`}
                               />
                             ))}
@@ -3819,6 +3837,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 onSelectWinner={(code) => handleSelectKoWinner("r16", idx, code)}
                                 onSimulateClick={() => handleOpenSimulator({
                                   type: "knockout",
+                                  round: "r16",
+                                  matchIndex: idx,
+                                  homeCode: m.home!,
+                                  awayCode: m.away!,
+                                  homeScore: koScores[`r16-${idx}`]?.home ?? "",
+                                  awayScore: koScores[`r16-${idx}`]?.away ?? "",
+                                  details: KO_DETAILS.r16[idx]
+                                })}
+                                on1v1Click={() => setSelected1v1Match({
                                   round: "r16",
                                   matchIndex: idx,
                                   homeCode: m.home!,
@@ -3869,6 +3896,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   awayScore: koScores[`qf-${idx}`]?.away ?? "",
                                   details: KO_DETAILS.qf[idx]
                                 })}
+                                on1v1Click={() => setSelected1v1Match({
+                                  round: "qf",
+                                  matchIndex: idx,
+                                  homeCode: m.home!,
+                                  awayCode: m.away!,
+                                  homeScore: koScores[`qf-${idx}`]?.home ?? "",
+                                  awayScore: koScores[`qf-${idx}`]?.away ?? "",
+                                  details: KO_DETAILS.qf[idx]
+                                })}
                                 label={`QF Match ${idx + 1}`}
                                 lockedMessage="TBD (R16)"
                               />
@@ -3903,6 +3939,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 onSelectWinner={(code) => handleSelectKoWinner("sf", idx, code)}
                                 onSimulateClick={() => handleOpenSimulator({
                                   type: "knockout",
+                                  round: "sf",
+                                  matchIndex: idx,
+                                  homeCode: m.home!,
+                                  awayCode: m.away!,
+                                  homeScore: koScores[`sf-${idx}`]?.home ?? "",
+                                  awayScore: koScores[`sf-${idx}`]?.away ?? "",
+                                  details: KO_DETAILS.sf[idx]
+                                })}
+                                on1v1Click={() => setSelected1v1Match({
                                   round: "sf",
                                   matchIndex: idx,
                                   homeCode: m.home!,
@@ -3984,6 +4029,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 awayScore: koScores["final-0"]?.away ?? "",
                                 details: KO_DETAILS.final[0]
                               })}
+                              on1v1Click={() => setSelected1v1Match({
+                                round: "final",
+                                matchIndex: 0,
+                                homeCode: koMatchups.final[0].home!,
+                                awayCode: koMatchups.final[0].away!,
+                                homeScore: koScores["final-0"]?.home ?? "",
+                                awayScore: koScores["final-0"]?.away ?? "",
+                                details: KO_DETAILS.final[0]
+                              })}
                               label="Final"
                               lockedMessage="TBD (SF Winners)"
                             />
@@ -4006,6 +4060,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               onSelectWinner={handleSelectThirdWinner}
                               onSimulateClick={() => handleOpenSimulator({
                                 type: "third",
+                                homeCode: sfLosers.home!,
+                                awayCode: sfLosers.away!,
+                                homeScore: thirdScores.home,
+                                awayScore: thirdScores.away,
+                                details: KO_DETAILS.third[0]
+                              })}
+                              on1v1Click={() => setSelected1v1Match({
+                                round: "third",
+                                matchIndex: 0,
                                 homeCode: sfLosers.home!,
                                 awayCode: sfLosers.away!,
                                 homeScore: thirdScores.home,
@@ -4047,6 +4110,24 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   onSelectWinner={(code) => handleSelectKoWinner("sf", realIdx, code)}
                                   onSimulateClick={() => handleOpenSimulator({
                                     type: "knockout",
+                                    round: "sf",
+                                    matchIndex: realIdx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: koScores[`sf-${realIdx}`]?.home ?? "",
+                                    awayScore: koScores[`sf-${realIdx}`]?.away ?? "",
+                                    details: KO_DETAILS.sf[realIdx]
+                                  })}
+                                  on1v1Click={() => setSelected1v1Match({
+                                    round: "sf",
+                                    matchIndex: realIdx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: koScores[`sf-${realIdx}`]?.home ?? "",
+                                    awayScore: koScores[`sf-${realIdx}`]?.away ?? "",
+                                    details: KO_DETAILS.sf[realIdx]
+                                  })}
+                                  on1v1Click={() => setSelected1v1Match({
                                     round: "sf",
                                     matchIndex: realIdx,
                                     homeCode: m.home!,
@@ -4100,6 +4181,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                     awayScore: koScores[`qf-${realIdx}`]?.away ?? "",
                                     details: KO_DETAILS.qf[realIdx]
                                   })}
+                                  on1v1Click={() => setSelected1v1Match({
+                                    round: "qf",
+                                    matchIndex: realIdx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: koScores[`qf-${realIdx}`]?.home ?? "",
+                                    awayScore: koScores[`qf-${realIdx}`]?.away ?? "",
+                                    details: KO_DETAILS.qf[realIdx]
+                                  })}
                                   label={`QF Match ${realIdx + 1}`}
                                   lockedMessage="TBD (R16)"
                                 />
@@ -4145,6 +4235,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                     awayScore: koScores[`r16-${realIdx}`]?.away ?? "",
                                     details: KO_DETAILS.r16[realIdx]
                                   })}
+                                  on1v1Click={() => setSelected1v1Match({
+                                    round: "r16",
+                                    matchIndex: realIdx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: koScores[`r16-${realIdx}`]?.home ?? "",
+                                    awayScore: koScores[`r16-${realIdx}`]?.away ?? "",
+                                    details: KO_DETAILS.r16[realIdx]
+                                  })}
                                   label={`Match ${realIdx + 1}`}
                                   lockedMessage="TBD (R32)"
                                 />
@@ -4182,6 +4281,15 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   onSelectWinner={(code) => handleSelectKoWinner("r32", realIdx, code)}
                                   onSimulateClick={() => handleOpenSimulator({
                                     type: "knockout",
+                                    round: "r32",
+                                    matchIndex: realIdx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: koScores[`r32-${realIdx}`]?.home ?? "",
+                                    awayScore: koScores[`r32-${realIdx}`]?.away ?? "",
+                                    details: KO_DETAILS.r32[realIdx]
+                                  })}
+                                  on1v1Click={() => setSelected1v1Match({
                                     round: "r32",
                                     matchIndex: realIdx,
                                     homeCode: m.home!,
@@ -5085,6 +5193,43 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           </div>
         </div>
       )}
+
+      {selected1v1Match && (
+        <Match1v1Modal
+          isOpen={true}
+          onClose={() => setSelected1v1Match(null)}
+          match={{
+            id: `${selected1v1Match.round}-${selected1v1Match.matchIndex}`,
+            group: selected1v1Match.round,
+            homeCode: selected1v1Match.homeCode,
+            awayCode: selected1v1Match.awayCode,
+            homeScore: selected1v1Match.homeScore,
+            awayScore: selected1v1Match.awayScore,
+          }}
+          homeTeam={getTeam(selected1v1Match.homeCode)}
+          awayTeam={getTeam(selected1v1Match.awayCode)}
+          homeTopPlayer={getTeamPlayers(selected1v1Match.homeCode)[0]}
+          awayTopPlayer={getTeamPlayers(selected1v1Match.awayCode)[0]}
+          homeLambda={getMatchExpectedGoals(getTeam(selected1v1Match.homeCode), getTeam(selected1v1Match.awayCode), players, selectedModel).homeLambda}
+          awayLambda={getMatchExpectedGoals(getTeam(selected1v1Match.homeCode), getTeam(selected1v1Match.awayCode), players, selectedModel).awayLambda}
+          matchDetails={selected1v1Match.details}
+          onSimulate={() => {
+            const h = getTeam(selected1v1Match.homeCode);
+            const a = getTeam(selected1v1Match.awayCode);
+            const { homeLambda, awayLambda } = getMatchExpectedGoals(h, a, players, selectedModel);
+            const simH = getPoisson(homeLambda);
+            let simA = getPoisson(awayLambda);
+            if (simH === simA) {
+              if (Math.random() > 0.5) simA += 1;
+              else simA -= 1;
+            }
+            handleKoScoreChange(selected1v1Match.round as any, selected1v1Match.matchIndex, "home", String(simH));
+            handleKoScoreChange(selected1v1Match.round as any, selected1v1Match.matchIndex, "away", String(simA));
+            handleSelectKoWinner(selected1v1Match.round as any, selected1v1Match.matchIndex, simH > simA ? selected1v1Match.homeCode : selected1v1Match.awayCode);
+          }}
+          isRealData={useRealScores && Boolean(getAssignedLiveScoreForMatch({ id: `${selected1v1Match.round}-${selected1v1Match.matchIndex}`, group: "", homeCode: selected1v1Match.homeCode, awayCode: selected1v1Match.awayCode, homeScore: "", awayScore: "" }))}
+        />
+      )}
     </div>
   );
 }
@@ -5129,6 +5274,7 @@ interface KnockoutMatchCardProps {
   onScoreChange: (side: "home" | "away", val: string) => void;
   onSelectWinner: (code: string) => void;
   onSimulateClick: () => void;
+  on1v1Click: () => void;
   label: string;
   lockedMessage?: string;
 }
@@ -5144,6 +5290,7 @@ function KnockoutMatchCard({
   onScoreChange,
   onSelectWinner,
   onSimulateClick,
+  on1v1Click,
   label,
   lockedMessage = "Seeding not available yet.",
 }: KnockoutMatchCardProps) {
@@ -5165,10 +5312,10 @@ function KnockoutMatchCard({
   }
 
   return (
-    <div className="glass-strong rounded-xl p-2.5 border border-white/5 hover:border-neon/20 transition flex flex-col justify-between min-h-[90px] shadow-glass bg-black/30">
+    <div className="glass-strong rounded-xl p-2.5 border border-white/5 hover:border-neon/20 transition flex flex-col justify-between min-h-[90px] shadow-glass bg-black/30 group relative">
       <div
         onClick={onSimulateClick}
-        title="Simulate 1v1"
+        title="Open Simulator Settings"
         className="flex items-center justify-between text-[9px] uppercase font-bold tracking-wider text-muted-foreground border-b border-white/5 pb-1 mb-1.5 cursor-pointer hover:text-neon group/hdr transition duration-200"
       >
         <span className="text-neon-2 group-hover/hdr:text-neon transition">{label}</span>
@@ -5182,7 +5329,16 @@ function KnockoutMatchCard({
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 relative">
+        {/* VS / 1v1 Button Overlay */}
+        <button
+          onClick={on1v1Click}
+          title="Click to view 1v1 Analysis"
+          className="absolute left-[38%] top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-slate-900 border border-slate-700 shadow-xl opacity-0 group-hover:opacity-100 hover:scale-110 hover:bg-neon hover:border-neon hover:text-black transition-all duration-300 text-xs font-black text-muted-foreground cursor-pointer"
+        >
+          VS
+        </button>
+
         {/* Home Row */}
         <div className="flex items-center justify-between gap-2">
           <button
