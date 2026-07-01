@@ -5270,6 +5270,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           initialAwayScore={editingScoreMatch.awayScore}
           players={players}
           selectedModel={selectedModel}
+          bypassOverrides={bypassOverrides}
           onSave={(homeVal, awayVal) => {
             if (editingScoreMatch.round === "third") {
               handleThirdScoreChange("home", homeVal);
@@ -5467,6 +5468,7 @@ interface EditScoreModalProps {
   initialAwayScore: number | "";
   players: any;
   selectedModel: any;
+  bypassOverrides: boolean;
   onSave: (homeScore: string, awayScore: string) => void;
 }
 
@@ -5480,13 +5482,14 @@ function EditScoreModal({
   initialAwayScore,
   players,
   selectedModel,
+  bypassOverrides,
   onSave,
 }: EditScoreModalProps) {
   const [homeScore, setHomeScore] = useState<string>(initialHomeScore === "" ? "" : String(initialHomeScore));
   const [awayScore, setAwayScore] = useState<string>(initialAwayScore === "" ? "" : String(initialAwayScore));
 
   const teams = useTeams();
-  const { teams: storeTeams, bypassOverrides, updateTeam } = useSimulationStore();
+  const { teams: storeTeams } = useSimulationStore();
 
   const getTeam = (code: string) => {
     const staticDefault = teams.find(t => t.code === code) || teams[0];
