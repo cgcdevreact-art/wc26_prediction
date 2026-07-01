@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useSimulationStore, PlayerStats, TeamStats } from "@/lib/store/simulationStore";
 import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
 import { getMatchExpectedGoals, SimTeam } from "@/lib/simulation/model";
-import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check, PencilLine, Lock, Trash2, X, Info, Minus, Plus, Shield, Zap, Coins, Cpu, Award, Route } from "lucide-react";
+import { Trophy, Search, ChevronRight, User, TrendingUp, Sparkles, AlertCircle, Check, Lock, Trash2, X, Info, Minus, Plus, Shield, Zap, Coins, Cpu, Award, Route } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -1697,6 +1697,7 @@ export default function CountryPredictionsClient({
         useRealScores,
         bypassOverrides,
       });
+      toast.success("done");
     } catch (err) {
       console.error("Country simulation failed:", err);
       toast.error("Simulation failed before results could render. Please try again.");
@@ -2222,9 +2223,6 @@ export default function CountryPredictionsClient({
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="truncate tracking-wide">{t.name}</span>
-                                {active && (
-                                  <PencilLine className="w-3.5 h-3.5 text-cyan-600 dark:text-neon shrink-0 animate-pulse" />
-                                )}
                               </div>
                               <div className="mt-1 min-h-[1.25rem] flex items-center">
                                 {"isCustom" in t && t.isCustom && t.code.startsWith("CC_") ? (
@@ -2624,14 +2622,6 @@ export default function CountryPredictionsClient({
                               <h2 className="text-3xl font-extrabold font-display text-slate-950 dark:text-foreground tracking-tight truncate">
                                 {selectedTeam.name}
                               </h2>
-                              <button
-                                type="button"
-                                onClick={() => document.getElementById("country-simulation-lab")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:border-cyan-400 hover:text-cyan-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:border-neon dark:hover:text-neon shrink-0"
-                                title="Edit simulation settings"
-                              >
-                                <PencilLine className="h-4 w-4" />
-                              </button>
                             </div>
                           </div>
                         </div>
@@ -3416,6 +3406,7 @@ export default function CountryPredictionsClient({
           </div>
         </DialogContent>
       </Dialog>
+
       <UpgradeModal
         isOpen={upgradeModalOpen}
         onClose={() => setUpgradeModalOpen(false)}

@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
-import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle, Brain, Cpu } from "lucide-react";
+import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle, Brain, Cpu, MoreVertical } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { StaminaBar, AlignmentGauge, TemperatureSlider } from "@/components/ui/SciFiControls";
 import { useSimulationStore, PlayerStats } from "@/lib/store/simulationStore";
@@ -1159,6 +1159,16 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     homeScore: number | "";
     awayScore: number | "";
     details: { date: string; time?: string; matchNumber?: number; venue: string };
+  } | null>(null);
+
+  const [editingScoreMatch, setEditingScoreMatch] = useState<{
+    round: "r32" | "r16" | "qf" | "sf" | "final" | "third";
+    matchIndex: number;
+    homeCode: string;
+    awayCode: string;
+    homeScore: number | "";
+    awayScore: number | "";
+    label: string;
   } | null>(null);
 
   const [simTemperature, setSimTemperature] = useState<number>(20);
@@ -2334,6 +2344,40 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         savePredictionToDb(501, "KNOCKOUT_WINNER", newScores.home, newScores.away, winner);
       }
     }
+  };
+
+  const handleOpenScoreEditModal = (
+    round: "r32" | "r16" | "qf" | "sf" | "final" | "third",
+    matchIndex: number,
+    homeCode: string | null,
+    awayCode: string | null,
+    label: string
+  ) => {
+    if (!homeCode || !awayCode) return;
+
+    let homeScore: number | "" = "";
+    let awayScore: number | "" = "";
+
+    if (round === "third") {
+      homeScore = thirdScores.home;
+      awayScore = thirdScores.away;
+    } else {
+      const matchScores = koScores[`${round}-${matchIndex}`];
+      if (matchScores) {
+        homeScore = matchScores.home;
+        awayScore = matchScores.away;
+      }
+    }
+
+    setEditingScoreMatch({
+      round,
+      matchIndex,
+      homeCode,
+      awayCode,
+      homeScore,
+      awayScore,
+      label,
+    });
   };
 
   const simulateKoMatch = (home: string, away: string) => {
@@ -3773,7 +3817,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               <Zap className="h-3.5 w-3.5 fill-neon/20" />
                             </button>
                           </div>
-                          <div className="flex-1 flex flex-col justify-around py-1">
+                          <div className="flex-1 flex flex-col justify-around gap-2.5 py-1">
                             {koMatchups.r32.slice(0, 8).map((m, idx) => (
                               <KnockoutMatchCard
                                 key={`r32-left-${idx}`}
@@ -3796,15 +3840,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   awayScore: koScores[`r32-${idx}`]?.away ?? "",
                                   details: KO_DETAILS.r32[idx]
                                 })}
-                                on1v1Click={() => setSelected1v1Match({
-                                  round: "r32",
-                                  matchIndex: idx,
-                                  homeCode: m.home!,
-                                  awayCode: m.away!,
-                                  homeScore: koScores[`r32-${idx}`]?.home ?? "",
-                                  awayScore: koScores[`r32-${idx}`]?.away ?? "",
-                                  details: KO_DETAILS.r32[idx]
-                                })}
+                                onEditScoreClick={() => handleOpenScoreEditModal("r32", idx, m.home, m.away, "Match " + (idx + 1))}
                                 label={`Match ${idx + 1}`}
                               />
                             ))}
@@ -3855,6 +3891,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   awayScore: koScores[`r16-${idx}`]?.away ?? "",
                                   details: KO_DETAILS.r16[idx]
                                 })}
+                                onEditScoreClick={() => handleOpenScoreEditModal("r16", idx, m.home, m.away, "Match " + (idx + 1))}
                                 label={`Match ${idx + 1}`}
                                 lockedMessage="TBD (R32)"
                               />
@@ -3906,6 +3943,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   awayScore: koScores[`qf-${idx}`]?.away ?? "",
                                   details: KO_DETAILS.qf[idx]
                                 })}
+                                onEditScoreClick={() => handleOpenScoreEditModal("qf", idx, m.home, m.away, "QF Match " + (idx + 1))}
                                 label={`QF Match ${idx + 1}`}
                                 lockedMessage="TBD (R16)"
                               />
@@ -3957,6 +3995,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   awayScore: koScores[`sf-${idx}`]?.away ?? "",
                                   details: KO_DETAILS.sf[idx]
                                 })}
+                                onEditScoreClick={() => handleOpenScoreEditModal("sf", idx, m.home, m.away, "SF Match " + (idx + 1))}
                                 label={`SF Match ${idx + 1}`}
                                 lockedMessage="TBD (QF)"
                               />
@@ -4039,6 +4078,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 awayScore: koScores["final-0"]?.away ?? "",
                                 details: KO_DETAILS.final[0]
                               })}
+                              onEditScoreClick={() => handleOpenScoreEditModal("final", 0, koMatchups.final[0].home, koMatchups.final[0].away, "Final")}
                               label="Final"
                               lockedMessage="TBD (SF Winners)"
                             />
@@ -4076,6 +4116,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                 awayScore: thirdScores.away,
                                 details: KO_DETAILS.third[0]
                               })}
+                              onEditScoreClick={() => handleOpenScoreEditModal("third", 0, sfLosers.home, sfLosers.away, "3rd Place")}
                               label="3rd Place"
                               lockedMessage="TBD (SF Losers)"
                             />
@@ -4128,6 +4169,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                     awayScore: koScores[`sf-${realIdx}`]?.away ?? "",
                                     details: KO_DETAILS.sf[realIdx]
                                   })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("sf", realIdx, m.home, m.away, "SF Match " + (realIdx + 1))}
                                   label={`SF Match ${realIdx + 1}`}
                                   lockedMessage="TBD (QF)"
                                 />
@@ -4182,6 +4224,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                     awayScore: koScores[`qf-${realIdx}`]?.away ?? "",
                                     details: KO_DETAILS.qf[realIdx]
                                   })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("qf", realIdx, m.home, m.away, "QF Match " + (realIdx + 1))}
                                   label={`QF Match ${realIdx + 1}`}
                                   lockedMessage="TBD (R16)"
                                 />
@@ -4236,6 +4279,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                     awayScore: koScores[`r16-${realIdx}`]?.away ?? "",
                                     details: KO_DETAILS.r16[realIdx]
                                   })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("r16", realIdx, m.home, m.away, "Match " + (realIdx + 1))}
                                   label={`Match ${realIdx + 1}`}
                                   lockedMessage="TBD (R32)"
                                 />
@@ -4256,7 +4300,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               <Zap className="h-3.5 w-3.5 fill-neon/20" />
                             </button>
                           </div>
-                          <div className="flex-1 flex flex-col justify-around py-1">
+                          <div className="flex-1 flex flex-col justify-around gap-2.5 py-1">
                             {koMatchups.r32.slice(8, 16).map((m, idx) => {
                               const realIdx = idx + 8;
                               return (
@@ -4281,15 +4325,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                     awayScore: koScores[`r32-${realIdx}`]?.away ?? "",
                                     details: KO_DETAILS.r32[realIdx]
                                   })}
-                                  on1v1Click={() => setSelected1v1Match({
-                                    round: "r32",
-                                    matchIndex: realIdx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: koScores[`r32-${realIdx}`]?.home ?? "",
-                                    awayScore: koScores[`r32-${realIdx}`]?.away ?? "",
-                                    details: KO_DETAILS.r32[realIdx]
-                                  })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("r32", realIdx, m.home, m.away, "Match " + (realIdx + 1))}
                                   label={`Match ${realIdx + 1}`}
                                 />
                               );
@@ -5222,6 +5258,31 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           isRealData={useRealScores && Boolean(getAssignedLiveScoreForMatch({ id: `${selected1v1Match.round}-${selected1v1Match.matchIndex}`, group: "", homeCode: selected1v1Match.homeCode, awayCode: selected1v1Match.awayCode, homeScore: "", awayScore: "" }))}
         />
       )}
+
+      {editingScoreMatch && (
+        <EditScoreModal
+          isOpen={true}
+          onClose={() => setEditingScoreMatch(null)}
+          matchLabel={editingScoreMatch.label}
+          homeCode={editingScoreMatch.homeCode}
+          awayCode={editingScoreMatch.awayCode}
+          initialHomeScore={editingScoreMatch.homeScore}
+          initialAwayScore={editingScoreMatch.awayScore}
+          players={players}
+          selectedModel={selectedModel}
+          onSave={(homeVal, awayVal) => {
+            if (editingScoreMatch.round === "third") {
+              handleThirdScoreChange("home", homeVal);
+              handleThirdScoreChange("away", awayVal);
+            } else {
+              handleKoScoreChange(editingScoreMatch.round, editingScoreMatch.matchIndex, "home", homeVal);
+              handleKoScoreChange(editingScoreMatch.round, editingScoreMatch.matchIndex, "away", awayVal);
+            }
+            toast.success("Match score saved successfully!");
+            setEditingScoreMatch(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -5269,6 +5330,7 @@ interface KnockoutMatchCardProps {
   on1v1Click: () => void;
   label: string;
   lockedMessage?: string;
+  onEditScoreClick?: () => void;
 }
 
 function KnockoutMatchCard({
@@ -5285,6 +5347,7 @@ function KnockoutMatchCard({
   on1v1Click,
   label,
   lockedMessage = "Seeding not available yet.",
+  onEditScoreClick,
 }: KnockoutMatchCardProps) {
   const teams = useTeams();
   const getTeam = (code: string) => teams.find(t => t.code === code) || teams[0];
@@ -5305,32 +5368,31 @@ function KnockoutMatchCard({
 
   return (
     <div className="glass-strong rounded-xl p-2.5 border border-white/5 hover:border-neon/20 transition flex flex-col justify-between min-h-[90px] shadow-glass bg-black/30 group relative">
-      <div
-        onClick={onSimulateClick}
-        title="Open Simulator Settings"
-        className="flex items-center justify-between text-[9px] uppercase font-bold tracking-wider text-muted-foreground border-b border-white/5 pb-1 mb-1.5 cursor-pointer hover:text-neon group/hdr transition duration-200"
-      >
-        <span className="text-neon-2 group-hover/hdr:text-neon transition">{label}</span>
+      <div className="flex items-center justify-between text-[9px] uppercase font-bold tracking-wider text-muted-foreground border-b border-slate-100 dark:border-white/5 pb-1 mb-1.5 transition duration-200">
+        <span className="text-neon-2 transition">{label}</span>
         <div className="flex items-center gap-1">
           {details && (
-            <span className="text-white/40 group-hover/hdr:text-white/70 transition">
+            <span className="text-slate-400 dark:text-white/40 transition">
               {details.venue} · {details.date}
             </span>
           )}
-          <Sparkles className="h-3 w-3 text-white/20 group-hover/hdr:text-neon transition ml-1" />
+          {onEditScoreClick && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditScoreClick();
+              }}
+              title="Edit Match Score"
+              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-900 dark:text-white/40 dark:hover:text-white transition cursor-pointer shrink-0"
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
       <div className="space-y-2 relative">
-        {/* VS / 1v1 Button Overlay */}
-        <button
-          onClick={on1v1Click}
-          title="Click to view 1v1 Analysis"
-          className="absolute left-[38%] top-1/2 -translate-y-1/2 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-slate-900 border border-slate-700 shadow-xl opacity-0 group-hover:opacity-100 hover:scale-110 hover:bg-neon hover:border-neon hover:text-black transition-all duration-300 text-xs font-black text-muted-foreground cursor-pointer"
-        >
-          VS
-        </button>
-
         {/* Home Row */}
         <div className="flex items-center justify-between gap-2">
           <button
@@ -5356,15 +5418,9 @@ function KnockoutMatchCard({
             {winnerCode === homeCode && <Check className="h-3 w-3 text-neon shrink-0 ml-1" />}
           </button>
 
-          <input
-            type="number"
-            value={homeScore}
-            min={0}
-            onChange={(e) => onScoreChange("home", e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            placeholder="-"
-            className="w-8 h-7 text-center bg-white/5 border border-white/10 rounded-lg font-bold text-xs text-foreground focus:ring-1 focus:ring-neon focus:outline-none placeholder-white/10 shrink-0 [-moz-appearance:_textfield] [&::-webkit-outer-spin-button]:margin-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:margin-0 [&::-webkit-inner-spin-button]:appearance-none"
-          />
+          <span className="w-8 text-center font-bold text-xs text-foreground shrink-0 select-none">
+            {homeScore !== "" ? homeScore : "-"}
+          </span>
         </div>
 
         {/* Away Row */}
@@ -5392,15 +5448,369 @@ function KnockoutMatchCard({
             {winnerCode === awayCode && <Check className="h-3.5 w-3.5 text-neon shrink-0 ml-1" />}
           </button>
 
-          <input
-            type="number"
-            value={awayScore}
-            min={0}
-            onChange={(e) => onScoreChange("away", e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            placeholder="-"
-            className="w-8 h-7 text-center bg-white/5 border border-white/10 rounded-lg font-bold text-xs text-foreground focus:ring-1 focus:ring-neon focus:outline-none placeholder-white/10 shrink-0 [-moz-appearance:_textfield] [&::-webkit-outer-spin-button]:margin-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:margin-0 [&::-webkit-inner-spin-button]:appearance-none"
+          <span className="w-8 text-center font-bold text-xs text-foreground shrink-0 select-none">
+            {awayScore !== "" ? awayScore : "-"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface EditScoreModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  matchLabel: string;
+  homeCode: string;
+  awayCode: string;
+  initialHomeScore: number | "";
+  initialAwayScore: number | "";
+  players: any;
+  selectedModel: any;
+  onSave: (homeScore: string, awayScore: string) => void;
+}
+
+function EditScoreModal({
+  isOpen,
+  onClose,
+  matchLabel,
+  homeCode,
+  awayCode,
+  initialHomeScore,
+  initialAwayScore,
+  players,
+  selectedModel,
+  onSave,
+}: EditScoreModalProps) {
+  const [homeScore, setHomeScore] = useState<string>(initialHomeScore === "" ? "" : String(initialHomeScore));
+  const [awayScore, setAwayScore] = useState<string>(initialAwayScore === "" ? "" : String(initialAwayScore));
+
+  const teams = useTeams();
+  const { teams: storeTeams, bypassOverrides, updateTeam } = useSimulationStore();
+
+  const getTeam = (code: string) => {
+    const staticDefault = teams.find(t => t.code === code) || teams[0];
+    const storeTeam = storeTeams[code];
+    if (storeTeam && !storeTeam.isOverrideDisabled && !bypassOverrides) {
+      return {
+        ...staticDefault,
+        elo: Number(storeTeam.elo || staticDefault.elo),
+        attack: Number(storeTeam.attack || staticDefault.attack),
+        defense: Number(storeTeam.defense || staticDefault.defense),
+        isCustom: true,
+      };
+    }
+    return staticDefault;
+  };
+
+  const tHome = getTeam(homeCode);
+  const tAway = getTeam(awayCode);
+
+  const getTeamPlayers = (teamCode: string) => {
+    return Object.values(players)
+      .filter((p: any) => p["Team Code"] === teamCode)
+      .sort((a: any, b: any) => {
+        const ratingA = parseInt(a["Overall Rating"] || "0", 10);
+        const ratingB = parseInt(b["Overall Rating"] || "0", 10);
+        return ratingB - ratingA;
+      });
+  };
+
+  const homeTopPlayer = getTeamPlayers(homeCode)[0];
+  const awayTopPlayer = getTeamPlayers(awayCode)[0];
+
+  // expected goals (lambdas)
+  const { homeLambda: baseHomeLambda, awayLambda: baseAwayLambda } = useMemo(() => {
+    if (!tHome || !tAway) return { homeLambda: 0, awayLambda: 0 };
+    return getMatchExpectedGoals(tHome, tAway, players, selectedModel);
+  }, [tHome, tAway, players, selectedModel]);
+
+  const homeLambda = useMemo(() => {
+    if (homeScore === "" || isNaN(parseFloat(homeScore))) return baseHomeLambda;
+    return Math.max(0.1, parseFloat(homeScore));
+  }, [homeScore, baseHomeLambda]);
+
+  const awayLambda = useMemo(() => {
+    if (awayScore === "" || isNaN(parseFloat(awayScore))) return baseAwayLambda;
+    return Math.max(0.1, parseFloat(awayScore));
+  }, [awayScore, baseAwayLambda]);
+
+  const probs = useMemo(() => {
+    if (!tHome || !tAway) return { homeWin: 0, awayWin: 0 };
+    
+    const poissonPdf = (lambda: number, k: number) => {
+      let fact = 1;
+      for (let i = 2; i <= k; i++) fact *= i;
+      return (Math.pow(lambda, k) * Math.exp(-lambda)) / fact;
+    };
+
+    const homeP = Array.from({ length: 8 }, (_, k) => poissonPdf(homeLambda, k));
+    const awayP = Array.from({ length: 8 }, (_, k) => poissonPdf(awayLambda, k));
+
+    let pHomeWin = 0;
+    let pDraw = 0;
+    let pAwayWin = 0;
+
+    for (let h = 0; h < 8; h++) {
+      for (let a = 0; a < 8; a++) {
+        const p = homeP[h] * awayP[a];
+        if (h > a) pHomeWin += p;
+        else if (h === a) pDraw += p;
+        else pAwayWin += p;
+      }
+    }
+
+    const total = pHomeWin + pDraw + pAwayWin;
+    pHomeWin /= total || 1;
+    pDraw /= total || 1;
+    pAwayWin /= total || 1;
+
+    const drawSplit = pHomeWin / (pHomeWin + pAwayWin || 1);
+    pHomeWin += pDraw * drawSplit;
+    pAwayWin += pDraw * (1 - drawSplit);
+
+    return {
+      homeWin: Math.round(pHomeWin * 100),
+      awayWin: Math.round(pAwayWin * 100)
+    };
+  }, [tHome, tAway, homeLambda, awayLambda]);
+
+  const StatBar = ({ label, homeValue, awayValue, isLowerBetter = false, maxValue, displayFormatter = (v: number) => String(v) }: any) => {
+    const hVal = parseFloat(homeValue) || 0;
+    const aVal = parseFloat(awayValue) || 0;
+
+    const isHomeBetter = isLowerBetter ? hVal <= aVal : hVal >= aVal;
+
+    let homePercent = 0;
+    let awayPercent = 0;
+
+    if (isLowerBetter) {
+      homePercent = Math.min(100, Math.max(5, ((200 - hVal) / 200) * 100));
+      awayPercent = Math.min(100, Math.max(5, ((200 - aVal) / 200) * 100));
+    } else {
+      homePercent = Math.min(100, Math.max(5, (hVal / maxValue) * 100));
+      awayPercent = Math.min(100, Math.max(5, (aVal / maxValue) * 100));
+    }
+
+    return (
+      <div className="space-y-1">
+        <div className="flex justify-between text-[10px] font-bold text-slate-500 dark:text-muted-foreground uppercase">
+          <span className={isHomeBetter ? "text-neon font-extrabold" : "font-semibold text-slate-500 dark:text-slate-400"}>
+            {displayFormatter(hVal)}
+          </span>
+          <span className="text-[9px] tracking-widest font-black uppercase text-slate-400 dark:text-slate-500">{label}</span>
+          <span className={!isHomeBetter ? "text-purple-500 dark:text-purple-400 font-extrabold" : "font-semibold text-slate-500 dark:text-slate-400"}>
+            {displayFormatter(aVal)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Home Bar (progress goes right to left) */}
+          <div className="h-1.5 flex-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex justify-end">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${isHomeBetter ? "bg-neon" : "bg-neon/30"}`}
+              style={{ width: `${homePercent}%` }}
+            />
+          </div>
+          {/* Away Bar (progress goes left to right) */}
+          <div className="h-1.5 flex-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${!isHomeBetter ? "bg-purple-500 dark:bg-purple-650" : "bg-purple-500/30 dark:bg-purple-500/20"}`}
+              style={{ width: `${awayPercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-6 w-full max-w-lg shadow-2xl text-slate-900 dark:text-white space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto scrollbar-custom">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+          <div className="flex items-center gap-2">
+            <Cpu className="h-5 w-5 text-neon" />
+            <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">Match Controller</h3>
+          </div>
+          <span className="text-xs font-mono bg-slate-100 dark:bg-white/10 px-2 py-0.5 rounded text-slate-600 dark:text-white/70">{matchLabel}</span>
+        </div>
+
+        {/* Score Editor Dashboard */}
+        <div className="flex items-center justify-between bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-100 dark:border-white/5 gap-4">
+          {/* Home Team */}
+          <div className="flex flex-col items-center gap-1.5 w-1/3 text-center">
+            <CountryFlag
+              code={tHome?.code}
+              flag={tHome?.flag}
+              name={tHome?.name}
+              className="h-10 w-15 rounded object-cover shadow-sm border border-slate-250 dark:border-white/10"
+              emojiClassName="text-4xl"
+            />
+            <span className="font-bold text-xs truncate w-full text-slate-900 dark:text-white mt-1">{tHome?.name}</span>
+            <span className="text-[10px] text-slate-400 font-mono">Rank #{tHome?.rank || "-"}</span>
+          </div>
+
+          {/* Scores Control */}
+          <div className="flex items-center gap-3 w-2/5 justify-center">
+            <div className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setHomeScore(prev => String(Math.max(0, (parseInt(prev) || 0) + 1)))}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-250 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-white font-bold transition cursor-pointer text-xs"
+              >
+                +
+              </button>
+              <input
+                type="number"
+                min={0}
+                value={homeScore}
+                onChange={(e) => setHomeScore(e.target.value)}
+                placeholder="0"
+                className="w-12 h-9 text-center bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/15 rounded-lg font-bold text-base text-slate-900 dark:text-white focus:ring-1 focus:ring-neon focus:outline-none shrink-0"
+              />
+              <button
+                type="button"
+                onClick={() => setHomeScore(prev => String(Math.max(0, (parseInt(prev) || 0) - 1)))}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-250 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-white font-bold transition cursor-pointer text-xs"
+              >
+                -
+              </button>
+            </div>
+
+            <span className="font-bold text-slate-450 dark:text-muted-foreground text-sm">VS</span>
+
+            <div className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setAwayScore(prev => String(Math.max(0, (parseInt(prev) || 0) + 1)))}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-250 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-white font-bold transition cursor-pointer text-xs"
+              >
+                +
+              </button>
+              <input
+                type="number"
+                min={0}
+                value={awayScore}
+                onChange={(e) => setAwayScore(e.target.value)}
+                placeholder="0"
+                className="w-12 h-9 text-center bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/15 rounded-lg font-bold text-base text-slate-900 dark:text-white focus:ring-1 focus:ring-neon focus:outline-none shrink-0"
+              />
+              <button
+                type="button"
+                onClick={() => setAwayScore(prev => String(Math.max(0, (parseInt(prev) || 0) - 1)))}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-250 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-white font-bold transition cursor-pointer text-xs"
+              >
+                -
+              </button>
+            </div>
+          </div>
+
+          {/* Away Team */}
+          <div className="flex flex-col items-center gap-1.5 w-1/3 text-center">
+            <CountryFlag
+              code={tAway?.code}
+              flag={tAway?.flag}
+              name={tAway?.name}
+              className="h-10 w-15 rounded object-cover shadow-sm border border-slate-250 dark:border-white/10"
+              emojiClassName="text-4xl"
+            />
+            <span className="font-bold text-xs truncate w-full text-slate-900 dark:text-white mt-1">{tAway?.name}</span>
+            <span className="text-[10px] text-slate-400 font-mono">Rank #{tAway?.rank || "-"}</span>
+          </div>
+        </div>
+
+        {/* Win Probability Live Meter */}
+        <div className="space-y-1">
+          <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-muted-foreground">
+            <span>WIN PROBABILITY</span>
+            <span className="text-neon">{probs.homeWin}% VS {probs.awayWin}%</span>
+          </div>
+          <div className="w-full flex h-2 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800">
+            <div className="bg-gradient-to-r from-neon to-neon-2 transition-all duration-300" style={{ width: `${probs.homeWin}%` }} />
+            <div className="bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-300" style={{ width: `${probs.awayWin}%` }} />
+          </div>
+        </div>
+
+        {/* Compare Stats Grid */}
+        <div className="bg-slate-50 dark:bg-white/5 rounded-2xl p-4 border border-slate-100 dark:border-white/5 space-y-3">
+          <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-muted-foreground border-b border-slate-100 dark:border-white/5 pb-2 mb-1">
+            <span className="truncate max-w-[130px]">{tHome?.name}</span>
+            <span className="text-neon text-[10px]">Team Comparison</span>
+            <span className="text-right truncate max-w-[130px]">{tAway?.name}</span>
+          </div>
+
+          <StatBar
+            label="Rank"
+            homeValue={tHome?.rank}
+            awayValue={tAway?.rank}
+            isLowerBetter={true}
+            displayFormatter={(v: number) => `#${v}`}
           />
+
+          <StatBar
+            label="Elo"
+            homeValue={tHome?.elo}
+            awayValue={tAway?.elo}
+            maxValue={2200}
+            displayFormatter={(v: number) => String(Math.round(v))}
+          />
+
+          <StatBar
+            label="Attack"
+            homeValue={tHome?.attack}
+            awayValue={tAway?.attack}
+            maxValue={2.0}
+            displayFormatter={(v: number) => v.toFixed(2)}
+          />
+
+          <StatBar
+            label="Defense"
+            homeValue={tHome?.defense}
+            awayValue={tAway?.defense}
+            maxValue={2.0}
+            displayFormatter={(v: number) => v.toFixed(2)}
+          />
+        </div>
+
+        {/* Key Player Cards (Sci-Fi details) */}
+        {(homeTopPlayer || awayTopPlayer) && (
+          <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 dark:bg-white/5 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
+            <div>
+              <div className="text-[9px] uppercase font-bold text-slate-400 dark:text-muted-foreground mb-0.5">Key Player</div>
+              {homeTopPlayer ? (
+                <div className="font-semibold text-slate-800 dark:text-slate-250 truncate">
+                  {homeTopPlayer["Name on Shirt"] || homeTopPlayer["Player Name"]} <span className="text-[10px] text-neon font-mono">({homeTopPlayer["Overall Rating"]})</span>
+                </div>
+              ) : <div className="text-slate-400 dark:text-muted-foreground/60 text-[10px] italic">N/A</div>}
+            </div>
+            <div className="text-right">
+              <div className="text-[9px] uppercase font-bold text-slate-400 dark:text-muted-foreground mb-0.5">Key Player</div>
+              {awayTopPlayer ? (
+                <div className="font-semibold text-slate-800 dark:text-slate-250 truncate">
+                  <span className="text-[10px] text-purple-500 dark:text-purple-400 font-mono">({awayTopPlayer["Overall Rating"]})</span> {awayTopPlayer["Name on Shirt"] || awayTopPlayer["Player Name"]}
+                </div>
+              ) : <div className="text-slate-400 dark:text-muted-foreground/60 text-[10px] italic">N/A</div>}
+            </div>
+          </div>
+        )}
+
+        {/* Footer Actions */}
+        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-white/5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-semibold uppercase tracking-wider rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 text-slate-500 dark:text-white/70 dark:hover:text-white transition cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(homeScore, awayScore)}
+            className="px-5 py-2 text-sm font-semibold uppercase tracking-wider rounded-xl bg-gradient-to-r from-neon to-neon-2 text-background hover:opacity-90 transition font-black cursor-pointer shadow-neon"
+          >
+            Save
+          </button>
         </div>
       </div>
     </div>
