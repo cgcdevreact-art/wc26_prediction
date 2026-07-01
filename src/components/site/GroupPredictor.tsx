@@ -5523,22 +5523,22 @@ function EditScoreModal({
   const awayTopPlayer = getTeamPlayers(awayCode)[0];
 
   // expected goals (lambdas)
-  const { homeLambda: baseHomeLambda, awayLambda: baseAwayLambda } = useMemo(() => {
+  const { homeLambda: baseHomeLambda, awayLambda: baseAwayLambda }: { homeLambda: number; awayLambda: number } = useMemo(() => {
     if (!tHome || !tAway) return { homeLambda: 0, awayLambda: 0 };
     return getMatchExpectedGoals(tHome, tAway, players, selectedModel);
   }, [tHome, tAway, players, selectedModel]);
 
-  const homeLambda = useMemo(() => {
+  const homeLambda: number = useMemo(() => {
     if (homeScore === "" || isNaN(parseFloat(homeScore))) return baseHomeLambda;
     return Math.max(0.1, parseFloat(homeScore));
   }, [homeScore, baseHomeLambda]);
 
-  const awayLambda = useMemo(() => {
+  const awayLambda: number = useMemo(() => {
     if (awayScore === "" || isNaN(parseFloat(awayScore))) return baseAwayLambda;
     return Math.max(0.1, parseFloat(awayScore));
   }, [awayScore, baseAwayLambda]);
 
-  const probs = useMemo(() => {
+  const probs: { homeWin: number; awayWin: number } = useMemo(() => {
     if (!tHome || !tAway) return { homeWin: 0, awayWin: 0 };
     
     const poissonPdf = (lambda: number, k: number) => {
@@ -5547,8 +5547,12 @@ function EditScoreModal({
       return (Math.pow(lambda, k) * Math.exp(-lambda)) / fact;
     };
 
-    const homeP = Array.from({ length: 8 }, (_, k) => poissonPdf(homeLambda, k));
-    const awayP = Array.from({ length: 8 }, (_, k) => poissonPdf(awayLambda, k));
+    const homeP: number[] = [];
+    const awayP: number[] = [];
+    for (let k = 0; k < 8; k++) {
+      homeP.push(poissonPdf(homeLambda, k));
+      awayP.push(poissonPdf(awayLambda, k));
+    }
 
     let pHomeWin = 0;
     let pDraw = 0;
