@@ -3417,7 +3417,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               className={toolbarButtonClass}
             >
               <FolderOpen className="h-4 w-4 text-cyan-400" />
-              Saves Manager
+              Saved Manager
             </button>
           )}
 
@@ -4775,7 +4775,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 <div className="space-y-2 relative z-50">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Simulation Engine</span>
-                    <div 
+                    <div
                       className="relative"
                       onMouseEnter={() => setSimModelDropdownOpen(true)}
                       onMouseLeave={() => setSimModelDropdownOpen(false)}
@@ -6038,7 +6038,7 @@ function EditScoreModal({
 
   const probs: { homeWin: number; awayWin: number } = useMemo(() => {
     if (!tHome || !tAway) return { homeWin: 0, awayWin: 0 };
-    
+
     const poissonPdf = (lambda: number, k: number) => {
       let fact = 1;
       for (let i = 2; i <= k; i++) fact *= i;

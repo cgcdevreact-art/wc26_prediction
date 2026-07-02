@@ -100,17 +100,17 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
         </div>
 
         <div className="glass rounded-2xl p-5">
-          <div className={`grid grid-cols-[1fr_90px_90px] gap-2 border-b pb-2 text-[10px] uppercase tracking-wider text-muted-foreground ${comparisonDivider}`}>
-            <div>Metric</div>
-            <div className="flex items-center justify-end gap-2 text-right">
-              <CountryFlag code={tA.code} flag={tA.flag} name={tA.name} className="h-4 w-6 rounded-[2px] object-cover" emojiClassName="text-base leading-none" />
-              <span>{tA.code}</span>
+            <div className={`grid grid-cols-[1fr_90px_90px] gap-2 border-b pb-2 items-center text-[10px] uppercase tracking-wider text-muted-foreground ${comparisonDivider}`}>
+              <div className="font-bold text-xs">Metric</div>
+              <div className="flex items-center justify-end gap-2 text-right">
+                <CountryFlag code={tA.code} flag={tA.flag} name={tA.name} className="h-6 w-8 rounded-[4px] object-cover" emojiClassName="text-2xl leading-none" />
+                <span>{tA.code}</span>
+              </div>
+              <div className="flex items-center justify-end gap-2 text-right">
+                <CountryFlag code={tB.code} flag={tB.flag} name={tB.name} className="h-6 w-8 rounded-[4px] object-cover" emojiClassName="text-2xl leading-none" />
+                <span>{tB.code}</span>
+              </div>
             </div>
-            <div className="flex items-center justify-end gap-2 text-right">
-              <CountryFlag code={tB.code} flag={tB.flag} name={tB.name} className="h-4 w-6 rounded-[2px] object-cover" emojiClassName="text-base leading-none" />
-              <span>{tB.code}</span>
-            </div>
-          </div>
           {rows.map(([label, va, vb, dir]) => {
             const na = parseFloat(String(va).replace(/[^\d.-]/g, ""));
             const nb = parseFloat(String(vb).replace(/[^\d.-]/g, ""));

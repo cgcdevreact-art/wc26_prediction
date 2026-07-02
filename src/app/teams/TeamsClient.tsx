@@ -1021,7 +1021,7 @@ export default function TeamsClient({
             </div>
             <div className="overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
               <table className="w-full text-left text-[11px] table-auto">
-                <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[9px] uppercase tracking-[0.12em] text-slate-600 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-300">
+                <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[10px] sm:text-xs font-bold uppercase tracking-[0.12em] text-slate-700 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-200">
                   <tr>
                     <th className="w-8 px-1 py-3 font-semibold whitespace-nowrap">#</th>
                     <th className="min-w-[90px] px-1 py-3 font-semibold whitespace-nowrap">Team</th>
@@ -1050,7 +1050,7 @@ export default function TeamsClient({
                         </th>
                       );
                     })}
-                    <th className="min-w-[90px] px-1 py-3 text-right font-semibold whitespace-nowrap">Top Player</th>
+                    <th className="w-[100px] px-1 py-3 text-right font-semibold whitespace-nowrap">Top Player</th>
                   </tr>
                 </thead>
                 <tbody>
