@@ -5,7 +5,7 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="border-t border-white/5 mt-5">
+    <footer className="border-t border-white/5">
       <div className="container mx-auto px-4 pt-10 pb-4">
         <Link
           href="/predictions/country"
