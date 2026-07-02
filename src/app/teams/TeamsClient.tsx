@@ -182,11 +182,8 @@ export default function TeamsClient({
         name: team.name,
         flag: team.flag || flagMap[team.code] || "🏳️",
         playersCount: teamPlayers.length || Number(teamRecord?.Players || 0),
-        eliteCount: teamPlayers.filter(p => parseInt(p["Overall Rating"]?.replace("%", "") || "0", 10) >= 90).length,
-        strongCount: teamPlayers.filter(p => {
-          const r = parseInt(p["Overall Rating"]?.replace("%", "") || "0", 10);
-          return r >= 85 && r <= 89;
-        }).length,
+        eliteCount: teamPlayers.filter(p => p["Rating Tier"] === "Elite").length,
+        strongCount: teamPlayers.filter(p => p["Rating Tier"] === "Very Strong").length,
         topPlayerName: topPlayer ? topPlayer["Name on Shirt"] || topPlayer["Player Name"] || "N/A" : "N/A",
         topPlayerRating: topPlayer?.["Overall Rating"] || "",
         rank: team.rank,
@@ -262,8 +259,8 @@ export default function TeamsClient({
     align?: "left" | "center" | "right";
     render: (team: RankingTeam) => string;
   }[] = [
-      { key: "eliteCount", label: "Elite", tooltip: "Elite Players (overall rating 90+)", render: (team) => String(team.eliteCount) },
-      { key: "strongCount", label: "Strong", tooltip: "Strong Players (overall rating 85-89)", render: (team) => String(team.strongCount) },
+      { key: "eliteCount", label: "Elite", tooltip: "Elite Players (overall rating 85+)", render: (team) => String(team.eliteCount) },
+      { key: "strongCount", label: "Strong", tooltip: "Strong Players (overall rating 70-84)", render: (team) => String(team.strongCount) },
       { key: "winProbability", label: "Win %", tooltip: "Championship Win Probability", render: (team) => `${team.winProbability.toFixed(1)}%` },
       { key: "rank", label: "FIFA", tooltip: "Official FIFA World Ranking position", render: (team) => `#${team.rank}` },
       { key: "elo", label: "Elo", tooltip: "Elo rating of team strength based on historic match results", render: (team) => team.elo.toFixed(2) },
@@ -791,7 +788,7 @@ export default function TeamsClient({
                   <th className="w-16 px-4 py-4 text-center font-semibold whitespace-nowrap">
                     <TableHeaderCell tooltip="Defense rating (average goals conceded index)">Def</TableHeaderCell>
                   </th>
-                  <th className="w-56 px-5 py-4 text-right font-semibold whitespace-nowrap">Top Player</th>
+                  <th className="w-56 px-5 py-4 text-left font-semibold whitespace-nowrap">Top Player</th>
                   <th className="w-32 rounded-tr-[1.75rem] px-5 py-4 text-right font-semibold whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
@@ -840,7 +837,7 @@ export default function TeamsClient({
                         } : undefined}
                       >
                         <span className={`inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
-                          {getTeamPlayers(team["Team Code"]).filter(p => parseInt(p["Overall Rating"]?.replace("%", "") || "0", 10) >= 90).length}
+                          {getTeamPlayers(team["Team Code"]).filter(p => p["Rating Tier"] === "Elite").length}
                         </span>
                       </td>
                       <td
@@ -852,10 +849,7 @@ export default function TeamsClient({
                         } : undefined}
                       >
                         <span className={`inline-flex min-w-12 items-center justify-center rounded-full bg-slate-100 px-3 py-1 font-mono text-slate-700 ring-1 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10 ${subTier === "free" ? "blur-[5px] select-none pointer-events-none" : ""}`}>
-                          {getTeamPlayers(team["Team Code"]).filter(p => {
-                            const r = parseInt(p["Overall Rating"]?.replace("%", "") || "0", 10);
-                            return r >= 85 && r <= 89;
-                          }).length}
+                          {getTeamPlayers(team["Team Code"]).filter(p => p["Rating Tier"] === "Very Strong").length}
                         </span>
                       </td>
                       <td
@@ -933,7 +927,7 @@ export default function TeamsClient({
                           {formatRating(appTeam?.defense)}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-5 py-4 text-left">
                         <div className="inline-flex max-w-full items-center gap-2 rounded-full bg-gradient-to-r from-emerald-50 to-cyan-50 px-3 py-1.5 ring-1 ring-emerald-200 dark:from-emerald-500/10 dark:to-cyan-500/10 dark:ring-emerald-500/20">
                           <span className="truncate font-semibold text-emerald-700 dark:text-neon">
                             {topPlayerName || "N/A"}
@@ -1050,7 +1044,7 @@ export default function TeamsClient({
                         </th>
                       );
                     })}
-                    <th className="w-[100px] px-1 py-3 text-right font-semibold whitespace-nowrap">Top Player</th>
+                    <th className="w-[100px] px-1 py-3 text-left font-semibold whitespace-nowrap">Top Player</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1149,7 +1143,7 @@ export default function TeamsClient({
                           </td>
                         );
                       })}
-                      <td className="px-1 py-2 text-right">
+                      <td className="px-1 py-2 text-left">
                         <div className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-emerald-50 to-cyan-50 px-1.5 py-0.5 ring-1 ring-emerald-200 dark:from-emerald-500/10 dark:to-cyan-500/10 dark:ring-emerald-500/20">
                           <span className="font-semibold text-emerald-700 dark:text-neon truncate max-w-[60px] sm:max-w-[90px]" title={team.topPlayerName}>
                             {team.topPlayerName}

@@ -139,7 +139,7 @@ export function Header() {
             />
           </span>
           <div className="leading-tight">
-            <div className="text-sm font-semibold tracking-wide">20626 World Cup <span className="text-gradient">PREDICTION</span></div>
+            <div className="text-sm font-semibold tracking-wide">2026 World Cup <span className="text-gradient">PREDICTION</span></div>
             <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Predict like an Expert</div>
           </div>
         </Link>

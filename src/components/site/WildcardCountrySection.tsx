@@ -130,6 +130,8 @@ export function WildcardCountrySection() {
   const [isReplacementDropdownOpen, setIsReplacementDropdownOpen] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [confirmRunOpen, setConfirmRunOpen] = useState(false);
+  const [confirmEditOpen, setConfirmEditOpen] = useState(false);
+  const [editTargetCode, setEditTargetCode] = useState<string | null>(null);
   const [customCountryDeleteTarget, setCustomCountryDeleteTarget] = useState<CustomCountry | null>(null);
 
   const worldCupCodes = useMemo(() => {
@@ -939,7 +941,10 @@ export function WildcardCountrySection() {
                 {canEditSavedCountry && (
                   <button
                     type="button"
-                    onClick={() => handleEditCustomCountry(selectedCode)}
+                    onClick={() => {
+                      setEditTargetCode(selectedCode);
+                      setConfirmEditOpen(true);
+                    }}
                     className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-neon to-neon-2 px-4 text-sm font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-neon/20 transition hover:opacity-95 hover:shadow-neon/30"
                   >
                     <Pencil className="h-4 w-4" />
@@ -1336,6 +1341,35 @@ export function WildcardCountrySection() {
               className="rounded-xl bg-red-600 px-4 py-2 text-xs font-black text-white hover:bg-red-700"
             >
               Delete Country
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmEditOpen} onOpenChange={setConfirmEditOpen}>
+        <AlertDialogContent className="rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl dark:border-white/10 dark:bg-slate-950 dark:text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl font-bold text-slate-950 dark:text-white">
+              Edit Country Profile?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              Are you sure you want to edit the profile settings for {previewTeam?.name || "this custom country"}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 flex gap-2">
+            <AlertDialogCancel className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:text-white dark:hover:bg-white/5">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (editTargetCode) {
+                  handleEditCustomCountry(editTargetCode);
+                }
+                setConfirmEditOpen(false);
+              }}
+              className="rounded-xl bg-gradient-to-r from-neon to-neon-2 px-4 py-2 text-xs font-black text-background hover:opacity-95"
+            >
+              Edit Profile
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
