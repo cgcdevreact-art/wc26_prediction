@@ -39,10 +39,10 @@ export function Footer() {
         <FooterCol
           title="Predict"
           items={[
+            { label: "Home", href: "/" },
             { label: "Simulator", href: "/simulator" },
             { label: "Compare", href: "/teams/compare" },
             { label: "Bracket", href: "/bracket" },
-            { label: "Home", href: "/" }
           ]}
         />
         <FooterCol

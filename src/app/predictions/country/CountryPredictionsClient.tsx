@@ -2075,7 +2075,7 @@ export default function CountryPredictionsClient({
               <Sparkles className="w-4 h-4 text-cyan-600 dark:text-neon animate-pulse" />
               Predictive Intelligence Platform
             </div>
-            <h1 className="font-display text-3xl font-black sm:text-4xl text-slate-950 dark:text-gradient tracking-tight">
+            <h1 className="font-display text-3xl font-black sm:text-4xl text-slate-950 dark:text-gradient tracking-tight mt-4">
               Path to Glory Explorer
             </h1>
             <p className="mt-2 text-muted-foreground text-sm max-w-2xl leading-relaxed">
@@ -2087,11 +2087,11 @@ export default function CountryPredictionsClient({
             {isWildcardScenario && activeCustomCountry && (
               <div className="mt-4 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/70 bg-cyan-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-700 dark:border-neon/25 dark:bg-neon/10 dark:text-neon">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/70 bg-cyan-50 px-3 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-700 dark:border-neon/25 dark:bg-neon/10 dark:text-neon">
                     <Sparkles className="h-3.5 w-3.5" />
                     Hypothetical Path
                   </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-emerald-50 px-3 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300">
                     Base Model Run
                   </span>
                 </div>
@@ -2104,8 +2104,8 @@ export default function CountryPredictionsClient({
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
             <label
               className={`inline-flex min-h-[56px] items-center gap-3 rounded-2xl border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${useRealScores
-                  ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
-                  : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
+                ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+                : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
                 }`}
             >
               <input
@@ -2125,8 +2125,8 @@ export default function CountryPredictionsClient({
             {totalOverrides > 0 && (
               <label
                 className={`inline-flex min-h-[56px] items-center gap-3 rounded-2xl border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${bypassOverrides
-                    ? "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
-                    : "bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.15)] animate-pulse"
+                  ? "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
+                  : "bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.15)] animate-pulse"
                   }`}
               >
                 <input
@@ -2548,8 +2548,8 @@ export default function CountryPredictionsClient({
               <AccordionTrigger className="px-6 pt-6 pb-3 hover:no-underline">
                 <div className="flex w-full flex-col gap-3 pr-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="text-left">
-                    <div className="font-display text-lg font-extrabold text-foreground">Team Overview</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">Profile, champion odds, and stage progression</div>
+                    <div className="font-display text-lg font-extrabold text-foreground mb-2">Team Overview</div>
+                    <div className="text-xs text-muted-foreground mt-0.5 mb-2">Profile, champion odds, and stage progression</div>
                   </div>
                   {/* Save Projections Action Button */}
                   {simResults && (

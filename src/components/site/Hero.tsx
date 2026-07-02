@@ -441,7 +441,7 @@ function HeroMatchCard({
               <span className="text-[7px] text-muted-foreground/80 uppercase font-extrabold mt-0.5">FT</span>
             </>
           ) : (
-            <span className="font-mono text-[9px] font-bold text-red-500">
+            <span className="font-mono text-[11px] font-bold text-red-500">
               {getCountdownString(diffMs)}
             </span>
           )}
