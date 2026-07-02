@@ -5,14 +5,14 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="border-t border-white/5 mt-10">
+    <footer className="border-t border-white/5">
       <div className="container mx-auto px-4 pt-10 pb-4">
         <Link
           href="/predictions/country"
           className="block overflow-hidden rounded-2xl border border-black/8 shadow-lg transition-opacity duration-300 hover:opacity-95 dark:border-white/10"
         >
           <Image
-            src="/footerbanner.png"
+            src="/footerbanner100k.png"
             alt="FIFA World Cup 2026 Banner"
             width={1600}
             height={500}
@@ -39,10 +39,10 @@ export function Footer() {
         <FooterCol
           title="Predict"
           items={[
+            { label: "Home", href: "/" },
             { label: "Simulator", href: "/simulator" },
             { label: "Compare", href: "/teams/compare" },
             { label: "Bracket", href: "/bracket" },
-            { label: "Home", href: "/" }
           ]}
         />
         <FooterCol

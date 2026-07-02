@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
-import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle, Brain, Cpu } from "lucide-react";
+import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle, Brain, Cpu, MoreVertical, ChevronDown } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { StaminaBar, AlignmentGauge, TemperatureSlider } from "@/components/ui/SciFiControls";
 import { useSimulationStore, PlayerStats } from "@/lib/store/simulationStore";
@@ -12,6 +12,7 @@ import { getMatchExpectedGoals } from "@/lib/simulation/model";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { UpgradeModal } from "./UpgradeModal";
 import { ScoreTrendGraph } from "./ScoreTrendGraph";
+import { Match1v1Modal } from "./Match1v1Modal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
 import { CountryFlag } from "@/components/ui/CountryFlag";
@@ -122,6 +123,30 @@ function getPoisson(lambda: number) {
   return k - 1;
 }
 
+function getSeededRandom(seedStr: string) {
+  let hash = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const x = Math.sin(hash) * 10000;
+  return x - Math.floor(x);
+}
+
+function getDeterministicPoisson(lambda: number, seed: string) {
+  const L = Math.exp(-lambda);
+  let k = 0;
+  let p = 1;
+  let currentSeed = seed;
+  do {
+    k++;
+    const rand = getSeededRandom(currentSeed);
+    p *= rand;
+    currentSeed += "x"; // change seed for next iteration
+  } while (p > L);
+  return k - 1;
+}
+
+
 // Helper: Convert group code (e.g., A-1) to unique integer ID
 function getNumericId(id: string): number {
   const [group, index] = id.split("-");
@@ -167,9 +192,7 @@ function getGroupMatchDetails(
 
   const normalizeCode = (c: string) => {
     if (!c) return "";
-    const clean = c.toUpperCase().trim();
-    if (clean === "KSA") return "SAU";
-    return clean;
+    return c.toUpperCase().trim();
   };
 
   const getCode = (id: string | number, nameEn: string) => {
@@ -411,7 +434,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const GROUPS_CONFIG = useGroupsConfig();
   const cupResults = useCupResults();
   const { data: session } = useSession();
-  const { players: storePlayers, teams: storeTeams, isInitialized, initializeData, syncData, selectedModel, resetToDefaults, updatePlayer, updateTeam, toggleTeamOverride, togglePlayerOverride } = useSimulationStore();
+  const { players: storePlayers, teams: storeTeams, isInitialized, initializeData, syncData, selectedModel, setSelectedModel, resetToDefaults, updatePlayer, updateTeam, toggleTeamOverride, togglePlayerOverride } = useSimulationStore();
 
   const [bypassOverrides, setBypassOverrides] = useState(false);
   const [isOverridesModalOpen, setIsOverridesModalOpen] = useState(false);
@@ -584,6 +607,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   // ─── Live data from worldcup26.ir ───
   const [liveGames, setLiveGames] = useState<any[]>([]);
   const [liveStadiums, setLiveStadiums] = useState<any[]>([]);
+  const [apiFixtures, setApiFixtures] = useState<any[]>([]);
 
   const openAuthModal = (mode: "signin" | "signup" = "signin") => {
     router.push(buildAuthModalHref({
@@ -619,6 +643,19 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         console.error("Failed to load live games/stadiums from real API", error);
         setLiveGames([]);
         setLiveStadiums([]);
+      }
+
+      // Fetch mapped API fixtures from our proxy endpoint
+      try {
+        const fixturesRes = await fetch("/api/fixtures", { cache: "no-store" });
+        if (fixturesRes.ok) {
+          const fData = await fixturesRes.json();
+          if (fData.success && Array.isArray(fData.fixtures)) {
+            setApiFixtures(fData.fixtures);
+          }
+        }
+      } catch (fError) {
+        console.error("Failed to load mapped fixtures from proxy API", fError);
       }
     }
 
@@ -663,7 +700,9 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const [confirmSimType, setConfirmSimType] = useState<"all" | "group" | null>(null);
   const [confirmSimGroup, setConfirmSimGroup] = useState<string | null>(null);
   const [deleteGroupTarget, setDeleteGroupTarget] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<"all" | "knockouts" | null>(null);
   const [simScope, setSimScope] = useState<"whole" | "r32">("whole");
+  const [simModelDropdownOpen, setSimModelDropdownOpen] = useState(false);
 
   const handleConfirmSimulation = () => {
     if (confirmSimType === "all") {
@@ -880,7 +919,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
     const targetH = home.toUpperCase().trim();
     const targetA = away.toUpperCase().trim();
-    const normalizeCode = (c: string) => (c === "KSA" ? "SAU" : c);
+    const normalizeCode = (c: string) => c;
     const predH = normalizeCode(targetH);
     const predA = normalizeCode(targetA);
 
@@ -942,6 +981,20 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     }
     return { homeScore, awayScore };
   }, [useRealScores, liveGames, teams]);
+
+  const getLiveFixtureForTeams = useCallback((home: string | null, away: string | null) => {
+    if (!useRealScores || !home || !away || apiFixtures.length === 0) return null;
+    const h = home.toUpperCase().trim();
+    const a = away.toUpperCase().trim();
+    return apiFixtures.find((f) => {
+      if (!f.isKnockout) return false;
+      const apiH = (f.homeTeamObj?.code || "").toUpperCase().trim();
+      const apiA = (f.awayTeamObj?.code || "").toUpperCase().trim();
+      return (apiH === h && apiA === a) || (apiH === a && apiA === h);
+    });
+  }, [useRealScores, apiFixtures]);
+
+
 
   const applyRealScores = useCallback((currentMatches: PredictorMatch[]) => {
     return currentMatches.map((m) => {
@@ -1016,15 +1069,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     }
   }, [liveGames, useRealScores, applyRealScores]);
 
-  const globalRealPercent = useMemo(() => {
-    const realCount = matches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
-    return Math.round((realCount / TOTAL_TOURNAMENT_MATCHES) * 100);
-  }, [matches, getAssignedLiveScoreForMatch]);
-
   const groupRealPercent = useMemo(() => {
-    const realCount = matches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
-    return Math.round((realCount / 104) * 100);
-  }, [matches, getAssignedLiveScoreForMatch]);
+    const realGroupCount = matches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
+    const realKnockoutCount = apiFixtures.length > 0
+      ? apiFixtures.filter((f) => f.isKnockout && (f.status === "COMPLETED" || f.status === "LIVE") && f.homeScore !== "-" && f.awayScore !== "-").length
+      : 0;
+    return Math.min(100, Math.round(((realGroupCount + realKnockoutCount) / 104) * 100));
+  }, [matches, getAssignedLiveScoreForMatch, apiFixtures]);
 
   const simulatePendingMatches = useCallback(() => {
     const updatedMatches = matches.map((m) => {
@@ -1139,6 +1190,162 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const [thirdWinner, setThirdWinner] = useState<string | null>(null);
   const [thirdScores, setThirdScores] = useState<{ home: number | ""; away: number | "" }>({ home: "", away: "" });
 
+  const getDeterministicKoMatchSimulation = useCallback((
+    round: string,
+    matchIndex: number,
+    home: string,
+    away: string
+  ) => {
+    const homeTeam = getTeam(home);
+    const awayTeam = getTeam(away);
+    const { homeLambda, awayLambda } = getMatchExpectedGoals(homeTeam, awayTeam, players, selectedModel);
+
+    // Create a stable seed unique to this matchup in this round/index
+    const seedHome = `${round}-${matchIndex}-${home}-vs-${away}-home`;
+    const seedAway = `${round}-${matchIndex}-${home}-vs-${away}-away`;
+
+    let hs = getDeterministicPoisson(homeLambda, seedHome);
+    let as = getDeterministicPoisson(awayLambda, seedAway);
+
+    // Knockouts cannot end in a draw!
+    if (hs === as) {
+      // Deterministically resolve draw using seeded random
+      const drawSeed = `${round}-${matchIndex}-${home}-vs-${away}-draw`;
+      if (getSeededRandom(drawSeed) > 0.5) {
+        hs += 1;
+      } else {
+        as += 1;
+      }
+    }
+
+    return {
+      homeScore: hs,
+      awayScore: as,
+      winnerCode: hs > as ? home : away,
+    };
+  }, [getTeam, players, selectedModel]);
+
+  const getKoMatchWinnerAndScore = useCallback((
+    round: "r32" | "r16" | "qf" | "sf" | "final" | "third",
+    matchIndex: number,
+    home: string | null,
+    away: string | null
+  ) => {
+    // If teams are not determined, return empty/null
+    if (!home || !away) {
+      return {
+        homeScore: "" as const,
+        awayScore: "" as const,
+        winnerCode: null,
+        isReal: false,
+      };
+    }
+
+    // 1. Check if there is a real match in apiFixtures
+    const realMatch = useRealScores ? getLiveFixtureForTeams(home, away) : null;
+    if (realMatch) {
+      const isCompleted = realMatch.status === "COMPLETED" || realMatch.status === "LIVE";
+      const hasRealScore = isCompleted && realMatch.homeScore !== "-" && realMatch.awayScore !== "-";
+
+      if (hasRealScore) {
+        // Parse scores
+        const hScore = Number(realMatch.homeScore);
+        const aScore = Number(realMatch.awayScore);
+
+        // Check if teams were swapped in the API compared to our home/away order
+        const apiHomeCode = (realMatch.homeTeamObj?.code || "").toUpperCase().trim();
+        const isSwapped = apiHomeCode !== home.toUpperCase().trim();
+
+        const actualHomeScore = isSwapped ? aScore : hScore;
+        const actualAwayScore = isSwapped ? hScore : aScore;
+
+        let winner = null;
+        if (actualHomeScore > actualAwayScore) {
+          winner = home;
+        } else if (actualAwayScore > actualHomeScore) {
+          winner = away;
+        } else {
+          // Tie score in knockout. Check if either team advanced in the API data.
+          let advancedTeam = null;
+          if (useRealScores && apiFixtures.length > 0) {
+            const stages = ["Round of 32", "Round of 16", "Quarter-Finals", "Semi-Finals", "Final"];
+            const currentStageIndex = stages.indexOf(realMatch.stageName);
+            if (currentStageIndex >= 0) {
+              const homeCode = home.toUpperCase().trim();
+              const awayCode = away.toUpperCase().trim();
+              for (const f of apiFixtures) {
+                const fStageIndex = stages.indexOf(f.stageName);
+                if (fStageIndex > currentStageIndex && f.isKnockout) {
+                  const fHome = (f.homeTeamObj?.code || "").toUpperCase().trim();
+                  const fAway = (f.awayTeamObj?.code || "").toUpperCase().trim();
+                  if (fHome === homeCode || fAway === homeCode) {
+                    advancedTeam = home;
+                    break;
+                  }
+                  if (fHome === awayCode || fAway === awayCode) {
+                    advancedTeam = away;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          winner = advancedTeam || home;
+        }
+
+        return {
+          homeScore: actualHomeScore,
+          awayScore: actualAwayScore,
+          winnerCode: winner,
+          isReal: true,
+        };
+      }
+    }
+
+    // 2. Check manual prediction / simulated prediction stored in state
+    const manualScores = round === "third"
+      ? thirdScores
+      : (koScores[`${round}-${matchIndex}`] || { home: "" as const, away: "" as const });
+
+    const manualWinner = round === "third"
+      ? thirdWinner
+      : (koWinners[round]?.[matchIndex] ?? null);
+
+    const hasHome = manualScores.home !== "";
+    const hasAway = manualScores.away !== "";
+
+    // Prevent "ghost" teams: if a manual winner is saved but is no longer in the match,
+    // the saved simulation data is stale and must be ignored.
+    if (manualWinner && manualWinner !== home && manualWinner !== away) {
+      return {
+        homeScore: "" as const,
+        awayScore: "" as const,
+        winnerCode: null,
+        isReal: false,
+      };
+    }
+
+    if (hasHome || hasAway || manualWinner) {
+      const hScore = hasHome ? Number(manualScores.home) : ("" as const);
+      const aScore = hasAway ? Number(manualScores.away) : ("" as const);
+      const winner = manualWinner || (hasHome && hasAway ? (Number(manualScores.home) > Number(manualScores.away) ? home : away) : null);
+      return {
+        homeScore: hScore,
+        awayScore: aScore,
+        winnerCode: winner,
+        isReal: false,
+      };
+    }
+
+    // 3. Otherwise, keep it empty (do not auto-simulate!)
+    return {
+      homeScore: "" as const,
+      awayScore: "" as const,
+      winnerCode: null,
+      isReal: false,
+    };
+  }, [useRealScores, apiFixtures, koScores, koWinners, thirdScores, thirdWinner, getLiveFixtureForTeams]);
+
   // 1v1 Simulator Modal State
   const [simMatch, setSimMatch] = useState<{
     type: "group" | "knockout" | "third";
@@ -1152,6 +1359,26 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     details: { date: string; time?: string; matchNumber?: number; venue: string };
   } | null>(null);
 
+  const [selected1v1Match, setSelected1v1Match] = useState<{
+    round: string;
+    matchIndex: number;
+    homeCode: string;
+    awayCode: string;
+    homeScore: number | "";
+    awayScore: number | "";
+    details: { date: string; time?: string; matchNumber?: number; venue: string };
+  } | null>(null);
+
+  const [editingScoreMatch, setEditingScoreMatch] = useState<{
+    round: "r32" | "r16" | "qf" | "sf" | "final" | "third";
+    matchIndex: number;
+    homeCode: string;
+    awayCode: string;
+    homeScore: number | "";
+    awayScore: number | "";
+    label: string;
+  } | null>(null);
+
   const [simTemperature, setSimTemperature] = useState<number>(20);
   const [simCrowdSupport, setSimCrowdSupport] = useState<number>(50); // 0-100: percentage of support for home team
   const [simHomePhysical, setSimHomePhysical] = useState<number>(100);
@@ -1162,6 +1389,14 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const [simAwayPlayerOut, setSimAwayPlayerOut] = useState<string>("");
   const [simHomeGoals, setSimHomeGoals] = useState<number | "">("");
   const [simAwayGoals, setSimAwayGoals] = useState<number | "">("");
+
+  const [simInitialTemp, setSimInitialTemp] = useState<number>(20);
+  const [simInitialCrowd, setSimInitialCrowd] = useState<number>(50);
+  const [simInitialHomePhysical, setSimInitialHomePhysical] = useState<number>(100);
+  const [simInitialHomeDiscipline, setSimInitialHomeDiscipline] = useState<number>(0);
+  const [simInitialAwayPhysical, setSimInitialAwayPhysical] = useState<number>(100);
+  const [simInitialAwayDiscipline, setSimInitialAwayDiscipline] = useState<number>(0);
+  const [simInitialModel, setSimInitialModel] = useState<string>("advanced");
 
   const handleOpenSimulator = (match: {
     type: "group" | "knockout" | "third";
@@ -1185,6 +1420,14 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setSimAwayPlayerOut("");
     setSimHomeGoals(match.homeScore);
     setSimAwayGoals(match.awayScore);
+
+    setSimInitialTemp(20);
+    setSimInitialCrowd(50);
+    setSimInitialHomePhysical(100);
+    setSimInitialHomeDiscipline(0);
+    setSimInitialAwayPhysical(100);
+    setSimInitialAwayDiscipline(0);
+    setSimInitialModel(selectedModel);
   };
 
   const getPlayerRating = (playerName: string, teamCode: string) => {
@@ -1251,6 +1494,66 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setSimHomeGoals(hs);
     setSimAwayGoals(as);
   };
+
+  const isInitialOpenRef = useRef(true);
+
+  useEffect(() => {
+    isInitialOpenRef.current = true;
+  }, [simMatch]);
+
+  useEffect(() => {
+    if (!simMatch) return;
+
+    if (isInitialOpenRef.current) {
+      isInitialOpenRef.current = false;
+      if (simMatch.homeScore !== "" && simMatch.awayScore !== "") {
+        return;
+      }
+    }
+
+    handleReSimulate();
+  }, [
+    selectedModel,
+    simTemperature,
+    simCrowdSupport,
+    simHomePhysical,
+    simHomeDiscipline,
+    simAwayPhysical,
+    simAwayDiscipline,
+    simHomePlayerOut,
+    simAwayPlayerOut
+  ]);
+
+  const hasControlsChanged = useMemo(() => {
+    return (
+      simTemperature !== simInitialTemp ||
+      simCrowdSupport !== simInitialCrowd ||
+      simHomePhysical !== simInitialHomePhysical ||
+      simHomeDiscipline !== simInitialHomeDiscipline ||
+      simAwayPhysical !== simInitialAwayPhysical ||
+      simAwayDiscipline !== simInitialAwayDiscipline ||
+      selectedModel !== simInitialModel ||
+      simHomePlayerOut !== "" ||
+      simAwayPlayerOut !== ""
+    );
+  }, [
+    simTemperature,
+    simInitialTemp,
+    simCrowdSupport,
+    simInitialCrowd,
+    simHomePhysical,
+    simInitialHomePhysical,
+    simHomeDiscipline,
+    simInitialHomeDiscipline,
+    simAwayPhysical,
+    simInitialAwayPhysical,
+    simAwayDiscipline,
+    simInitialAwayDiscipline,
+    selectedModel,
+    simInitialModel,
+    simHomePlayerOut,
+    simAwayPlayerOut
+  ]);
 
   const simProbabilities = useMemo(() => {
     if (!simMatch) return { homeWin: 50, draw: 0, awayWin: 50 };
@@ -1975,7 +2278,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     const getRunner = (grp: string) => standings[grp][1].code;
     const getThird = (idx: number) => bestThirdPlaces[idx] || "ARG";
 
-    return [
+    const fallbackPairs = [
       { home: getWinner("A"), away: getThird(7) },
       { home: getRunner("B"), away: getRunner("C") },
       { home: getWinner("C"), away: getThird(6) },
@@ -1993,7 +2296,28 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       { home: getWinner("I"), away: getWinner("J") },
       { home: getWinner("K"), away: getWinner("L") },
     ];
-  }, [isGroupStageComplete, standings, thirdPlaceStandings, useRealScores, liveGames, teams]);
+
+    if (useRealScores && apiFixtures.length > 0) {
+      const liveR32 = apiFixtures.filter((f) => f.isKnockout && f.stageName === "Round of 32");
+      if (liveR32.length === 16) {
+        const isValidCode = (c: string) => c && c.length === 3 && !c.match(/Winner|Runner|3rd|TBC|TBD/i);
+        return fallbackPairs.map((pair, idx) => {
+          const match = liveR32[idx];
+          if (match) {
+            const h = match.homeTeamObj?.code;
+            const a = match.awayTeamObj?.code;
+            return {
+              home: isValidCode(h) ? h.toUpperCase() : pair.home,
+              away: isValidCode(a) ? a.toUpperCase() : pair.away,
+            };
+          }
+          return pair;
+        });
+      }
+    }
+
+    return fallbackPairs;
+  }, [isGroupStageComplete, standings, thirdPlaceStandings, useRealScores, apiFixtures]);
 
   const koMatchups = useMemo(() => {
     const matchups: Record<string, { home: string | null; away: string | null }[]> = {
@@ -2005,19 +2329,58 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       away: pair?.away ?? null,
     }));
 
+    // R16: Propagate resolved winners from R32
     for (let i = 0; i < 8; i++) {
-      matchups.r16.push({ home: koWinners.r32[2 * i] ?? null, away: koWinners.r32[2 * i + 1] ?? null });
+      const feederHome = matchups.r32[2 * i];
+      const feederAway = matchups.r32[2 * i + 1];
+      const winnerHome = getKoMatchWinnerAndScore("r32", 2 * i, feederHome.home, feederHome.away).winnerCode;
+      const winnerAway = getKoMatchWinnerAndScore("r32", 2 * i + 1, feederAway.home, feederAway.away).winnerCode;
+
+      matchups.r16.push({
+        home: winnerHome,
+        away: winnerAway
+      });
     }
+
+    // QF: Propagate resolved winners from R16
     for (let i = 0; i < 4; i++) {
-      matchups.qf.push({ home: koWinners.r16[2 * i] ?? null, away: koWinners.r16[2 * i + 1] ?? null });
+      const feederHome = matchups.r16[2 * i];
+      const feederAway = matchups.r16[2 * i + 1];
+      const winnerHome = getKoMatchWinnerAndScore("r16", 2 * i, feederHome.home, feederHome.away).winnerCode;
+      const winnerAway = getKoMatchWinnerAndScore("r16", 2 * i + 1, feederAway.home, feederAway.away).winnerCode;
+
+      matchups.qf.push({
+        home: winnerHome,
+        away: winnerAway
+      });
     }
+
+    // SF: Propagate resolved winners from QF
     for (let i = 0; i < 2; i++) {
-      matchups.sf.push({ home: koWinners.qf[2 * i] ?? null, away: koWinners.qf[2 * i + 1] ?? null });
+      const feederHome = matchups.qf[2 * i];
+      const feederAway = matchups.qf[2 * i + 1];
+      const winnerHome = getKoMatchWinnerAndScore("qf", 2 * i, feederHome.home, feederHome.away).winnerCode;
+      const winnerAway = getKoMatchWinnerAndScore("qf", 2 * i + 1, feederAway.home, feederAway.away).winnerCode;
+
+      matchups.sf.push({
+        home: winnerHome,
+        away: winnerAway
+      });
     }
-    matchups.final.push({ home: koWinners.sf[0] ?? null, away: koWinners.sf[1] ?? null });
+
+    // Final: Propagate resolved winners from SF
+    const feederHome = matchups.sf[0];
+    const feederAway = matchups.sf[1];
+    const winnerHome = getKoMatchWinnerAndScore("sf", 0, feederHome.home, feederHome.away).winnerCode;
+    const winnerAway = getKoMatchWinnerAndScore("sf", 1, feederAway.home, feederAway.away).winnerCode;
+
+    matchups.final.push({
+      home: winnerHome,
+      away: winnerAway
+    });
 
     return matchups;
-  }, [r32Teams, koWinners]);
+  }, [r32Teams, koWinners, useRealScores, apiFixtures, getKoMatchWinnerAndScore]);
 
   const topTeamsData = useMemo(() => {
     const isBracketSynced = () => {
@@ -2068,6 +2431,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
     const isTeamEliminated = (teamCode: string) => {
       if (!isQualified(teamCode)) return true;
+      if (activeTab === "group") return false;
       return isEliminated(teamCode);
     };
 
@@ -2097,7 +2461,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       })
       .sort((a, b) => b.winProb - a.winProb)
       .slice(0, 8);
-  }, [teams, koMatchups, koWinners, r32Teams, isGroupStageComplete, useRealScores]);
+  }, [teams, koMatchups, koWinners, r32Teams, isGroupStageComplete, useRealScores, activeTab]);
 
   // Computed losers of SF for the 3rd place match
   const sfLosers = useMemo(() => {
@@ -2324,6 +2688,40 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         savePredictionToDb(501, "KNOCKOUT_WINNER", newScores.home, newScores.away, winner);
       }
     }
+  };
+
+  const handleOpenScoreEditModal = (
+    round: "r32" | "r16" | "qf" | "sf" | "final" | "third",
+    matchIndex: number,
+    homeCode: string | null,
+    awayCode: string | null,
+    label: string
+  ) => {
+    if (!homeCode || !awayCode) return;
+
+    let homeScore: number | "" = "";
+    let awayScore: number | "" = "";
+
+    if (round === "third") {
+      homeScore = thirdScores.home;
+      awayScore = thirdScores.away;
+    } else {
+      const matchScores = koScores[`${round}-${matchIndex}`];
+      if (matchScores) {
+        homeScore = matchScores.home;
+        awayScore = matchScores.away;
+      }
+    }
+
+    setEditingScoreMatch({
+      round,
+      matchIndex,
+      homeCode,
+      awayCode,
+      homeScore,
+      awayScore,
+      label,
+    });
   };
 
   const simulateKoMatch = (home: string, away: string) => {
@@ -2680,6 +3078,30 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   };
 
   // Clear Board
+  const handleModelChange = (model: "base" | "advanced" | "pro") => {
+    if (model === "base") {
+      setSelectedModel("base");
+      return;
+    }
+    const tier = session?.user?.subscriptionTier || "free";
+    if (model === "advanced") {
+      if (tier === "free") {
+        setUpgradeModalReason("plus");
+        setUpgradeModalOpen(true);
+        return;
+      }
+      setSelectedModel("advanced");
+    }
+    if (model === "pro") {
+      if (tier === "free" || tier === "plus") {
+        setUpgradeModalReason("pro");
+        setUpgradeModalOpen(true);
+        return;
+      }
+      setSelectedModel("pro");
+    }
+  };
+
   const handleReset = () => {
     disableRealScoresState();
     const resetMatches = matches.map(clearPredictorMatchScores);
@@ -2697,6 +3119,21 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setThirdWinner(null);
     setThirdScores({ home: "", away: "" });
     saveBulkToDb(resetMatches, clearedWinners, {}, null, { home: "", away: "" });
+  };
+
+  const handleResetKnockouts = () => {
+    const clearedWinners = {
+      r32: Array(16).fill(null),
+      r16: Array(8).fill(null),
+      qf: Array(4).fill(null),
+      sf: Array(2).fill(null),
+      final: Array(1).fill(null),
+    };
+    setKoWinners(clearedWinners);
+    setKoScores({});
+    setThirdWinner(null);
+    setThirdScores({ home: "", away: "" });
+    saveBulkToDb(matches, clearedWinners, {}, null, { home: "", away: "" });
   };
 
 
@@ -3041,7 +3478,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               className={toolbarButtonClass}
             >
               <FolderOpen className="h-4 w-4 text-cyan-400" />
-              Saves Manager
+              Saved Manager
             </button>
           )}
 
@@ -3055,7 +3492,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 Simulate Bracket
               </button>
               <button
-                onClick={handleReset}
+                onClick={() => setResetTarget("all")}
                 className={toolbarButtonClass}
               >
                 <RefreshCw className="h-4 w-4" />
@@ -3085,7 +3522,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 </button>
               )}
               <button
-                onClick={handleReset}
+                onClick={() => setResetTarget("all")}
                 className={toolbarButtonClass}
               >
                 <RefreshCw className="h-4 w-4" />
@@ -3229,7 +3666,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 className="h-5 w-5 rounded-md border-border bg-black/10 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-background cursor-pointer accent-cyan-500"
               />
               <label htmlFor="use-actual-scores" className="text-sm font-semibold text-foreground/90 select-none cursor-pointer">
-                Use actual / real-life scores for group stage matches ({groupRealPercent}%)
+                Use Real-Time Results for group stage matches
               </label>
             </div>
             <div className="flex items-center gap-2">
@@ -3245,7 +3682,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               )}
               {useRealScores && (
                 <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse">
-                  Real-life scores assigned
+                  Real-Time scores assigned
                 </span>
               )}
             </div>
@@ -3358,7 +3795,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   {idx + 1}
                                 </span>
                               </td>
-                              <td className="py-1 truncate flex items-center gap-1.5 max-w-[90px]">
+                              <td className="py-1 truncate flex items-center gap-1.5 w-full sm:min-w-[120px]">
                                 <CountryFlag
                                   code={row.team.code}
                                   flag={row.team.flag}
@@ -3366,7 +3803,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
                                   emojiClassName="text-base shrink-0 leading-none"
                                 />
-                                <span className="truncate flex items-center gap-1">
+                                <span className="truncate flex items-center gap-1" title={row.team.name}>
                                   {row.team.name}
                                   {row.team.isCustom && !bypassOverrides && !storeTeams[row.team.code]?.isOverrideDisabled && (
                                     <span title="Custom team stats active" className="inline-flex shrink-0">
@@ -3698,10 +4135,18 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           <Sparkles className="h-4 w-4" />
                           Simulate Remaining Bracket
                         </button>
+                        <button
+                          onClick={() => setResetTarget("knockouts")}
+                          className="flex items-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-muted-foreground hover:text-foreground"
+                          title="Reset Knockout Bracket"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                          Reset
+                        </button>
                         {useRealScores && (
                           <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1.5 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse flex items-center gap-1.5">
                             <Zap className="h-3.5 w-3.5 fill-cyan-500/20 text-cyan-500" />
-                            {groupRealPercent}% Real-Time Data Included
+                            Real-Time Data Included
                           </span>
                         )}
                       </div>
@@ -3763,32 +4208,37 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               <Zap className="h-3.5 w-3.5 fill-neon/20" />
                             </button>
                           </div>
-                          <div className="flex-1 flex flex-col justify-around py-1">
-                            {koMatchups.r32.slice(0, 8).map((m, idx) => (
-                              <KnockoutMatchCard
-                                key={`r32-left-${idx}`}
-                                round="r32"
-                                matchIndex={idx}
-                                homeCode={m.home}
-                                awayCode={m.away}
-                                winnerCode={koWinners.r32[idx]}
-                                homeScore={koScores[`r32-${idx}`]?.home ?? ""}
-                                awayScore={koScores[`r32-${idx}`]?.away ?? ""}
-                                onScoreChange={(side, val) => handleKoScoreChange("r32", idx, side, val)}
-                                onSelectWinner={(code) => handleSelectKoWinner("r32", idx, code)}
-                                onSimulateClick={() => handleOpenSimulator({
-                                  type: "knockout",
-                                  round: "r32",
-                                  matchIndex: idx,
-                                  homeCode: m.home!,
-                                  awayCode: m.away!,
-                                  homeScore: koScores[`r32-${idx}`]?.home ?? "",
-                                  awayScore: koScores[`r32-${idx}`]?.away ?? "",
-                                  details: KO_DETAILS.r32[idx]
-                                })}
-                                label={`Match ${idx + 1}`}
-                              />
-                            ))}
+                          <div className="flex-1 flex flex-col justify-around gap-2.5 py-1">
+                            {koMatchups.r32.slice(0, 8).map((m, idx) => {
+                              const matchState = getKoMatchWinnerAndScore("r32", idx, m.home, m.away);
+                              return (
+                                <KnockoutMatchCard
+                                  key={`r32-left-${idx}`}
+                                  round="r32"
+                                  matchIndex={idx}
+                                  homeCode={m.home}
+                                  awayCode={m.away}
+                                  winnerCode={matchState.winnerCode}
+                                  homeScore={matchState.homeScore}
+                                  awayScore={matchState.awayScore}
+                                  isReal={matchState.isReal}
+                                  onScoreChange={(side, val) => handleKoScoreChange("r32", idx, side, val)}
+                                  onSelectWinner={(code) => handleSelectKoWinner("r32", idx, code)}
+                                  onSimulateClick={() => handleOpenSimulator({
+                                    type: "knockout",
+                                    round: "r32",
+                                    matchIndex: idx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.r32[idx]
+                                  })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("r32", idx, m.home, m.away, "Match " + (idx + 1))}
+                                  label={`Match ${idx + 1}`}
+                                />
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -3805,32 +4255,46 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             </button>
                           </div>
                           <div className="flex-1 flex flex-col justify-around py-4">
-                            {koMatchups.r16.slice(0, 4).map((m, idx) => (
-                              <KnockoutMatchCard
-                                key={`r16-left-${idx}`}
-                                round="r16"
-                                matchIndex={idx}
-                                homeCode={m.home}
-                                awayCode={m.away}
-                                winnerCode={koWinners.r16[idx]}
-                                homeScore={koScores[`r16-${idx}`]?.home ?? ""}
-                                awayScore={koScores[`r16-${idx}`]?.away ?? ""}
-                                onScoreChange={(side, val) => handleKoScoreChange("r16", idx, side, val)}
-                                onSelectWinner={(code) => handleSelectKoWinner("r16", idx, code)}
-                                onSimulateClick={() => handleOpenSimulator({
-                                  type: "knockout",
-                                  round: "r16",
-                                  matchIndex: idx,
-                                  homeCode: m.home!,
-                                  awayCode: m.away!,
-                                  homeScore: koScores[`r16-${idx}`]?.home ?? "",
-                                  awayScore: koScores[`r16-${idx}`]?.away ?? "",
-                                  details: KO_DETAILS.r16[idx]
-                                })}
-                                label={`Match ${idx + 1}`}
-                                lockedMessage="TBD (R32)"
-                              />
-                            ))}
+                            {koMatchups.r16.slice(0, 4).map((m, idx) => {
+                              const matchState = getKoMatchWinnerAndScore("r16", idx, m.home, m.away);
+                              return (
+                                <KnockoutMatchCard
+                                  key={`r16-left-${idx}`}
+                                  round="r16"
+                                  matchIndex={idx}
+                                  homeCode={m.home}
+                                  awayCode={m.away}
+                                  winnerCode={matchState.winnerCode}
+                                  homeScore={matchState.homeScore}
+                                  awayScore={matchState.awayScore}
+                                  isReal={matchState.isReal}
+                                  onScoreChange={(side, val) => handleKoScoreChange("r16", idx, side, val)}
+                                  onSelectWinner={(code) => handleSelectKoWinner("r16", idx, code)}
+                                  onSimulateClick={() => handleOpenSimulator({
+                                    type: "knockout",
+                                    round: "r16",
+                                    matchIndex: idx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.r16[idx]
+                                  })}
+                                  on1v1Click={() => setSelected1v1Match({
+                                    round: "r16",
+                                    matchIndex: idx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.r16[idx]
+                                  })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("r16", idx, m.home, m.away, "Match " + (idx + 1))}
+                                  label={`Match ${idx + 1}`}
+                                  lockedMessage="TBD (R32)"
+                                />
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -3847,32 +4311,46 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             </button>
                           </div>
                           <div className="flex-1 flex flex-col justify-around py-8">
-                            {koMatchups.qf.slice(0, 2).map((m, idx) => (
-                              <KnockoutMatchCard
-                                key={`qf-left-${idx}`}
-                                round="qf"
-                                matchIndex={idx}
-                                homeCode={m.home}
-                                awayCode={m.away}
-                                winnerCode={koWinners.qf[idx]}
-                                homeScore={koScores[`qf-${idx}`]?.home ?? ""}
-                                awayScore={koScores[`qf-${idx}`]?.away ?? ""}
-                                onScoreChange={(side, val) => handleKoScoreChange("qf", idx, side, val)}
-                                onSelectWinner={(code) => handleSelectKoWinner("qf", idx, code)}
-                                onSimulateClick={() => handleOpenSimulator({
-                                  type: "knockout",
-                                  round: "qf",
-                                  matchIndex: idx,
-                                  homeCode: m.home!,
-                                  awayCode: m.away!,
-                                  homeScore: koScores[`qf-${idx}`]?.home ?? "",
-                                  awayScore: koScores[`qf-${idx}`]?.away ?? "",
-                                  details: KO_DETAILS.qf[idx]
-                                })}
-                                label={`QF Match ${idx + 1}`}
-                                lockedMessage="TBD (R16)"
-                              />
-                            ))}
+                            {koMatchups.qf.slice(0, 2).map((m, idx) => {
+                              const matchState = getKoMatchWinnerAndScore("qf", idx, m.home, m.away);
+                              return (
+                                <KnockoutMatchCard
+                                  key={`qf-left-${idx}`}
+                                  round="qf"
+                                  matchIndex={idx}
+                                  homeCode={m.home}
+                                  awayCode={m.away}
+                                  winnerCode={matchState.winnerCode}
+                                  homeScore={matchState.homeScore}
+                                  awayScore={matchState.awayScore}
+                                  isReal={matchState.isReal}
+                                  onScoreChange={(side, val) => handleKoScoreChange("qf", idx, side, val)}
+                                  onSelectWinner={(code) => handleSelectKoWinner("qf", idx, code)}
+                                  onSimulateClick={() => handleOpenSimulator({
+                                    type: "knockout",
+                                    round: "qf",
+                                    matchIndex: idx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.qf[idx]
+                                  })}
+                                  on1v1Click={() => setSelected1v1Match({
+                                    round: "qf",
+                                    matchIndex: idx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.qf[idx]
+                                  })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("qf", idx, m.home, m.away, "QF Match " + (idx + 1))}
+                                  label={`QF Match ${idx + 1}`}
+                                  lockedMessage="TBD (R16)"
+                                />
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -3889,32 +4367,46 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             </button>
                           </div>
                           <div className="flex-1 flex flex-col justify-around py-12">
-                            {koMatchups.sf.slice(0, 1).map((m, idx) => (
-                              <KnockoutMatchCard
-                                key={`sf-left-${idx}`}
-                                round="sf"
-                                matchIndex={idx}
-                                homeCode={m.home}
-                                awayCode={m.away}
-                                winnerCode={koWinners.sf[idx]}
-                                homeScore={koScores[`sf-${idx}`]?.home ?? ""}
-                                awayScore={koScores[`sf-${idx}`]?.away ?? ""}
-                                onScoreChange={(side, val) => handleKoScoreChange("sf", idx, side, val)}
-                                onSelectWinner={(code) => handleSelectKoWinner("sf", idx, code)}
-                                onSimulateClick={() => handleOpenSimulator({
-                                  type: "knockout",
-                                  round: "sf",
-                                  matchIndex: idx,
-                                  homeCode: m.home!,
-                                  awayCode: m.away!,
-                                  homeScore: koScores[`sf-${idx}`]?.home ?? "",
-                                  awayScore: koScores[`sf-${idx}`]?.away ?? "",
-                                  details: KO_DETAILS.sf[idx]
-                                })}
-                                label={`SF Match ${idx + 1}`}
-                                lockedMessage="TBD (QF)"
-                              />
-                            ))}
+                            {koMatchups.sf.slice(0, 1).map((m, idx) => {
+                              const matchState = getKoMatchWinnerAndScore("sf", idx, m.home, m.away);
+                              return (
+                                <KnockoutMatchCard
+                                  key={`sf-left-${idx}`}
+                                  round="sf"
+                                  matchIndex={idx}
+                                  homeCode={m.home}
+                                  awayCode={m.away}
+                                  winnerCode={matchState.winnerCode}
+                                  homeScore={matchState.homeScore}
+                                  awayScore={matchState.awayScore}
+                                  isReal={matchState.isReal}
+                                  onScoreChange={(side, val) => handleKoScoreChange("sf", idx, side, val)}
+                                  onSelectWinner={(code) => handleSelectKoWinner("sf", idx, code)}
+                                  onSimulateClick={() => handleOpenSimulator({
+                                    type: "knockout",
+                                    round: "sf",
+                                    matchIndex: idx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.sf[idx]
+                                  })}
+                                  on1v1Click={() => setSelected1v1Match({
+                                    round: "sf",
+                                    matchIndex: idx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.sf[idx]
+                                  })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("sf", idx, m.home, m.away, "SF Match " + (idx + 1))}
+                                  label={`SF Match ${idx + 1}`}
+                                  lockedMessage="TBD (QF)"
+                                />
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -3922,41 +4414,45 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                         <div className="flex flex-col w-64 min-w-[256px] shrink-0 gap-3 justify-center">
                           {/* Trophy / Champion Celebration */}
                           <div className="text-center mb-4">
-                            {koWinners.final[0] ? (
-                              <div className="glass-strong rounded-3xl p-6 border border-neon/50 shadow-neon flex flex-col items-center gap-4 text-center animate-float bg-muted/30 dark:bg-black/40">
-                                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-neon to-neon-2 flex items-center justify-center text-background text-3xl font-bold shadow-md">
-                                  🏆
-                                </div>
-                                <div>
-                                  <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-semibold">
-                                    World Cup Champion
+                            {(() => {
+                              const finalMatch = koMatchups.final[0];
+                              const finalWinner = getKoMatchWinnerAndScore("final", 0, finalMatch.home, finalMatch.away).winnerCode;
+                              return finalWinner ? (
+                                <div className="glass-strong rounded-3xl p-6 border border-neon/50 shadow-neon flex flex-col items-center gap-4 text-center animate-float bg-muted/30 dark:bg-black/40">
+                                  <div className="w-16 h-16 rounded-full bg-gradient-to-r from-neon to-neon-2 flex items-center justify-center text-background text-3xl font-bold shadow-md">
+                                    🏆
                                   </div>
-                                  <div className="text-2xl font-display font-bold mt-2 flex items-center gap-1.5 justify-center">
-                                    <CountryFlag
-                                      code={getTeam(koWinners.final[0]).code}
-                                      flag={getTeam(koWinners.final[0]).flag}
-                                      name={getTeam(koWinners.final[0]).name}
-                                      className="h-6 w-8 shrink-0 rounded object-cover"
-                                      emojiClassName="text-2xl leading-none"
-                                    />
-                                    <span className="text-gradient truncate max-w-[180px]">{getTeam(koWinners.final[0]).name}</span>
+                                  <div>
+                                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-semibold">
+                                      World Cup Champion
+                                    </div>
+                                    <div className="text-2xl font-display font-bold mt-2 flex items-center gap-1.5 justify-center">
+                                      <CountryFlag
+                                        code={getTeam(finalWinner).code}
+                                        flag={getTeam(finalWinner).flag}
+                                        name={getTeam(finalWinner).name}
+                                        className="h-6 w-8 shrink-0 rounded object-cover"
+                                        emojiClassName="text-2xl leading-none"
+                                      />
+                                      <span className="text-gradient truncate max-w-[180px]">{getTeam(finalWinner).name}</span>
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground mt-1">
+                                      Elo: {getTeam(finalWinner).elo} · FIFA #{getTeam(finalWinner).rank}
+                                    </div>
                                   </div>
-                                  <div className="text-[10px] text-muted-foreground mt-1">
-                                    Elo: {getTeam(koWinners.final[0]).elo} · FIFA #{getTeam(koWinners.final[0]).rank}
+                                </div>
+                              ) : (
+                                <div className="glass rounded-3xl p-6 border border-border dark:border-white/5 flex flex-col items-center gap-3 text-center opacity-60">
+                                  <div className="text-4xl animate-pulse">🏆</div>
+                                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                                    FIFA World Cup Trophy
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground">
+                                    Simulate or predict matches to crown the champion
                                   </div>
                                 </div>
-                              </div>
-                            ) : (
-                              <div className="glass rounded-3xl p-6 border border-border dark:border-white/5 flex flex-col items-center gap-3 text-center opacity-60">
-                                <div className="text-4xl animate-pulse">🏆</div>
-                                <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-                                  FIFA World Cup Trophy
-                                </div>
-                                <div className="text-[10px] text-muted-foreground">
-                                  Simulate or predict matches to crown the champion
-                                </div>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </div>
 
                           {/* World Cup Final Match */}
@@ -3964,29 +4460,46 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             <div className="text-center font-display font-bold text-xs tracking-wider uppercase text-gold pb-2 border-b border-white/10 mb-2">
                               World Cup Final
                             </div>
-                            <KnockoutMatchCard
-                              round="final"
-                              matchIndex={0}
-                              homeCode={koMatchups.final[0].home}
-                              awayCode={koMatchups.final[0].away}
-                              winnerCode={koWinners.final[0]}
-                              homeScore={koScores["final-0"]?.home ?? ""}
-                              awayScore={koScores["final-0"]?.away ?? ""}
-                              onScoreChange={(side, val) => handleKoScoreChange("final", 0, side, val)}
-                              onSelectWinner={(code) => handleSelectKoWinner("final", 0, code)}
-                              onSimulateClick={() => handleOpenSimulator({
-                                type: "knockout",
-                                round: "final",
-                                matchIndex: 0,
-                                homeCode: koMatchups.final[0].home!,
-                                awayCode: koMatchups.final[0].away!,
-                                homeScore: koScores["final-0"]?.home ?? "",
-                                awayScore: koScores["final-0"]?.away ?? "",
-                                details: KO_DETAILS.final[0]
-                              })}
-                              label="Final"
-                              lockedMessage="TBD (SF Winners)"
-                            />
+                            {(() => {
+                              const finalMatch = koMatchups.final[0];
+                              const matchState = getKoMatchWinnerAndScore("final", 0, finalMatch.home, finalMatch.away);
+                              return (
+                                <KnockoutMatchCard
+                                  round="final"
+                                  matchIndex={0}
+                                  homeCode={finalMatch.home}
+                                  awayCode={finalMatch.away}
+                                  winnerCode={matchState.winnerCode}
+                                  homeScore={matchState.homeScore}
+                                  awayScore={matchState.awayScore}
+                                  isReal={matchState.isReal}
+                                  onScoreChange={(side, val) => handleKoScoreChange("final", 0, side, val)}
+                                  onSelectWinner={(code) => handleSelectKoWinner("final", 0, code)}
+                                  onSimulateClick={() => handleOpenSimulator({
+                                    type: "knockout",
+                                    round: "final",
+                                    matchIndex: 0,
+                                    homeCode: finalMatch.home!,
+                                    awayCode: finalMatch.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.final[0]
+                                  })}
+                                  on1v1Click={() => setSelected1v1Match({
+                                    round: "final",
+                                    matchIndex: 0,
+                                    homeCode: finalMatch.home!,
+                                    awayCode: finalMatch.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.final[0]
+                                  })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("final", 0, finalMatch.home, finalMatch.away, "Final")}
+                                  label="Final"
+                                  lockedMessage="TBD (SF Winners)"
+                                />
+                              );
+                            })()}
                           </div>
 
                           {/* 3rd Place Match */}
@@ -3994,27 +4507,43 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             <div className="text-center font-display font-bold text-xs tracking-wider uppercase text-muted-foreground pb-2 border-b border-white/10 mb-2">
                               3rd Place Match
                             </div>
-                            <KnockoutMatchCard
-                              round="third"
-                              matchIndex={0}
-                              homeCode={sfLosers.home}
-                              awayCode={sfLosers.away}
-                              winnerCode={thirdWinner}
-                              homeScore={thirdScores.home}
-                              awayScore={thirdScores.away}
-                              onScoreChange={handleThirdScoreChange}
-                              onSelectWinner={handleSelectThirdWinner}
-                              onSimulateClick={() => handleOpenSimulator({
-                                type: "third",
-                                homeCode: sfLosers.home!,
-                                awayCode: sfLosers.away!,
-                                homeScore: thirdScores.home,
-                                awayScore: thirdScores.away,
-                                details: KO_DETAILS.third[0]
-                              })}
-                              label="3rd Place"
-                              lockedMessage="TBD (SF Losers)"
-                            />
+                            {(() => {
+                              const matchState = getKoMatchWinnerAndScore("third", 0, sfLosers.home, sfLosers.away);
+                              return (
+                                <KnockoutMatchCard
+                                  round="third"
+                                  matchIndex={0}
+                                  homeCode={sfLosers.home}
+                                  awayCode={sfLosers.away}
+                                  winnerCode={matchState.winnerCode}
+                                  homeScore={matchState.homeScore}
+                                  awayScore={matchState.awayScore}
+                                  isReal={matchState.isReal}
+                                  onScoreChange={handleThirdScoreChange}
+                                  onSelectWinner={handleSelectThirdWinner}
+                                  onSimulateClick={() => handleOpenSimulator({
+                                    type: "third",
+                                    homeCode: sfLosers.home!,
+                                    awayCode: sfLosers.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.third[0]
+                                  })}
+                                  on1v1Click={() => setSelected1v1Match({
+                                    round: "third",
+                                    matchIndex: 0,
+                                    homeCode: sfLosers.home!,
+                                    awayCode: sfLosers.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.third[0]
+                                  })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("third", 0, sfLosers.home, sfLosers.away, "3rd Place")}
+                                  label="3rd Place"
+                                  lockedMessage="TBD (SF Losers)"
+                                />
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -4033,6 +4562,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           <div className="flex-1 flex flex-col justify-around py-12">
                             {koMatchups.sf.slice(1, 2).map((m, idx) => {
                               const realIdx = idx + 1;
+                              const matchState = getKoMatchWinnerAndScore("sf", realIdx, m.home, m.away);
                               return (
                                 <KnockoutMatchCard
                                   key={`sf-right-${realIdx}`}
@@ -4040,9 +4570,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   matchIndex={realIdx}
                                   homeCode={m.home}
                                   awayCode={m.away}
-                                  winnerCode={koWinners.sf[realIdx]}
-                                  homeScore={koScores[`sf-${realIdx}`]?.home ?? ""}
-                                  awayScore={koScores[`sf-${realIdx}`]?.away ?? ""}
+                                  winnerCode={matchState.winnerCode}
+                                  homeScore={matchState.homeScore}
+                                  awayScore={matchState.awayScore}
+                                  isReal={matchState.isReal}
                                   onScoreChange={(side, val) => handleKoScoreChange("sf", realIdx, side, val)}
                                   onSelectWinner={(code) => handleSelectKoWinner("sf", realIdx, code)}
                                   onSimulateClick={() => handleOpenSimulator({
@@ -4051,10 +4582,20 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                     matchIndex: realIdx,
                                     homeCode: m.home!,
                                     awayCode: m.away!,
-                                    homeScore: koScores[`sf-${realIdx}`]?.home ?? "",
-                                    awayScore: koScores[`sf-${realIdx}`]?.away ?? "",
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
                                     details: KO_DETAILS.sf[realIdx]
                                   })}
+                                  on1v1Click={() => setSelected1v1Match({
+                                    round: "sf",
+                                    matchIndex: realIdx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.sf[realIdx]
+                                  })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("sf", realIdx, m.home, m.away, "SF Match " + (realIdx + 1))}
                                   label={`SF Match ${realIdx + 1}`}
                                   lockedMessage="TBD (QF)"
                                 />
@@ -4078,6 +4619,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           <div className="flex-1 flex flex-col justify-around py-8">
                             {koMatchups.qf.slice(2, 4).map((m, idx) => {
                               const realIdx = idx + 2;
+                              const matchState = getKoMatchWinnerAndScore("qf", realIdx, m.home, m.away);
                               return (
                                 <KnockoutMatchCard
                                   key={`qf-right-${realIdx}`}
@@ -4085,9 +4627,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   matchIndex={realIdx}
                                   homeCode={m.home}
                                   awayCode={m.away}
-                                  winnerCode={koWinners.qf[realIdx]}
-                                  homeScore={koScores[`qf-${realIdx}`]?.home ?? ""}
-                                  awayScore={koScores[`qf-${realIdx}`]?.away ?? ""}
+                                  winnerCode={matchState.winnerCode}
+                                  homeScore={matchState.homeScore}
+                                  awayScore={matchState.awayScore}
+                                  isReal={matchState.isReal}
                                   onScoreChange={(side, val) => handleKoScoreChange("qf", realIdx, side, val)}
                                   onSelectWinner={(code) => handleSelectKoWinner("qf", realIdx, code)}
                                   onSimulateClick={() => handleOpenSimulator({
@@ -4096,10 +4639,20 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                     matchIndex: realIdx,
                                     homeCode: m.home!,
                                     awayCode: m.away!,
-                                    homeScore: koScores[`qf-${realIdx}`]?.home ?? "",
-                                    awayScore: koScores[`qf-${realIdx}`]?.away ?? "",
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
                                     details: KO_DETAILS.qf[realIdx]
                                   })}
+                                  on1v1Click={() => setSelected1v1Match({
+                                    round: "qf",
+                                    matchIndex: realIdx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.qf[realIdx]
+                                  })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("qf", realIdx, m.home, m.away, "QF Match " + (realIdx + 1))}
                                   label={`QF Match ${realIdx + 1}`}
                                   lockedMessage="TBD (R16)"
                                 />
@@ -4123,6 +4676,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           <div className="flex-1 flex flex-col justify-around py-4">
                             {koMatchups.r16.slice(4, 8).map((m, idx) => {
                               const realIdx = idx + 4;
+                              const matchState = getKoMatchWinnerAndScore("r16", realIdx, m.home, m.away);
                               return (
                                 <KnockoutMatchCard
                                   key={`r16-right-${realIdx}`}
@@ -4130,9 +4684,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   matchIndex={realIdx}
                                   homeCode={m.home}
                                   awayCode={m.away}
-                                  winnerCode={koWinners.r16[realIdx]}
-                                  homeScore={koScores[`r16-${realIdx}`]?.home ?? ""}
-                                  awayScore={koScores[`r16-${realIdx}`]?.away ?? ""}
+                                  winnerCode={matchState.winnerCode}
+                                  homeScore={matchState.homeScore}
+                                  awayScore={matchState.awayScore}
+                                  isReal={matchState.isReal}
                                   onScoreChange={(side, val) => handleKoScoreChange("r16", realIdx, side, val)}
                                   onSelectWinner={(code) => handleSelectKoWinner("r16", realIdx, code)}
                                   onSimulateClick={() => handleOpenSimulator({
@@ -4141,10 +4696,20 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                     matchIndex: realIdx,
                                     homeCode: m.home!,
                                     awayCode: m.away!,
-                                    homeScore: koScores[`r16-${realIdx}`]?.home ?? "",
-                                    awayScore: koScores[`r16-${realIdx}`]?.away ?? "",
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
                                     details: KO_DETAILS.r16[realIdx]
                                   })}
+                                  on1v1Click={() => setSelected1v1Match({
+                                    round: "r16",
+                                    matchIndex: realIdx,
+                                    homeCode: m.home!,
+                                    awayCode: m.away!,
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
+                                    details: KO_DETAILS.r16[realIdx]
+                                  })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("r16", realIdx, m.home, m.away, "Match " + (realIdx + 1))}
                                   label={`Match ${realIdx + 1}`}
                                   lockedMessage="TBD (R32)"
                                 />
@@ -4165,9 +4730,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               <Zap className="h-3.5 w-3.5 fill-neon/20" />
                             </button>
                           </div>
-                          <div className="flex-1 flex flex-col justify-around py-1">
+                          <div className="flex-1 flex flex-col justify-around gap-2.5 py-1">
                             {koMatchups.r32.slice(8, 16).map((m, idx) => {
                               const realIdx = idx + 8;
+                              const matchState = getKoMatchWinnerAndScore("r32", realIdx, m.home, m.away);
                               return (
                                 <KnockoutMatchCard
                                   key={`r32-right-${realIdx}`}
@@ -4175,9 +4741,10 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                   matchIndex={realIdx}
                                   homeCode={m.home}
                                   awayCode={m.away}
-                                  winnerCode={koWinners.r32[realIdx]}
-                                  homeScore={koScores[`r32-${realIdx}`]?.home ?? ""}
-                                  awayScore={koScores[`r32-${realIdx}`]?.away ?? ""}
+                                  winnerCode={matchState.winnerCode}
+                                  homeScore={matchState.homeScore}
+                                  awayScore={matchState.awayScore}
+                                  isReal={matchState.isReal}
                                   onScoreChange={(side, val) => handleKoScoreChange("r32", realIdx, side, val)}
                                   onSelectWinner={(code) => handleSelectKoWinner("r32", realIdx, code)}
                                   onSimulateClick={() => handleOpenSimulator({
@@ -4186,10 +4753,11 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                                     matchIndex: realIdx,
                                     homeCode: m.home!,
                                     awayCode: m.away!,
-                                    homeScore: koScores[`r32-${realIdx}`]?.home ?? "",
-                                    awayScore: koScores[`r32-${realIdx}`]?.away ?? "",
+                                    homeScore: matchState.homeScore,
+                                    awayScore: matchState.awayScore,
                                     details: KO_DETAILS.r32[realIdx]
                                   })}
+                                  onEditScoreClick={() => handleOpenScoreEditModal("r32", realIdx, m.home, m.away, "Match " + (realIdx + 1))}
                                   label={`Match ${realIdx + 1}`}
                                 />
                               );
@@ -4263,6 +4831,88 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
               {/* Scrollable Content */}
               <div className="p-6 overflow-y-auto space-y-6 flex-1">
+
+                {/* Model Selection */}
+                <div className="space-y-2 relative z-50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Simulation Engine</span>
+                    <div
+                      className="relative"
+                      onMouseEnter={() => setSimModelDropdownOpen(true)}
+                      onMouseLeave={() => setSimModelDropdownOpen(false)}
+                    >
+                      <button
+                        onClick={() => setSimModelDropdownOpen(!simModelDropdownOpen)}
+                        className="flex cursor-pointer items-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-[11px] font-medium rounded-lg px-2.5 py-1.5 text-foreground transition duration-200 select-none outline-none"
+                      >
+                        {selectedModel === "pro" && <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />}
+                        {selectedModel === "advanced" && <Brain className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />}
+                        {selectedModel === "base" && <Cpu className="h-3.5 w-3.5 text-emerald-600 dark:text-neon shrink-0" />}
+                        <span>
+                          {selectedModel === "pro" && "Pro Model"}
+                          {selectedModel === "advanced" && "Advanced Model"}
+                          {selectedModel === "base" && "Base Model"}
+                        </span>
+                        <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
+                      </button>
+
+                      {simModelDropdownOpen && (
+                        <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-border dark:border-white/10 bg-white/95 dark:bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
+                          <button
+                            onClick={() => {
+                              handleModelChange("base");
+                              setSimModelDropdownOpen(false);
+                            }}
+                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${selectedModel === "base" ? "text-emerald-600 dark:text-neon font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"}`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Cpu className="h-3.5 w-3.5 text-emerald-600 dark:text-neon shrink-0" />
+                              <div>
+                                <div className="text-foreground font-semibold">Base Model</div>
+                                <div className="text-[10px] text-muted-foreground">Elo / Att / Def stats</div>
+                              </div>
+                            </div>
+                            {selectedModel === "base" && <Check className="h-3.5 w-3.5" />}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              handleModelChange("advanced");
+                              setSimModelDropdownOpen(false);
+                            }}
+                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 mt-1 ${selectedModel === "advanced" ? "text-blue-600 dark:text-blue-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"}`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Brain className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                              <div>
+                                <div className="text-foreground font-semibold">Advanced Model</div>
+                                <div className="text-[10px] text-muted-foreground">Avg player overall ratings</div>
+                              </div>
+                            </div>
+                            {selectedModel === "advanced" && <Check className="h-3.5 w-3.5" />}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              handleModelChange("pro");
+                              setSimModelDropdownOpen(false);
+                            }}
+                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 mt-1 ${selectedModel === "pro" ? "text-purple-600 dark:text-purple-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"}`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                              <div>
+                                <div className="text-foreground font-semibold">Pro Model</div>
+                                <div className="text-[10px] text-muted-foreground">Deep player attributes</div>
+                              </div>
+                            </div>
+                            {selectedModel === "pro" && <Check className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
                 {/* Temperature Slider */}
                 <TemperatureSlider
@@ -4449,7 +5099,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 <button
                   type="button"
                   onClick={handleReSimulate}
-                  className="flex-1 bg-muted dark:bg-zinc-800/80 hover:bg-black/5 dark:hover:bg-zinc-700 hover:text-foreground dark:hover:text-white text-foreground/90 dark:text-white/90 border border-border dark:border-zinc-700 py-3 rounded-2xl flex items-center justify-center gap-2 transition duration-200 font-semibold"
+                  disabled={!hasControlsChanged && simHomeGoals !== "" && simAwayGoals !== ""}
+                  className="flex-1 bg-muted dark:bg-zinc-800/80 hover:bg-black/5 dark:hover:bg-zinc-700 hover:text-foreground dark:hover:text-white text-foreground/90 dark:text-white/90 border border-border dark:border-zinc-700 py-3 rounded-2xl flex items-center justify-center gap-2 transition duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RefreshCw className="w-4 h-4" />
                   <span>Re-Simulate</span>
@@ -4929,6 +5580,38 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={!!resetTarget} onOpenChange={(open) => !open && setResetTarget(null)}>
+        <AlertDialogContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-display font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-rose-500" />
+              <span>Confirm Reset</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-slate-500 dark:text-muted-foreground mt-2">
+              Are you sure you want to reset {resetTarget === "all" ? "the entire board" : "the knockout bracket"}? This will clear all {resetTarget === "all" ? "predicted scores and outcomes" : "simulated knockout scores and outcomes"}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 flex gap-2">
+            <AlertDialogCancel className="px-4 py-2 text-xs font-bold rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 dark:border-white/10 dark:text-white dark:hover:bg-white/5 cursor-pointer">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (resetTarget === "all") {
+                  handleReset();
+                } else if (resetTarget === "knockouts") {
+                  handleResetKnockouts();
+                }
+                setResetTarget(null);
+              }}
+              className="px-4 py-2 text-xs font-black rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition cursor-pointer"
+            >
+              Reset {resetTarget === "all" ? "Board" : "Knockouts"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {isOverridesModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-2xl rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-6 shadow-2xl flex flex-col max-h-[85vh]">
@@ -5085,6 +5768,69 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           </div>
         </div>
       )}
+
+      {selected1v1Match && (
+        <Match1v1Modal
+          isOpen={true}
+          onClose={() => setSelected1v1Match(null)}
+          match={{
+            id: `${selected1v1Match.round}-${selected1v1Match.matchIndex}`,
+            group: selected1v1Match.round,
+            homeCode: selected1v1Match.homeCode,
+            awayCode: selected1v1Match.awayCode,
+            homeScore: selected1v1Match.homeScore,
+            awayScore: selected1v1Match.awayScore,
+          }}
+          homeTeam={getTeam(selected1v1Match.homeCode)}
+          awayTeam={getTeam(selected1v1Match.awayCode)}
+          homeTopPlayer={getTeamPlayers(selected1v1Match.homeCode)[0]}
+          awayTopPlayer={getTeamPlayers(selected1v1Match.awayCode)[0]}
+          homeLambda={getMatchExpectedGoals(getTeam(selected1v1Match.homeCode), getTeam(selected1v1Match.awayCode), players, selectedModel).homeLambda}
+          awayLambda={getMatchExpectedGoals(getTeam(selected1v1Match.homeCode), getTeam(selected1v1Match.awayCode), players, selectedModel).awayLambda}
+          matchDetails={selected1v1Match.details}
+          onSimulate={() => {
+            const h = getTeam(selected1v1Match.homeCode);
+            const a = getTeam(selected1v1Match.awayCode);
+            const { homeLambda, awayLambda } = getMatchExpectedGoals(h, a, players, selectedModel);
+            const simH = getPoisson(homeLambda);
+            let simA = getPoisson(awayLambda);
+            if (simH === simA) {
+              if (Math.random() > 0.5) simA += 1;
+              else simA -= 1;
+            }
+            handleKoScoreChange(selected1v1Match.round as any, selected1v1Match.matchIndex, "home", String(simH));
+            handleKoScoreChange(selected1v1Match.round as any, selected1v1Match.matchIndex, "away", String(simA));
+            handleSelectKoWinner(selected1v1Match.round as any, selected1v1Match.matchIndex, simH > simA ? selected1v1Match.homeCode : selected1v1Match.awayCode);
+          }}
+          isRealData={useRealScores && Boolean(getAssignedLiveScoreForMatch({ id: `${selected1v1Match.round}-${selected1v1Match.matchIndex}`, group: "", homeCode: selected1v1Match.homeCode, awayCode: selected1v1Match.awayCode, homeScore: "", awayScore: "" }))}
+        />
+      )}
+
+      {editingScoreMatch && (
+        <EditScoreModal
+          isOpen={true}
+          onClose={() => setEditingScoreMatch(null)}
+          matchLabel={editingScoreMatch.label}
+          homeCode={editingScoreMatch.homeCode}
+          awayCode={editingScoreMatch.awayCode}
+          initialHomeScore={editingScoreMatch.homeScore}
+          initialAwayScore={editingScoreMatch.awayScore}
+          players={players}
+          selectedModel={selectedModel}
+          bypassOverrides={bypassOverrides}
+          onSave={(homeVal, awayVal) => {
+            if (editingScoreMatch.round === "third") {
+              handleThirdScoreChange("home", homeVal);
+              handleThirdScoreChange("away", awayVal);
+            } else {
+              handleKoScoreChange(editingScoreMatch.round, editingScoreMatch.matchIndex, "home", homeVal);
+              handleKoScoreChange(editingScoreMatch.round, editingScoreMatch.matchIndex, "away", awayVal);
+            }
+            toast.success("Match score saved successfully!");
+            setEditingScoreMatch(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -5129,8 +5875,11 @@ interface KnockoutMatchCardProps {
   onScoreChange: (side: "home" | "away", val: string) => void;
   onSelectWinner: (code: string) => void;
   onSimulateClick: () => void;
+  on1v1Click?: () => void;
   label: string;
   lockedMessage?: string;
+  onEditScoreClick?: () => void;
+  isReal?: boolean;
 }
 
 function KnockoutMatchCard({
@@ -5144,8 +5893,11 @@ function KnockoutMatchCard({
   onScoreChange,
   onSelectWinner,
   onSimulateClick,
+  on1v1Click,
   label,
   lockedMessage = "Seeding not available yet.",
+  onEditScoreClick,
+  isReal = false,
 }: KnockoutMatchCardProps) {
   const teams = useTeams();
   const getTeam = (code: string) => teams.find(t => t.code === code) || teams[0];
@@ -5165,33 +5917,51 @@ function KnockoutMatchCard({
   }
 
   return (
-    <div className="glass-strong rounded-xl p-2.5 border border-white/5 hover:border-neon/20 transition flex flex-col justify-between min-h-[90px] shadow-glass bg-black/30">
-      <div
-        onClick={onSimulateClick}
-        title="Simulate 1v1"
-        className="flex items-center justify-between text-[9px] uppercase font-bold tracking-wider text-muted-foreground border-b border-white/5 pb-1 mb-1.5 cursor-pointer hover:text-neon group/hdr transition duration-200"
-      >
-        <span className="text-neon-2 group-hover/hdr:text-neon transition">{label}</span>
+    <div className="glass-strong rounded-xl p-2.5 border border-white/5 hover:border-neon/20 transition flex flex-col justify-between min-h-[90px] shadow-glass bg-black/30 group relative">
+      <div className="flex items-center justify-between text-[9px] uppercase font-bold tracking-wider text-muted-foreground border-b border-slate-100 dark:border-white/5 pb-1 mb-1.5 transition duration-200">
+        <div className="flex items-center gap-1.5">
+          <span className="text-neon-2 transition">{label}</span>
+          {homeScore !== "" && (
+            isReal ? (
+              <span className="px-1.5 py-0.5 rounded-[4px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[8px] font-extrabold uppercase tracking-wider scale-90 shrink-0">Real</span>
+            ) : (
+              <span className="px-1.5 py-0.5 rounded-[4px] bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[8px] font-extrabold uppercase tracking-wider scale-90 shrink-0">Simulated</span>
+            )
+          )}
+        </div>
         <div className="flex items-center gap-1">
           {details && (
-            <span className="text-white/40 group-hover/hdr:text-white/70 transition">
+            <span className="text-slate-400 dark:text-white/40 transition">
               {details.venue} · {details.date}
             </span>
           )}
-          <Sparkles className="h-3 w-3 text-white/20 group-hover/hdr:text-neon transition ml-1" />
+          {onSimulateClick && !isReal && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSimulateClick();
+              }}
+              title="Match Simulation"
+              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-900 dark:text-white/40 dark:hover:text-white transition cursor-pointer shrink-0"
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 relative">
         {/* Home Row */}
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
+            disabled={isReal}
             onClick={() => tHome && onSelectWinner(tHome.code)}
             className={`flex-1 flex items-center justify-between p-1.5 rounded-lg transition ${winnerCode === homeCode
               ? "bg-gradient-to-r from-neon/20 to-neon-2/15 border border-neon/30 text-foreground font-bold"
               : "hover:bg-white/5 text-muted-foreground"
-              }`}
+              } ${isReal ? "cursor-default opacity-90" : ""}`}
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <CountryFlag
@@ -5208,26 +5978,21 @@ function KnockoutMatchCard({
             {winnerCode === homeCode && <Check className="h-3 w-3 text-neon shrink-0 ml-1" />}
           </button>
 
-          <input
-            type="number"
-            value={homeScore}
-            min={0}
-            onChange={(e) => onScoreChange("home", e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            placeholder="-"
-            className="w-8 h-7 text-center bg-white/5 border border-white/10 rounded-lg font-bold text-xs text-foreground focus:ring-1 focus:ring-neon focus:outline-none placeholder-white/10 shrink-0 [-moz-appearance:_textfield] [&::-webkit-outer-spin-button]:margin-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:margin-0 [&::-webkit-inner-spin-button]:appearance-none"
-          />
+          <span className="w-8 text-center font-bold text-xs text-foreground shrink-0 select-none">
+            {homeScore !== "" ? homeScore : "-"}
+          </span>
         </div>
 
         {/* Away Row */}
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
+            disabled={isReal}
             onClick={() => tAway && onSelectWinner(tAway.code)}
             className={`flex-1 flex items-center justify-between p-1.5 rounded-lg transition ${winnerCode === awayCode
               ? "bg-gradient-to-r from-neon/20 to-neon-2/15 border border-neon/30 text-foreground font-bold"
               : "hover:bg-white/5 text-muted-foreground"
-              }`}
+              } ${isReal ? "cursor-default opacity-90" : ""}`}
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <CountryFlag
@@ -5244,15 +6009,375 @@ function KnockoutMatchCard({
             {winnerCode === awayCode && <Check className="h-3.5 w-3.5 text-neon shrink-0 ml-1" />}
           </button>
 
-          <input
-            type="number"
-            value={awayScore}
-            min={0}
-            onChange={(e) => onScoreChange("away", e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            placeholder="-"
-            className="w-8 h-7 text-center bg-white/5 border border-white/10 rounded-lg font-bold text-xs text-foreground focus:ring-1 focus:ring-neon focus:outline-none placeholder-white/10 shrink-0 [-moz-appearance:_textfield] [&::-webkit-outer-spin-button]:margin-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:margin-0 [&::-webkit-inner-spin-button]:appearance-none"
+          <span className="w-8 text-center font-bold text-xs text-foreground shrink-0 select-none">
+            {awayScore !== "" ? awayScore : "-"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface EditScoreModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  matchLabel: string;
+  homeCode: string;
+  awayCode: string;
+  initialHomeScore: number | "";
+  initialAwayScore: number | "";
+  players: any;
+  selectedModel: any;
+  bypassOverrides: boolean;
+  onSave: (homeScore: string, awayScore: string) => void;
+}
+
+function EditScoreModal({
+  isOpen,
+  onClose,
+  matchLabel,
+  homeCode,
+  awayCode,
+  initialHomeScore,
+  initialAwayScore,
+  players,
+  selectedModel,
+  bypassOverrides,
+  onSave,
+}: EditScoreModalProps) {
+  const [homeScore, setHomeScore] = useState<string>(initialHomeScore === "" ? "" : String(initialHomeScore));
+  const [awayScore, setAwayScore] = useState<string>(initialAwayScore === "" ? "" : String(initialAwayScore));
+
+  const teams = useTeams();
+  const { teams: storeTeams } = useSimulationStore();
+
+  const getTeam = (code: string) => {
+    const staticDefault = teams.find(t => t.code === code) || teams[0];
+    const storeTeam = storeTeams[code];
+    if (storeTeam && !storeTeam.isOverrideDisabled && !bypassOverrides) {
+      return {
+        ...staticDefault,
+        elo: Number(storeTeam.elo || staticDefault.elo),
+        attack: Number(storeTeam.attack || staticDefault.attack),
+        defense: Number(storeTeam.defense || staticDefault.defense),
+        isCustom: true,
+      };
+    }
+    return staticDefault;
+  };
+
+  const tHome = getTeam(homeCode) as any;
+  const tAway = getTeam(awayCode) as any;
+
+  const getTeamPlayers = (teamCode: string) => {
+    return Object.values(players)
+      .filter((p: any) => p["Team Code"] === teamCode)
+      .sort((a: any, b: any) => {
+        const ratingA = parseInt(a["Overall Rating"] || "0", 10);
+        const ratingB = parseInt(b["Overall Rating"] || "0", 10);
+        return ratingB - ratingA;
+      });
+  };
+
+  const homeTopPlayer = getTeamPlayers(homeCode)[0] as any;
+  const awayTopPlayer = getTeamPlayers(awayCode)[0] as any;
+
+  // expected goals (lambdas)
+  const { homeLambda: baseHomeLambda, awayLambda: baseAwayLambda }: { homeLambda: number; awayLambda: number } = useMemo(() => {
+    if (!tHome || !tAway) return { homeLambda: 0, awayLambda: 0 };
+    return getMatchExpectedGoals(tHome, tAway, players, selectedModel);
+  }, [tHome, tAway, players, selectedModel]);
+
+  const homeLambda: number = useMemo(() => {
+    if (homeScore === "" || isNaN(parseFloat(homeScore))) return baseHomeLambda;
+    return Math.max(0.1, parseFloat(homeScore));
+  }, [homeScore, baseHomeLambda]);
+
+  const awayLambda: number = useMemo(() => {
+    if (awayScore === "" || isNaN(parseFloat(awayScore))) return baseAwayLambda;
+    return Math.max(0.1, parseFloat(awayScore));
+  }, [awayScore, baseAwayLambda]);
+
+  const probs: { homeWin: number; awayWin: number } = useMemo(() => {
+    if (!tHome || !tAway) return { homeWin: 0, awayWin: 0 };
+
+    const poissonPdf = (lambda: number, k: number) => {
+      let fact = 1;
+      for (let i = 2; i <= k; i++) fact *= i;
+      return (Math.pow(lambda, k) * Math.exp(-lambda)) / fact;
+    };
+
+    const homeP: number[] = [];
+    const awayP: number[] = [];
+    for (let k = 0; k < 8; k++) {
+      homeP.push(poissonPdf(homeLambda, k));
+      awayP.push(poissonPdf(awayLambda, k));
+    }
+
+    let pHomeWin = 0;
+    let pDraw = 0;
+    let pAwayWin = 0;
+
+    for (let h = 0; h < 8; h++) {
+      for (let a = 0; a < 8; a++) {
+        const p = homeP[h] * awayP[a];
+        if (h > a) pHomeWin += p;
+        else if (h === a) pDraw += p;
+        else pAwayWin += p;
+      }
+    }
+
+    const total = pHomeWin + pDraw + pAwayWin;
+    pHomeWin /= total || 1;
+    pDraw /= total || 1;
+    pAwayWin /= total || 1;
+
+    const drawSplit = pHomeWin / (pHomeWin + pAwayWin || 1);
+    pHomeWin += pDraw * drawSplit;
+    pAwayWin += pDraw * (1 - drawSplit);
+
+    return {
+      homeWin: Math.round(pHomeWin * 100),
+      awayWin: Math.round(pAwayWin * 100)
+    };
+  }, [tHome, tAway, homeLambda, awayLambda]);
+
+  const StatBar = ({ label, homeValue, awayValue, isLowerBetter = false, maxValue, displayFormatter = (v: number) => String(v) }: any) => {
+    const hVal = parseFloat(homeValue) || 0;
+    const aVal = parseFloat(awayValue) || 0;
+
+    const isHomeBetter = isLowerBetter ? hVal <= aVal : hVal >= aVal;
+
+    let homePercent = 0;
+    let awayPercent = 0;
+
+    if (isLowerBetter) {
+      homePercent = Math.min(100, Math.max(5, ((200 - hVal) / 200) * 100));
+      awayPercent = Math.min(100, Math.max(5, ((200 - aVal) / 200) * 100));
+    } else {
+      homePercent = Math.min(100, Math.max(5, (hVal / maxValue) * 100));
+      awayPercent = Math.min(100, Math.max(5, (aVal / maxValue) * 100));
+    }
+
+    return (
+      <div className="space-y-1">
+        <div className="flex justify-between text-[10px] font-bold text-slate-500 dark:text-muted-foreground uppercase">
+          <span className={isHomeBetter ? "text-neon font-extrabold" : "font-semibold text-slate-500 dark:text-slate-400"}>
+            {displayFormatter(hVal)}
+          </span>
+          <span className="text-[9px] tracking-widest font-black uppercase text-slate-400 dark:text-slate-500">{label}</span>
+          <span className={!isHomeBetter ? "text-purple-500 dark:text-purple-400 font-extrabold" : "font-semibold text-slate-500 dark:text-slate-400"}>
+            {displayFormatter(aVal)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Home Bar (progress goes right to left) */}
+          <div className="h-1.5 flex-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex justify-end">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${isHomeBetter ? "bg-neon" : "bg-neon/30"}`}
+              style={{ width: `${homePercent}%` }}
+            />
+          </div>
+          {/* Away Bar (progress goes left to right) */}
+          <div className="h-1.5 flex-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${!isHomeBetter ? "bg-purple-500 dark:bg-purple-650" : "bg-purple-500/30 dark:bg-purple-500/20"}`}
+              style={{ width: `${awayPercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-6 w-full max-w-lg shadow-2xl text-slate-900 dark:text-white space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto scrollbar-custom">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-3">
+          <div className="flex items-center gap-2">
+            <Cpu className="h-5 w-5 text-neon" />
+            <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white">Match Controller</h3>
+          </div>
+          <span className="text-xs font-mono bg-slate-100 dark:bg-white/10 px-2 py-0.5 rounded text-slate-600 dark:text-white/70">{matchLabel}</span>
+        </div>
+
+        {/* Score Editor Dashboard */}
+        <div className="flex items-center justify-between bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-slate-100 dark:border-white/5 gap-4">
+          {/* Home Team */}
+          <div className="flex flex-col items-center gap-1.5 w-1/3 text-center">
+            <CountryFlag
+              code={tHome?.code}
+              flag={tHome?.flag}
+              name={tHome?.name}
+              className="h-10 w-15 rounded object-cover shadow-sm border border-slate-250 dark:border-white/10"
+              emojiClassName="text-4xl"
+            />
+            <span className="font-bold text-xs truncate w-full text-slate-900 dark:text-white mt-1">{tHome?.name}</span>
+            <span className="text-[10px] text-slate-400 font-mono">Rank #{tHome?.rank || "-"}</span>
+          </div>
+
+          {/* Scores Control */}
+          <div className="flex items-center gap-3 w-2/5 justify-center">
+            <div className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setHomeScore(prev => String(Math.max(0, (parseInt(prev) || 0) + 1)))}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-250 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-white font-bold transition cursor-pointer text-xs"
+              >
+                +
+              </button>
+              <input
+                type="number"
+                min={0}
+                value={homeScore}
+                onChange={(e) => setHomeScore(e.target.value)}
+                placeholder="0"
+                className="w-12 h-9 text-center bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/15 rounded-lg font-bold text-base text-slate-900 dark:text-white focus:ring-1 focus:ring-neon focus:outline-none shrink-0"
+              />
+              <button
+                type="button"
+                onClick={() => setHomeScore(prev => String(Math.max(0, (parseInt(prev) || 0) - 1)))}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-250 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-white font-bold transition cursor-pointer text-xs"
+              >
+                -
+              </button>
+            </div>
+
+            <span className="font-bold text-slate-450 dark:text-muted-foreground text-sm">VS</span>
+
+            <div className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setAwayScore(prev => String(Math.max(0, (parseInt(prev) || 0) + 1)))}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-250 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-white font-bold transition cursor-pointer text-xs"
+              >
+                +
+              </button>
+              <input
+                type="number"
+                min={0}
+                value={awayScore}
+                onChange={(e) => setAwayScore(e.target.value)}
+                placeholder="0"
+                className="w-12 h-9 text-center bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/15 rounded-lg font-bold text-base text-slate-900 dark:text-white focus:ring-1 focus:ring-neon focus:outline-none shrink-0"
+              />
+              <button
+                type="button"
+                onClick={() => setAwayScore(prev => String(Math.max(0, (parseInt(prev) || 0) - 1)))}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-250 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-white font-bold transition cursor-pointer text-xs"
+              >
+                -
+              </button>
+            </div>
+          </div>
+
+          {/* Away Team */}
+          <div className="flex flex-col items-center gap-1.5 w-1/3 text-center">
+            <CountryFlag
+              code={tAway?.code}
+              flag={tAway?.flag}
+              name={tAway?.name}
+              className="h-10 w-15 rounded object-cover shadow-sm border border-slate-250 dark:border-white/10"
+              emojiClassName="text-4xl"
+            />
+            <span className="font-bold text-xs truncate w-full text-slate-900 dark:text-white mt-1">{tAway?.name}</span>
+            <span className="text-[10px] text-slate-400 font-mono">Rank #{tAway?.rank || "-"}</span>
+          </div>
+        </div>
+
+        {/* Win Probability Live Meter */}
+        <div className="space-y-1">
+          <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-muted-foreground">
+            <span>WIN PROBABILITY</span>
+            <span className="text-neon">{(probs.homeWin as any)}% VS {(probs.awayWin as any)}%</span>
+          </div>
+          <div className="w-full flex h-2 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800">
+            <div className="bg-gradient-to-r from-neon to-neon-2 transition-all duration-300" style={{ width: `${(probs.homeWin as any)}%` }} />
+            <div className="bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-300" style={{ width: `${(probs.awayWin as any)}%` }} />
+          </div>
+        </div>
+
+        {/* Compare Stats Grid */}
+        <div className="bg-slate-50 dark:bg-white/5 rounded-2xl p-4 border border-slate-100 dark:border-white/5 space-y-3">
+          <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-500 dark:text-muted-foreground border-b border-slate-100 dark:border-white/5 pb-2 mb-1">
+            <span className="truncate max-w-[130px]">{tHome?.name}</span>
+            <span className="text-neon text-[10px]">Team Comparison</span>
+            <span className="text-right truncate max-w-[130px]">{tAway?.name}</span>
+          </div>
+
+          <StatBar
+            label="Rank"
+            homeValue={tHome?.rank}
+            awayValue={tAway?.rank}
+            isLowerBetter={true}
+            displayFormatter={(v: number) => `#${v}`}
           />
+
+          <StatBar
+            label="Elo"
+            homeValue={tHome?.elo}
+            awayValue={tAway?.elo}
+            maxValue={2200}
+            displayFormatter={(v: number) => String(Math.round(v))}
+          />
+
+          <StatBar
+            label="Attack"
+            homeValue={tHome?.attack}
+            awayValue={tAway?.attack}
+            maxValue={2.0}
+            displayFormatter={(v: number) => v.toFixed(2)}
+          />
+
+          <StatBar
+            label="Defense"
+            homeValue={tHome?.defense}
+            awayValue={tAway?.defense}
+            maxValue={2.0}
+            displayFormatter={(v: number) => v.toFixed(2)}
+          />
+        </div>
+
+        {/* Key Player Cards (Sci-Fi details) */}
+        {(homeTopPlayer || awayTopPlayer) && (
+          <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 dark:bg-white/5 p-3 rounded-2xl border border-slate-100 dark:border-white/5">
+            <div>
+              <div className="text-[9px] uppercase font-bold text-slate-400 dark:text-muted-foreground mb-0.5">Key Player</div>
+              {homeTopPlayer ? (
+                <div className="font-semibold text-slate-800 dark:text-slate-250 truncate">
+                  {homeTopPlayer["Name on Shirt"] || homeTopPlayer["Player Name"]} <span className="text-[10px] text-neon font-mono">({homeTopPlayer["Overall Rating"]})</span>
+                </div>
+              ) : <div className="text-slate-400 dark:text-muted-foreground/60 text-[10px] italic">N/A</div>}
+            </div>
+            <div className="text-right">
+              <div className="text-[9px] uppercase font-bold text-slate-400 dark:text-muted-foreground mb-0.5">Key Player</div>
+              {awayTopPlayer ? (
+                <div className="font-semibold text-slate-800 dark:text-slate-250 truncate">
+                  <span className="text-[10px] text-purple-500 dark:text-purple-400 font-mono">({awayTopPlayer["Overall Rating"]})</span> {awayTopPlayer["Name on Shirt"] || awayTopPlayer["Player Name"]}
+                </div>
+              ) : <div className="text-slate-400 dark:text-muted-foreground/60 text-[10px] italic">N/A</div>}
+            </div>
+          </div>
+        )}
+
+        {/* Footer Actions */}
+        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-white/5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-semibold uppercase tracking-wider rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 text-slate-500 dark:text-white/70 dark:hover:text-white transition cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(homeScore, awayScore)}
+            className="px-5 py-2 text-sm font-semibold uppercase tracking-wider rounded-xl bg-gradient-to-r from-neon to-neon-2 text-background hover:opacity-90 transition font-black cursor-pointer shadow-neon"
+          >
+            Save
+          </button>
         </div>
       </div>
     </div>

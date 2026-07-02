@@ -285,7 +285,7 @@ export default function SubscriptionPage() {
     <div className="min-h-screen bg-hero text-foreground">
       <Header />
 
-      <main className="container mx-auto px-4 py-16 md:py-24">
+      <main className="container mx-auto px-4 py-16 md:py-10">
         {/* Page Header */}
         <div className="text-center max-w-3xl mx-auto mb-20">
           <div className="inline-flex items-center gap-2 rounded-full glass px-3.5 py-1 text-xs uppercase tracking-[0.25em] text-neon mb-4">
@@ -414,7 +414,26 @@ export default function SubscriptionPage() {
 
                 {/* Call to Action button */}
                 <div className="relative z-10 mt-auto">
-                  {isCurrent ? (
+                  {!session ? (
+                    <button
+                      onClick={() => {
+                        router.push(buildAuthModalHref({
+                          pathname,
+                          search: searchParams.toString(),
+                          mode: "signin",
+                          callbackUrl: pathname,
+                        }));
+                      }}
+                      className={`w-full rounded-xl py-3 text-sm font-bold text-center transition duration-200 active:scale-95 flex items-center justify-center gap-2 cursor-pointer ${tier.id === "plus"
+                        ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/20 hover:opacity-90"
+                        : tier.id === "pro"
+                          ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/20 hover:opacity-90"
+                          : "bg-muted hover:bg-muted/80 text-foreground dark:bg-white/10 dark:hover:bg-white/20 dark:text-white"
+                        }`}
+                    >
+                      Sign In
+                    </button>
+                  ) : isCurrent ? (
                     <div className="w-full rounded-xl bg-muted dark:bg-white/5 border border-border dark:border-white/10 py-3 text-center text-sm font-semibold text-muted-foreground">
                       Current Plan
                     </div>
@@ -466,11 +485,11 @@ export default function SubscriptionPage() {
                     Checkout Confirmation
                   </div>
                   <DialogTitle className="font-display text-2xl font-bold tracking-tight text-foreground dark:text-white">
-                    Confirm your {pendingTier === "pro" ? "Expert" : "Advanced"} upgrade
+                    Confirm your upgrade
                   </DialogTitle>
-                  <DialogDescription className="max-w-md text-sm leading-relaxed text-muted-foreground">
+                  {/* <DialogDescription className="max-w-md text-sm leading-relaxed text-muted-foreground">
                     Before we send you to payment, please confirm that you agree to the plan terms and recurring billing details.
-                  </DialogDescription>
+                  </DialogDescription> */}
                 </DialogHeader>
 
                 <div className="mt-6 rounded-2xl border border-slate-200/60 bg-white/70 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] backdrop-blur-sm dark:border-white/5 dark:bg-slate-900/20">

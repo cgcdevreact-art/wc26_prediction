@@ -8,9 +8,12 @@ export function StaminaBar({ value, onChange }: { value: number, onChange: (v: n
   
   return (
     <div className="flex flex-col gap-1.5 w-full">
-      <div className="flex justify-between items-end">
-        <span className="text-[10px] uppercase font-bold text-white/50 tracking-wider">Physical</span>
-        <span className="text-xs font-mono font-bold text-green-400">{value}%</span>
+      <div className="flex justify-between items-end mb-1">
+        <div className="flex flex-col">
+          <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Physical</span>
+          <span className="text-[8px] text-muted-foreground/70 uppercase tracking-widest mt-0.5">Squad Match Fitness</span>
+        </div>
+        <span className="text-xs font-mono font-bold text-green-500 dark:text-green-400">{value}%</span>
       </div>
       <div className="flex gap-1 h-3 w-full">
         {segments.map((seg) => {
@@ -39,9 +42,12 @@ export function AlignmentGauge({ value, onChange }: { value: number, onChange: (
   
   return (
     <div className="flex flex-col gap-1.5 w-full">
-      <div className="flex justify-between items-end">
-        <span className="text-[10px] uppercase font-bold text-white/50 tracking-wider">Discipline</span>
-        <span className={`text-xs font-mono font-bold ${value > 0 ? "text-purple-400" : value < 0 ? "text-red-400" : "text-zinc-400"}`}>
+      <div className="flex justify-between items-end mb-1">
+        <div className="flex flex-col">
+          <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Discipline</span>
+          <span className="text-[8px] text-muted-foreground/70 uppercase tracking-widest mt-0.5">Aggression & Card Risk</span>
+        </div>
+        <span className={`text-xs font-mono font-bold ${value > 0 ? "text-purple-500 dark:text-purple-400" : value < 0 ? "text-red-500 dark:text-red-400" : "text-muted-foreground"}`}>
           {value > 0 ? `+${value}` : value}
         </span>
       </div>
