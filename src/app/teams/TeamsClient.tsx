@@ -788,7 +788,7 @@ export default function TeamsClient({
                   <th className="w-16 px-4 py-4 text-center font-semibold whitespace-nowrap">
                     <TableHeaderCell tooltip="Defense rating (average goals conceded index)">Def</TableHeaderCell>
                   </th>
-                  <th className="w-56 px-5 py-4 text-right font-semibold whitespace-nowrap">Top Player</th>
+                  <th className="w-56 px-5 py-4 text-left font-semibold whitespace-nowrap">Top Player</th>
                   <th className="w-32 rounded-tr-[1.75rem] px-5 py-4 text-right font-semibold whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
@@ -927,7 +927,7 @@ export default function TeamsClient({
                           {formatRating(appTeam?.defense)}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-5 py-4 text-left">
                         <div className="inline-flex max-w-full items-center gap-2 rounded-full bg-gradient-to-r from-emerald-50 to-cyan-50 px-3 py-1.5 ring-1 ring-emerald-200 dark:from-emerald-500/10 dark:to-cyan-500/10 dark:ring-emerald-500/20">
                           <span className="truncate font-semibold text-emerald-700 dark:text-neon">
                             {topPlayerName || "N/A"}
@@ -1044,7 +1044,7 @@ export default function TeamsClient({
                         </th>
                       );
                     })}
-                    <th className="w-[100px] px-1 py-3 text-right font-semibold whitespace-nowrap">Top Player</th>
+                    <th className="w-[100px] px-1 py-3 text-left font-semibold whitespace-nowrap">Top Player</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1143,7 +1143,7 @@ export default function TeamsClient({
                           </td>
                         );
                       })}
-                      <td className="px-1 py-2 text-right">
+                      <td className="px-1 py-2 text-left">
                         <div className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-emerald-50 to-cyan-50 px-1.5 py-0.5 ring-1 ring-emerald-200 dark:from-emerald-500/10 dark:to-cyan-500/10 dark:ring-emerald-500/20">
                           <span className="font-semibold text-emerald-700 dark:text-neon truncate max-w-[60px] sm:max-w-[90px]" title={team.topPlayerName}>
                             {team.topPlayerName}
