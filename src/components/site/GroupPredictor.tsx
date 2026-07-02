@@ -1069,21 +1069,13 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     }
   }, [liveGames, useRealScores, applyRealScores]);
 
-  const globalRealPercent = useMemo(() => {
-    const realGroupCount = matches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
-    const realKnockoutCount = useRealScores && apiFixtures.length > 0
-      ? apiFixtures.filter((f) => f.isKnockout && (f.status === "COMPLETED" || f.status === "LIVE") && f.homeScore !== "-" && f.awayScore !== "-").length
-      : 0;
-    return Math.min(100, Math.round(((realGroupCount + realKnockoutCount) / TOTAL_TOURNAMENT_MATCHES) * 100));
-  }, [matches, getAssignedLiveScoreForMatch, useRealScores, apiFixtures]);
-
   const groupRealPercent = useMemo(() => {
     const realGroupCount = matches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
-    const realKnockoutCount = useRealScores && apiFixtures.length > 0
+    const realKnockoutCount = apiFixtures.length > 0
       ? apiFixtures.filter((f) => f.isKnockout && (f.status === "COMPLETED" || f.status === "LIVE") && f.homeScore !== "-" && f.awayScore !== "-").length
       : 0;
     return Math.min(100, Math.round(((realGroupCount + realKnockoutCount) / 104) * 100));
-  }, [matches, getAssignedLiveScoreForMatch, useRealScores, apiFixtures]);
+  }, [matches, getAssignedLiveScoreForMatch, apiFixtures]);
 
   const simulatePendingMatches = useCallback(() => {
     const updatedMatches = matches.map((m) => {
@@ -1398,6 +1390,14 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const [simHomeGoals, setSimHomeGoals] = useState<number | "">("");
   const [simAwayGoals, setSimAwayGoals] = useState<number | "">("");
 
+  const [simInitialTemp, setSimInitialTemp] = useState<number>(20);
+  const [simInitialCrowd, setSimInitialCrowd] = useState<number>(50);
+  const [simInitialHomePhysical, setSimInitialHomePhysical] = useState<number>(100);
+  const [simInitialHomeDiscipline, setSimInitialHomeDiscipline] = useState<number>(0);
+  const [simInitialAwayPhysical, setSimInitialAwayPhysical] = useState<number>(100);
+  const [simInitialAwayDiscipline, setSimInitialAwayDiscipline] = useState<number>(0);
+  const [simInitialModel, setSimInitialModel] = useState<string>("advanced");
+
   const handleOpenSimulator = (match: {
     type: "group" | "knockout" | "third";
     id?: string;
@@ -1420,6 +1420,14 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setSimAwayPlayerOut("");
     setSimHomeGoals(match.homeScore);
     setSimAwayGoals(match.awayScore);
+
+    setSimInitialTemp(20);
+    setSimInitialCrowd(50);
+    setSimInitialHomePhysical(100);
+    setSimInitialHomeDiscipline(0);
+    setSimInitialAwayPhysical(100);
+    setSimInitialAwayDiscipline(0);
+    setSimInitialModel(selectedModel);
   };
 
   const getPlayerRating = (playerName: string, teamCode: string) => {
@@ -1487,12 +1495,65 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     setSimAwayGoals(as);
   };
 
+  const isInitialOpenRef = useRef(true);
+
   useEffect(() => {
-    if (simMatch) {
-      handleReSimulate();
+    isInitialOpenRef.current = true;
+  }, [simMatch]);
+
+  useEffect(() => {
+    if (!simMatch) return;
+
+    if (isInitialOpenRef.current) {
+      isInitialOpenRef.current = false;
+      if (simMatch.homeScore !== "" && simMatch.awayScore !== "") {
+        return;
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedModel]);
+
+    handleReSimulate();
+  }, [
+    selectedModel,
+    simTemperature,
+    simCrowdSupport,
+    simHomePhysical,
+    simHomeDiscipline,
+    simAwayPhysical,
+    simAwayDiscipline,
+    simHomePlayerOut,
+    simAwayPlayerOut
+  ]);
+
+  const hasControlsChanged = useMemo(() => {
+    return (
+      simTemperature !== simInitialTemp ||
+      simCrowdSupport !== simInitialCrowd ||
+      simHomePhysical !== simInitialHomePhysical ||
+      simHomeDiscipline !== simInitialHomeDiscipline ||
+      simAwayPhysical !== simInitialAwayPhysical ||
+      simAwayDiscipline !== simInitialAwayDiscipline ||
+      selectedModel !== simInitialModel ||
+      simHomePlayerOut !== "" ||
+      simAwayPlayerOut !== ""
+    );
+  }, [
+    simTemperature,
+    simInitialTemp,
+    simCrowdSupport,
+    simInitialCrowd,
+    simHomePhysical,
+    simInitialHomePhysical,
+    simHomeDiscipline,
+    simInitialHomeDiscipline,
+    simAwayPhysical,
+    simInitialAwayPhysical,
+    simAwayDiscipline,
+    simInitialAwayDiscipline,
+    selectedModel,
+    simInitialModel,
+    simHomePlayerOut,
+    simAwayPlayerOut
+  ]);
 
   const simProbabilities = useMemo(() => {
     if (!simMatch) return { homeWin: 50, draw: 0, awayWin: 50 };
@@ -5038,7 +5099,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 <button
                   type="button"
                   onClick={handleReSimulate}
-                  className="flex-1 bg-muted dark:bg-zinc-800/80 hover:bg-black/5 dark:hover:bg-zinc-700 hover:text-foreground dark:hover:text-white text-foreground/90 dark:text-white/90 border border-border dark:border-zinc-700 py-3 rounded-2xl flex items-center justify-center gap-2 transition duration-200 font-semibold"
+                  disabled={!hasControlsChanged && simHomeGoals !== "" && simAwayGoals !== ""}
+                  className="flex-1 bg-muted dark:bg-zinc-800/80 hover:bg-black/5 dark:hover:bg-zinc-700 hover:text-foreground dark:hover:text-white text-foreground/90 dark:text-white/90 border border-border dark:border-zinc-700 py-3 rounded-2xl flex items-center justify-center gap-2 transition duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RefreshCw className="w-4 h-4" />
                   <span>Re-Simulate</span>
