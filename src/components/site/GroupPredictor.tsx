@@ -3666,7 +3666,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                 className="h-5 w-5 rounded-md border-border bg-black/10 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-background cursor-pointer accent-cyan-500"
               />
               <label htmlFor="use-actual-scores" className="text-sm font-semibold text-foreground/90 select-none cursor-pointer">
-                Use actual / real-life scores for group stage matches ({groupRealPercent}%)
+                Use Real-Time Results for group stage matches
               </label>
             </div>
             <div className="flex items-center gap-2">
@@ -3682,7 +3682,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
               )}
               {useRealScores && (
                 <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse">
-                  Real-life scores assigned
+                  Real-Time scores assigned
                 </span>
               )}
             </div>
@@ -4146,7 +4146,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                         {useRealScores && (
                           <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1.5 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse flex items-center gap-1.5">
                             <Zap className="h-3.5 w-3.5 fill-cyan-500/20 text-cyan-500" />
-                            {groupRealPercent}% Real-Time Data Included
+                            Real-Time Data Included
                           </span>
                         )}
                       </div>
