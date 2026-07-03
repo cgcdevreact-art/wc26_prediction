@@ -33,6 +33,12 @@ export default function Page() {
           >
             Compare Teams
           </Link>
+          <Link
+            href="/teams/clubs"
+            className="flex-1 rounded-full px-5 py-2.5 text-center text-sm font-semibold text-slate-600 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white sm:flex-none"
+          >
+            Club Rankings
+          </Link>
         </div>
       </div>
 

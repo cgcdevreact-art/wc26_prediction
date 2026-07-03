@@ -28,6 +28,7 @@ model User {
   teamOverrides     UserTeamOverride[]
   playerOverrides   UserPlayerOverride[]
   customCountries   UserCustomCountry[]
+  shareLinks        ShareLink[]
 
   stripeCustomerId       String?   @unique
   stripeSubscriptionId  String?   @unique
@@ -467,5 +468,30 @@ model UserCustomCountry {
   updatedAt    DateTime @updatedAt
 
   @@unique([userId, code])
+  @@index([userId])
+}
+
+model ShareLink {
+  id            String   @id @default(cuid())
+  userId        String?  // Nullable to support anonymous/guest shares
+  title         String?  @default("My World Cup 2026 Bracket")
+  description   String?
+  
+  // The complete serialized predictions array (group matches + knockouts)
+  snapshot      Json
+  
+  // Cached metadata fields for high-speed queries & OG rendering
+  championCode  String?  // E.g. "BRA"
+  finalist1Code String?  // E.g. "BRA"
+  finalist2Code String?  // E.g. "FRA"
+  modelUsed     String   @default("base") // base, advanced, pro
+  
+  // Stats
+  views         Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }

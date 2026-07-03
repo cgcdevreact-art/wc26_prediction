@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTeams, useGroupsConfig, useCupResults } from "@/components/TeamsProvider";
-import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle, Brain, Cpu, MoreVertical, ChevronDown } from "lucide-react";
+import { Trophy, Sparkles, RefreshCw, Play, Lock, Award, Check, Zap, X, Minus, Plus, FolderOpen, Trash2, Edit2, Save, AlertCircle, Brain, Cpu, MoreVertical, ChevronDown, Share2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useSession } from "next-auth/react";
 import { StaminaBar, AlignmentGauge, TemperatureSlider } from "@/components/ui/SciFiControls";
 import { useSimulationStore, PlayerStats } from "@/lib/store/simulationStore";
@@ -427,9 +428,19 @@ interface GroupPredictorProps {
   defaultTab?: "group" | "knockout";
   onlyKnockout?: boolean;
   fullWidth?: boolean;
+  sharedData?: any;
+  sharedAuthor?: string;
+  isReadOnly?: boolean;
 }
 
-export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, fullWidth = false }: GroupPredictorProps) {
+export function GroupPredictor({
+  defaultTab = "group",
+  onlyKnockout = false,
+  fullWidth = false,
+  sharedData,
+  sharedAuthor,
+  isReadOnly = false
+}: GroupPredictorProps) {
   const teams = useTeams();
   const GROUPS_CONFIG = useGroupsConfig();
   const cupResults = useCupResults();
@@ -1166,6 +1177,259 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const [expandedSlotDetails, setExpandedSlotDetails] = useState<Record<number, boolean>>({});
   const [slotToOverwriteConfirm, setSlotToOverwriteConfirm] = useState<number | null>(null);
   const [slotSummaries, setSlotSummaries] = useState<Record<number, any>>({});
+
+  const [shareLinkModalOpen, setShareLinkModalOpen] = useState(false);
+  const [generatedShareUrl, setGeneratedShareUrl] = useState("");
+  const [isSharingLoading, setIsSharingLoading] = useState(false);
+
+  const hydrateSharedData = useCallback((data: any[]) => {
+    disableRealScoresState();
+    
+    const groupPreds = data.filter((p: any) => p.matchId < 100);
+    const koPreds = data.filter((p: any) => p.matchId >= 100 && p.matchId < 999000);
+
+    setMatches((prev) =>
+      prev.map((m) => {
+        const numId = getNumericId(m.id);
+        const pred = groupPreds.find((p: any) => p.matchId === numId);
+        return {
+          ...m,
+          homeScore: pred ? normalizePredictorScore(pred.predictedHomeScore) : "",
+          awayScore: pred ? normalizePredictorScore(pred.predictedAwayScore) : "",
+        };
+      })
+    );
+
+    const nextWinners = {
+      r32: Array(16).fill(null),
+      r16: Array(8).fill(null),
+      qf: Array(4).fill(null),
+      sf: Array(2).fill(null),
+      final: Array(1).fill(null),
+    };
+    const nextScores: Record<string, { home: number | ""; away: number | "" }> = {};
+    let loadedThirdWinner: string | null = null;
+    let loadedThirdScores = { home: "" as number | "", away: "" as number | "" };
+
+    koPreds.forEach((p: any) => {
+      const id = p.matchId;
+      const team = intToTeamCode(p.predictedTeamId);
+      let round: "r32" | "r16" | "qf" | "sf" | "final" | null = null;
+      let idx = 0;
+
+      if (id >= 100 && id < 116) { round = "r32"; idx = id - 100; }
+      else if (id >= 200 && id < 208) { round = "r16"; idx = id - 200; }
+      else if (id >= 300 && id < 304) { round = "qf"; idx = id - 300; }
+      else if (id >= 400 && id < 402) { round = "sf"; idx = id - 400; }
+      else if (id === 500) { round = "final"; idx = 0; }
+      else if (id === 501) {
+        loadedThirdWinner = team;
+        loadedThirdScores = {
+          home: normalizePredictorScore(p.predictedHomeScore),
+          away: normalizePredictorScore(p.predictedAwayScore)
+        };
+      }
+
+      if (round) {
+        nextWinners[round][idx] = team;
+        nextScores[`${round}-${idx}`] = {
+          home: normalizePredictorScore(p.predictedHomeScore),
+          away: normalizePredictorScore(p.predictedAwayScore)
+        };
+      }
+    });
+
+    setKoWinners(nextWinners);
+    setKoScores(nextScores);
+    setThirdWinner(loadedThirdWinner);
+    setThirdScores(loadedThirdScores);
+  }, []);
+
+  useEffect(() => {
+    if (sharedData) {
+      hydrateSharedData(sharedData);
+    }
+  }, [sharedData, hydrateSharedData]);
+
+  const assembleFullSnapshot = () => {
+    const payload: any[] = [];
+    const matchType = "MATCH_SCORE";
+    const koType = "KNOCKOUT_WINNER";
+
+    matches.forEach((m) => {
+      payload.push({
+        matchId: getNumericId(m.id),
+        type: matchType,
+        predictedHomeScore: hasValidPredictorScore(m.homeScore) ? m.homeScore : null,
+        predictedAwayScore: hasValidPredictorScore(m.awayScore) ? m.awayScore : null,
+      });
+    });
+
+    koWinners.r32.forEach((code, idx) => {
+      if (code) {
+        const scores = koScores[`r32-${idx}`] || { home: "", away: "" };
+        const matchup = koMatchups.r32[idx] || { home: null, away: null };
+        payload.push({
+          matchId: 100 + idx,
+          type: koType,
+          predictedTeamId: teamCodeToInt(code),
+          predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
+          predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
+          predictedWinner: JSON.stringify({
+            homeCode: matchup.home,
+            awayCode: matchup.away,
+            winnerCode: code
+          })
+        });
+      }
+    });
+    koWinners.r16.forEach((code, idx) => {
+      if (code) {
+        const scores = koScores[`r16-${idx}`] || { home: "", away: "" };
+        const matchup = koMatchups.r16[idx] || { home: null, away: null };
+        payload.push({
+          matchId: 200 + idx,
+          type: koType,
+          predictedTeamId: teamCodeToInt(code),
+          predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
+          predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
+          predictedWinner: JSON.stringify({
+            homeCode: matchup.home,
+            awayCode: matchup.away,
+            winnerCode: code
+          })
+        });
+      }
+    });
+    koWinners.qf.forEach((code, idx) => {
+      if (code) {
+        const scores = koScores[`qf-${idx}`] || { home: "", away: "" };
+        const matchup = koMatchups.qf[idx] || { home: null, away: null };
+        payload.push({
+          matchId: 300 + idx,
+          type: koType,
+          predictedTeamId: teamCodeToInt(code),
+          predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
+          predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
+          predictedWinner: JSON.stringify({
+            homeCode: matchup.home,
+            awayCode: matchup.away,
+            winnerCode: code
+          })
+        });
+      }
+    });
+    koWinners.sf.forEach((code, idx) => {
+      if (code) {
+        const scores = koScores[`sf-${idx}`] || { home: "", away: "" };
+        const matchup = koMatchups.sf[idx] || { home: null, away: null };
+        payload.push({
+          matchId: 400 + idx,
+          type: koType,
+          predictedTeamId: teamCodeToInt(code),
+          predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
+          predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
+          predictedWinner: JSON.stringify({
+            homeCode: matchup.home,
+            awayCode: matchup.away,
+            winnerCode: code
+          })
+        });
+      }
+    });
+    if (koWinners.final[0]) {
+      const scores = koScores[`final-0`] || { home: "", away: "" };
+      const matchup = koMatchups.final[0] || { home: null, away: null };
+      payload.push({
+        matchId: 500,
+        type: koType,
+        predictedTeamId: teamCodeToInt(koWinners.final[0]),
+        predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
+        predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
+        predictedWinner: JSON.stringify({
+          homeCode: matchup.home,
+          awayCode: matchup.away,
+          winnerCode: koWinners.final[0]
+        })
+      });
+    }
+    if (thirdWinner) {
+      const getLoser = (sfIdx: number) => {
+        const matchup = koMatchups.sf[sfIdx];
+        const winner = koWinners.sf[sfIdx];
+        if (!matchup || !winner) return null;
+        return matchup.home === winner ? matchup.away : matchup.home;
+      };
+      payload.push({
+        matchId: 501,
+        type: koType,
+        predictedTeamId: teamCodeToInt(thirdWinner),
+        predictedHomeScore: thirdScores.home !== "" ? Number(thirdScores.home) : null,
+        predictedAwayScore: thirdScores.away !== "" ? Number(thirdScores.away) : null,
+        predictedWinner: JSON.stringify({
+          homeCode: getLoser(0),
+          awayCode: getLoser(1),
+          winnerCode: thirdWinner
+        })
+      });
+    }
+
+    const summary = getPredictionSummary(
+      matches,
+      koWinners,
+      koScores,
+      thirdWinner,
+      thirdScores
+    );
+    payload.push({
+      matchId: 999000,
+      type: "SLOT_METADATA",
+      predictedWinner: JSON.stringify({
+        name: "Shared Prediction",
+        updatedAt: new Date().toISOString(),
+        summary
+      })
+    });
+
+    return payload;
+  };
+
+  const handleCreateShareLink = async () => {
+    setIsSharingLoading(true);
+    try {
+      const payload = {
+        slotId: session ? currentSlot : undefined,
+        predictions: !session ? assembleFullSnapshot() : undefined,
+        modelUsed: selectedModel,
+        title: currentSlot !== null && session ? slotNames[currentSlot] : undefined
+      };
+
+      const res = await fetch("/api/share/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setGeneratedShareUrl(`${window.location.origin}${data.url}`);
+          setShareLinkModalOpen(true);
+          toast.success("Sharing snapshot created!");
+        } else {
+          throw new Error(data.error || "Failed to create share link");
+        }
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to create share link");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to create share link");
+    } finally {
+      setIsSharingLoading(false);
+    }
+  };
 
   // Knockout prediction state storing team codes
   // Knockout prediction state storing team codes
@@ -3413,121 +3677,139 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         </div>
 
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          {!session ? (
-            <div className="text-xs text-muted-foreground mr-2 hidden md:block">
-              Guest Sims: <strong className="text-neon">{guestCreditsUsed}</strong> / 3
+          {isReadOnly ? (
+            <div className="flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 px-4 py-2.5 rounded-[1.2rem] text-sm font-bold shadow-[0_0_10px_rgba(6,182,212,0.1)]">
+              <Lock className="h-4 w-4 shrink-0 animate-pulse" />
+              <span>Viewing {sharedAuthor}'s Shared Bracket (Read Only)</span>
             </div>
           ) : (
-            session.user.subscriptionTier === "free" && (
-              <div className="text-xs text-muted-foreground mr-2 hidden md:block">
-                Free Sims: <strong className="text-neon">{creditsUsed}</strong> / 5
-              </div>
-            )
-          )}
-          <label
-            className={`inline-flex min-h-[56px] w-full items-center justify-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto sm:min-w-[180px] ${useRealScores
-              ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
-              : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-700 dark:text-slate-300 dark:hover:bg-white/5"
-              }`}
-          >
-            <input
-              type="checkbox"
-              id="toolbar-real-time-data"
-              checked={useRealScores}
-              onChange={(e) => handleToggleRealScores(e.target.checked)}
-              className="h-5 w-5 rounded-md border-slate-300 dark:border-white/20 bg-slate-100 dark:bg-slate-800 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-background cursor-pointer accent-cyan-500 transition-all duration-200 hover:scale-105"
-            />
-            <div className="flex items-center gap-1.5">
-              <Zap className={`h-4 w-4 transition-all duration-300 ${useRealScores ? "text-cyan-500 fill-cyan-500 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)] animate-pulse" : "text-slate-400 dark:text-slate-500"}`} />
-              <span className="text-xs font-bold leading-none select-none">
-                Include Real-Time Results ({groupRealPercent}%)
-              </span>
-            </div>
-          </label>
-
-          {totalOverrides > 0 && (
-            <label
-              className={`inline-flex min-h-[56px] items-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${bypassOverrides
-                ? "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
-                : "bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.15)] animate-pulse"
-                }`}
-            >
-              <input
-                type="checkbox"
-                checked={!bypassOverrides}
-                onChange={(e) => setBypassOverrides(!e.target.checked)}
-                className="h-5 w-5 rounded-md border-slate-300 dark:border-white/20 bg-slate-100 dark:bg-slate-800 text-purple-600 focus:ring-purple-500 cursor-pointer accent-purple-500"
-              />
-              <div className="flex items-center gap-1.5" onClick={(e) => {
-                if ((e.target as HTMLElement).tagName !== "INPUT") {
-                  e.preventDefault();
-                  setIsOverridesModalOpen(true);
-                }
-              }}>
-                <Award className={`h-4 w-4 ${bypassOverrides ? "text-slate-400" : "text-purple-500 fill-purple-500/20"}`} />
-                <span className="text-xs font-bold leading-none select-none hover:underline">
-                  {!bypassOverrides ? "My Customizations Applied" : "Apply My Customizations"} ({totalOverrides})
-                </span>
-              </div>
-            </label>
-          )}
-
-          {session?.user?.id && (
-            <button
-              onClick={() => setIsSavesModalOpen(true)}
-              className={toolbarButtonClass}
-            >
-              <FolderOpen className="h-4 w-4 text-cyan-400" />
-              Saved Manager
-            </button>
-          )}
-
-          {onlyKnockout ? (
             <>
-              <button
-                onClick={() => handleAiPredictKnockoutsWithCredits()}
-                className={primaryToolbarButtonClass}
+              {!session ? (
+                <div className="text-xs text-muted-foreground mr-2 hidden md:block">
+                  Guest Sims: <strong className="text-neon">{guestCreditsUsed}</strong> / 3
+                </div>
+              ) : (
+                session.user.subscriptionTier === "free" && (
+                  <div className="text-xs text-muted-foreground mr-2 hidden md:block">
+                    Free Sims: <strong className="text-neon">{creditsUsed}</strong> / 5
+                  </div>
+                )
+              )}
+              <label
+                className={`inline-flex min-h-[56px] w-full items-center justify-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto sm:min-w-[180px] ${useRealScores
+                  ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+                  : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-700 dark:text-slate-300 dark:hover:bg-white/5"
+                  }`}
               >
-                <Sparkles className="h-4 w-4" />
-                Simulate Bracket
-              </button>
-              <button
-                onClick={() => setResetTarget("all")}
-                className={toolbarButtonClass}
-              >
-                <RefreshCw className="h-4 w-4" />
-                Reset
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => {
-                  setConfirmSimType("all");
-                  setConfirmSimGroup(null);
-                  setConfirmSimOpen(true);
-                }}
-                className={primaryToolbarButtonClass}
-              >
-                <Sparkles className="h-4 w-4" />
-                Simulate All
-              </button>
-              {pendingMatchesCount > 0 && (
+                <input
+                  type="checkbox"
+                  id="toolbar-real-time-data"
+                  checked={useRealScores}
+                  onChange={(e) => handleToggleRealScores(e.target.checked)}
+                  className="h-5 w-5 rounded-md border-slate-300 dark:border-white/20 bg-slate-100 dark:bg-slate-800 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-background cursor-pointer accent-cyan-500 transition-all duration-200 hover:scale-105"
+                />
+                <div className="flex items-center gap-1.5">
+                  <Zap className={`h-4 w-4 transition-all duration-300 ${useRealScores ? "text-cyan-500 fill-cyan-500 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)] animate-pulse" : "text-slate-400 dark:text-slate-500"}`} />
+                  <span className="text-xs font-bold leading-none select-none">
+                    Include Real-Time Results ({groupRealPercent}%)
+                  </span>
+                </div>
+              </label>
+
+              {totalOverrides > 0 && (
+                <label
+                  className={`inline-flex min-h-[56px] items-center gap-3 rounded-[1.2rem] border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${bypassOverrides
+                    ? "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
+                    : "bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.15)] animate-pulse"
+                    }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!bypassOverrides}
+                    onChange={(e) => setBypassOverrides(!e.target.checked)}
+                    className="h-5 w-5 rounded-md border-slate-300 dark:border-white/20 bg-slate-100 dark:bg-slate-800 text-purple-600 focus:ring-purple-500 cursor-pointer accent-purple-500"
+                  />
+                  <div className="flex items-center gap-1.5" onClick={(e) => {
+                    if ((e.target as HTMLElement).tagName !== "INPUT") {
+                      e.preventDefault();
+                      setIsOverridesModalOpen(true);
+                    }
+                  }}>
+                    <Award className={`h-4 w-4 ${bypassOverrides ? "text-slate-400" : "text-purple-500 fill-purple-500/20"}`} />
+                    <span className="text-xs font-bold leading-none select-none hover:underline">
+                      {!bypassOverrides ? "My Customizations Applied" : "Apply My Customizations"} ({totalOverrides})
+                    </span>
+                  </div>
+                </label>
+              )}
+
+              {session?.user?.id && (
                 <button
-                  onClick={simulatePendingMatches}
+                  onClick={() => setIsSavesModalOpen(true)}
                   className={toolbarButtonClass}
                 >
-                  <Play className="h-4 w-4 text-emerald-400" />
-                  Simulate Empty ({pendingMatchesCount})
+                  <FolderOpen className="h-4 w-4 text-cyan-400" />
+                  Saved Manager
                 </button>
               )}
+
               <button
-                onClick={() => setResetTarget("all")}
+                onClick={handleCreateShareLink}
+                disabled={isSharingLoading}
                 className={toolbarButtonClass}
               >
-                <RefreshCw className="h-4 w-4" />
-                Reset
+                <Share2 className="h-4 w-4 text-purple-450" />
+                {isSharingLoading ? "Sharing..." : "Share Bracket"}
               </button>
+
+              {onlyKnockout ? (
+                <>
+                  <button
+                    onClick={() => handleAiPredictKnockoutsWithCredits()}
+                    className={primaryToolbarButtonClass}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Simulate Bracket
+                  </button>
+                  <button
+                    onClick={() => setResetTarget("all")}
+                    className={toolbarButtonClass}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Reset
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      setConfirmSimType("all");
+                      setConfirmSimGroup(null);
+                      setConfirmSimOpen(true);
+                    }}
+                    className={primaryToolbarButtonClass}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Simulate All
+                  </button>
+                  {pendingMatchesCount > 0 && (
+                    <button
+                      onClick={simulatePendingMatches}
+                      className={toolbarButtonClass}
+                    >
+                      <Play className="h-4 w-4 text-emerald-400" />
+                      Simulate Empty ({pendingMatchesCount})
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setResetTarget("all")}
+                    className={toolbarButtonClass}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Reset
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -3942,23 +4224,25 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           </div>
 
                           {/* Simulate Match button */}
-                          <button
-                            onClick={() => handleOpenSimulator({
-                              type: "group",
-                              id: m.id,
-                              homeCode: m.homeCode,
-                              awayCode: m.awayCode,
-                              homeScore: m.homeScore,
-                              awayScore: m.awayScore,
-                              details
-                            })}
-                            title="Simulate Match 1v1"
-                            className="p-1.5 bg-muted dark:bg-zinc-800 border border-border dark:border-zinc-700 text-foreground/60 dark:text-muted-foreground hover:bg-neon dark:hover:bg-neon hover:text-black dark:hover:text-black hover:border-neon dark:hover:border-neon hover:scale-105 rounded-xl transition duration-200 shrink-0 ml-1 flex items-center justify-center"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.0" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                          </button>
+                          {!isReadOnly && (
+                            <button
+                              onClick={() => handleOpenSimulator({
+                                type: "group",
+                                id: m.id,
+                                homeCode: m.homeCode,
+                                awayCode: m.awayCode,
+                                homeScore: m.homeScore,
+                                awayScore: m.awayScore,
+                                details
+                              })}
+                              title="Simulate Match 1v1"
+                              className="p-1.5 bg-muted dark:bg-zinc-800 border border-border dark:border-zinc-700 text-foreground/60 dark:text-muted-foreground hover:bg-neon dark:hover:bg-neon hover:text-black dark:hover:text-black hover:border-neon dark:hover:border-neon hover:scale-105 rounded-xl transition duration-200 shrink-0 ml-1 flex items-center justify-center"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.0" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -4212,7 +4496,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             {koMatchups.r32.slice(0, 8).map((m, idx) => {
                               const matchState = getKoMatchWinnerAndScore("r32", idx, m.home, m.away);
                               return (
-                                <KnockoutMatchCard
+                                <KnockoutMatchCard isReadOnly={isReadOnly}
                                   key={`r32-left-${idx}`}
                                   round="r32"
                                   matchIndex={idx}
@@ -4258,7 +4542,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             {koMatchups.r16.slice(0, 4).map((m, idx) => {
                               const matchState = getKoMatchWinnerAndScore("r16", idx, m.home, m.away);
                               return (
-                                <KnockoutMatchCard
+                                <KnockoutMatchCard isReadOnly={isReadOnly}
                                   key={`r16-left-${idx}`}
                                   round="r16"
                                   matchIndex={idx}
@@ -4314,7 +4598,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             {koMatchups.qf.slice(0, 2).map((m, idx) => {
                               const matchState = getKoMatchWinnerAndScore("qf", idx, m.home, m.away);
                               return (
-                                <KnockoutMatchCard
+                                <KnockoutMatchCard isReadOnly={isReadOnly}
                                   key={`qf-left-${idx}`}
                                   round="qf"
                                   matchIndex={idx}
@@ -4370,7 +4654,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             {koMatchups.sf.slice(0, 1).map((m, idx) => {
                               const matchState = getKoMatchWinnerAndScore("sf", idx, m.home, m.away);
                               return (
-                                <KnockoutMatchCard
+                                <KnockoutMatchCard isReadOnly={isReadOnly}
                                   key={`sf-left-${idx}`}
                                   round="sf"
                                   matchIndex={idx}
@@ -4464,7 +4748,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               const finalMatch = koMatchups.final[0];
                               const matchState = getKoMatchWinnerAndScore("final", 0, finalMatch.home, finalMatch.away);
                               return (
-                                <KnockoutMatchCard
+                                <KnockoutMatchCard isReadOnly={isReadOnly}
                                   round="final"
                                   matchIndex={0}
                                   homeCode={finalMatch.home}
@@ -4510,7 +4794,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                             {(() => {
                               const matchState = getKoMatchWinnerAndScore("third", 0, sfLosers.home, sfLosers.away);
                               return (
-                                <KnockoutMatchCard
+                                <KnockoutMatchCard isReadOnly={isReadOnly}
                                   round="third"
                                   matchIndex={0}
                                   homeCode={sfLosers.home}
@@ -4564,7 +4848,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               const realIdx = idx + 1;
                               const matchState = getKoMatchWinnerAndScore("sf", realIdx, m.home, m.away);
                               return (
-                                <KnockoutMatchCard
+                                <KnockoutMatchCard isReadOnly={isReadOnly}
                                   key={`sf-right-${realIdx}`}
                                   round="sf"
                                   matchIndex={realIdx}
@@ -4621,7 +4905,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               const realIdx = idx + 2;
                               const matchState = getKoMatchWinnerAndScore("qf", realIdx, m.home, m.away);
                               return (
-                                <KnockoutMatchCard
+                                <KnockoutMatchCard isReadOnly={isReadOnly}
                                   key={`qf-right-${realIdx}`}
                                   round="qf"
                                   matchIndex={realIdx}
@@ -4678,7 +4962,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               const realIdx = idx + 4;
                               const matchState = getKoMatchWinnerAndScore("r16", realIdx, m.home, m.away);
                               return (
-                                <KnockoutMatchCard
+                                <KnockoutMatchCard isReadOnly={isReadOnly}
                                   key={`r16-right-${realIdx}`}
                                   round="r16"
                                   matchIndex={realIdx}
@@ -4735,7 +5019,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                               const realIdx = idx + 8;
                               const matchState = getKoMatchWinnerAndScore("r32", realIdx, m.home, m.away);
                               return (
-                                <KnockoutMatchCard
+                                <KnockoutMatchCard isReadOnly={isReadOnly}
                                   key={`r32-right-${realIdx}`}
                                   round="r32"
                                   matchIndex={realIdx}
@@ -5772,6 +6056,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       {selected1v1Match && (
         <Match1v1Modal
           isOpen={true}
+          isReadOnly={isReadOnly}
           onClose={() => setSelected1v1Match(null)}
           match={{
             id: `${selected1v1Match.round}-${selected1v1Match.matchIndex}`,
@@ -5831,6 +6116,63 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           }}
         />
       )}
+
+      {/* Share Link Dialog */}
+      <Dialog open={shareLinkModalOpen} onOpenChange={setShareLinkModalOpen}>
+        <DialogContent className="sm:max-w-md bg-slate-900 border border-slate-800 text-white rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold font-display text-white">Share Your Predictions</DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Anyone with this link can view your predicted bracket and results in read-only mode.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2 mt-4">
+            <div className="grid flex-1 gap-2">
+              <input
+                id="share-link-input"
+                readOnly
+                value={generatedShareUrl}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500 font-mono"
+              />
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(generatedShareUrl);
+                toast.success("Link copied to clipboard!");
+              }}
+              className="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold px-4 py-2 rounded-lg text-xs transition duration-200"
+            >
+              Copy
+            </button>
+          </div>
+          <div className="flex justify-center gap-4 mt-6 border-t border-slate-800 pt-4">
+            <a
+              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                `Check out my FIFA World Cup 2026 predictions bracket! 🏆 Predicted Champion: ${
+                  koWinners.final[0] || "TBD"
+                } @wc26_predict \n\n`
+              )}&url=${encodeURIComponent(generatedShareUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition"
+            >
+              <Share2 className="h-3.5 w-3.5 text-cyan-400" /> Share on X
+            </a>
+            <a
+              href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                `Check out my FIFA World Cup 2026 bracket predictions! 🏆 champion: ${
+                  koWinners.final[0] || "TBD"
+                } - ${generatedShareUrl}`
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 text-xs text-slate-450 hover:text-white transition"
+            >
+              WhatsApp
+            </a>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -5865,7 +6207,7 @@ function SimulationEngineBadge({ model }: { model: keyof typeof MODEL_META }) {
 
 // Single Knockout Match Row Card Component
 interface KnockoutMatchCardProps {
-  round: "r32" | "r16" | "qf" | "sf" | "final" | "third";
+  round: string;
   matchIndex: number;
   homeCode: string | null;
   awayCode: string | null;
@@ -5880,6 +6222,7 @@ interface KnockoutMatchCardProps {
   lockedMessage?: string;
   onEditScoreClick?: () => void;
   isReal?: boolean;
+  isReadOnly?: boolean;
 }
 
 function KnockoutMatchCard({
@@ -5898,6 +6241,7 @@ function KnockoutMatchCard({
   lockedMessage = "Seeding not available yet.",
   onEditScoreClick,
   isReal = false,
+  isReadOnly = false,
 }: KnockoutMatchCardProps) {
   const teams = useTeams();
   const getTeam = (code: string) => teams.find(t => t.code === code) || teams[0];
@@ -5935,7 +6279,20 @@ function KnockoutMatchCard({
               {details.venue} · {details.date}
             </span>
           )}
-          {onSimulateClick && !isReal && (
+          {on1v1Click && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                on1v1Click();
+              }}
+              title="1v1 Analysis"
+              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 text-cyan-400 hover:text-cyan-500 transition cursor-pointer shrink-0"
+            >
+              <Brain className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {onSimulateClick && !isReal && !isReadOnly && (
             <button
               type="button"
               onClick={(e) => {
@@ -5956,12 +6313,12 @@ function KnockoutMatchCard({
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
-            disabled={isReal}
+            disabled={isReal || isReadOnly}
             onClick={() => tHome && onSelectWinner(tHome.code)}
             className={`flex-1 flex items-center justify-between p-1.5 rounded-lg transition ${winnerCode === homeCode
               ? "bg-gradient-to-r from-neon/20 to-neon-2/15 border border-neon/30 text-foreground font-bold"
               : "hover:bg-white/5 text-muted-foreground"
-              } ${isReal ? "cursor-default opacity-90" : ""}`}
+              } ${isReal || isReadOnly ? "cursor-default opacity-90" : ""}`}
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <CountryFlag
@@ -5987,12 +6344,12 @@ function KnockoutMatchCard({
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
-            disabled={isReal}
+            disabled={isReal || isReadOnly}
             onClick={() => tAway && onSelectWinner(tAway.code)}
             className={`flex-1 flex items-center justify-between p-1.5 rounded-lg transition ${winnerCode === awayCode
               ? "bg-gradient-to-r from-neon/20 to-neon-2/15 border border-neon/30 text-foreground font-bold"
               : "hover:bg-white/5 text-muted-foreground"
-              } ${isReal ? "cursor-default opacity-90" : ""}`}
+              } ${isReal || isReadOnly ? "cursor-default opacity-90" : ""}`}
           >
             <div className="flex items-center gap-1.5 min-w-0">
               <CountryFlag
