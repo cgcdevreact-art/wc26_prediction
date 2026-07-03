@@ -334,7 +334,9 @@ function HeroMatchCard({
   match: any;
   onClick: () => void;
 }) {
-  const kickoffMs = new Date(match.kickoffAtIso).getTime();
+  const rawKickoff = match.kickoffAtIso ? new Date(match.kickoffAtIso).getTime() : NaN;
+  const kickoffMs = Number.isNaN(rawKickoff) ? 0 : rawKickoff;
+  const hasValidKickoff = !Number.isNaN(rawKickoff);
   const [nowTime, setNowTime] = useState<number>(kickoffMs);
 
   useEffect(() => {
@@ -351,11 +353,11 @@ function HeroMatchCard({
   }, []);
 
   const diffMs = kickoffMs - nowTime;
-  const isLive = match.status === "LIVE" || (match.status === "UPCOMING" && diffMs <= 0);
+  const isLive = match.status === "LIVE" || (match.status === "UPCOMING" && hasValidKickoff && diffMs <= 0);
   const isCompleted = match.status === "COMPLETED";
 
   const getCountdownString = (diff: number) => {
-    if (diff <= 0) return "0s";
+    if (!Number.isFinite(diff) || diff <= 0) return "0s";
     const totalSec = Math.floor(diff / 1000);
     const hrs = Math.floor(totalSec / 3600);
     const mins = Math.floor((totalSec % 3600) / 60);
@@ -440,6 +442,10 @@ function HeroMatchCard({
               <span className="font-mono text-xs font-bold text-muted-foreground">{match.homeScore} - {match.awayScore}</span>
               <span className="text-[7px] text-muted-foreground/80 uppercase font-extrabold mt-0.5">FT</span>
             </>
+          ) : !hasValidKickoff ? (
+            <span className="font-mono text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              TBD
+            </span>
           ) : (
             <span className="font-mono text-[11px] font-bold text-red-500">
               {getCountdownString(diffMs)}
@@ -467,7 +473,7 @@ function HeroMatchCard({
       <div className="text-[9px] text-center text-muted-foreground/80 mt-2.5 pt-1.5 border-t border-white/5 flex items-center justify-center gap-1.5 font-medium truncate">
         <MapPin className={`h-2.5 w-2.5 shrink-0 ${isLive ? "text-red-500" : "text-slate-500 dark:text-slate-400"}`} />
         <span className="truncate">
-          {match.kickoffTime} {match.timezoneLabel} · {match.venue}, {match.city}
+          {match.kickoffTime ? `${match.kickoffTime} ${match.timezoneLabel || ""} · ` : ""}{match.venue ? `${match.venue}${match.city ? `, ${match.city}` : ""}` : "Venue TBD"}
         </span>
       </div>
     </div>

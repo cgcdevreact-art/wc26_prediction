@@ -8,6 +8,10 @@ export const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASSWORD,
   },
+  tls: {
+    // Do not fail on invalid certificates or self-signed certs
+    rejectUnauthorized: false,
+  },
 });
 
 export const sendPasswordResetEmail = async (email: string, token: string) => {
