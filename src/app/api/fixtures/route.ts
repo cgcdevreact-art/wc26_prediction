@@ -7,13 +7,16 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     try {
-      const fixtures = mapFixtures(await fetchLiveSource());
+      const liveSource = await fetchLiveSource();
+      const fixtures = mapFixtures(liveSource);
       await syncFixturesToDb();
 
       return NextResponse.json(
         {
           success: true,
           fixtures,
+          games: liveSource.gamesData?.games || [],
+          stadiums: liveSource.stadiumsData?.stadiums || [],
           source: "live",
           warmed: false,
           lastSyncedAt: new Date(),
@@ -40,10 +43,26 @@ export async function GET() {
       warmed = true;
     }
 
+    // Load local fallback files for raw games/stadiums if server is offline or live api failed
+    let games: any[] = [];
+    let stadiums: any[] = [];
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const gamesFile = fs.readFileSync(path.join(process.cwd(), "public", "games_live.json"), "utf8");
+      const stadiumsFile = fs.readFileSync(path.join(process.cwd(), "public", "stadiums_live.json"), "utf8");
+      games = JSON.parse(gamesFile).games || [];
+      stadiums = JSON.parse(stadiumsFile).stadiums || [];
+    } catch (e) {
+      console.error("Failed to read local fallback files:", e);
+    }
+
     return NextResponse.json(
       {
         success: true,
         fixtures,
+        games,
+        stadiums,
         source: source || "db",
         warmed,
         lastSyncedAt,
