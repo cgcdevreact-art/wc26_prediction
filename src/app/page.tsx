@@ -8,7 +8,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 export const metadata = {
-  title: "WC26 Predict — Who Will Win the FIFA World Cup 2026?",
+  title: "26WC Prediction — Who Will Win the FIFA World Cup 2026?",
   description: "Predict every match, simulate the tournament, build your bracket and compete globally for World Cup 2026 glory.",
 };
 
