@@ -9,7 +9,11 @@ export async function GET() {
     try {
       const liveSource = await fetchLiveSource();
       const fixtures = mapFixtures(liveSource);
-      await syncFixturesToDb();
+      try {
+        await syncFixturesToDb();
+      } catch (dbSyncError) {
+        console.warn("Failed to sync live fixtures to database cache:", dbSyncError);
+      }
 
       return NextResponse.json(
         {
@@ -38,9 +42,13 @@ export async function GET() {
       Date.now() - new Date(lastSyncedAt).getTime() > FIXTURES_REVALIDATE_SECONDS * 1000;
 
     if (fixtures.length === 0 || isStale) {
-      await syncFixturesToDb();
-      ({ fixtures, lastSyncedAt, source } = await readFixturesFromDb());
-      warmed = true;
+      try {
+        await syncFixturesToDb();
+        ({ fixtures, lastSyncedAt, source } = await readFixturesFromDb());
+        warmed = true;
+      } catch (syncError) {
+        console.warn("Failed to sync fixtures on stale check. Using existing database cache.", syncError);
+      }
     }
 
     // Load local fallback files for raw games/stadiums if server is offline or live api failed
