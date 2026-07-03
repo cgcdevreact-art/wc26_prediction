@@ -619,43 +619,26 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   };
 
   useEffect(() => {
-    // Fetch games + stadiums from worldcup26.ir live API.
     async function fetchLiveData() {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000);
-
-        const [gamesRes, stadiumsRes] = await Promise.all([
-          fetch("https://worldcup26.ir/get/games", { signal: controller.signal, cache: "no-store" }),
-          fetch("https://worldcup26.ir/get/stadiums", { signal: controller.signal, cache: "no-store" }),
-        ]);
-
-        clearTimeout(timeout);
-
-        if (!gamesRes.ok || !stadiumsRes.ok) throw new Error("API response not OK");
-
-        const gData = await gamesRes.json();
-        const sData = await stadiumsRes.json();
-
-        setLiveGames(gData.games || []);
-        setLiveStadiums(sData.stadiums || []);
-      } catch (error) {
-        console.error("Failed to load live games/stadiums from real API", error);
-        setLiveGames([]);
-        setLiveStadiums([]);
-      }
-
-      // Fetch mapped API fixtures from our proxy endpoint
+      // Fetch mapped API fixtures + raw games/stadiums from our proxy endpoint to avoid CORS issues
       try {
         const fixturesRes = await fetch("/api/fixtures", { cache: "no-store" });
         if (fixturesRes.ok) {
           const fData = await fixturesRes.json();
-          if (fData.success && Array.isArray(fData.fixtures)) {
-            setApiFixtures(fData.fixtures);
+          if (fData.success) {
+            if (Array.isArray(fData.fixtures)) {
+              setApiFixtures(fData.fixtures);
+            }
+            if (Array.isArray(fData.games)) {
+              setLiveGames(fData.games);
+            }
+            if (Array.isArray(fData.stadiums)) {
+              setLiveStadiums(fData.stadiums);
+            }
           }
         }
       } catch (fError) {
-        console.error("Failed to load mapped fixtures from proxy API", fError);
+        console.error("Failed to load live games/fixtures from proxy API", fError);
       }
     }
 
@@ -893,26 +876,40 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   };
 
   const getAssignedLiveScoreForMatch = useCallback((match: PredictorMatch) => {
-    const suffix = parseInt(match.id.split("-")[1]);
-    const details = getGroupMatchDetails(match.group, suffix, liveGames, liveStadiums, match.homeCode, match.awayCode, teams);
-    if (!details || details.matchNumber <= 0) return null;
+    if (apiFixtures.length === 0) return null;
 
-    const game = liveGames.find((g: any) => parseInt(g.id) === details.matchNumber);
-    if (!game) return null;
-    if (!hasStartedLiveGame(game)) return null;
+    const h = match.homeCode.toUpperCase().trim();
+    const a = match.awayCode.toUpperCase().trim();
 
-    const homeScore = normalizePredictorScore(game.home_score);
-    const awayScore = normalizePredictorScore(game.away_score);
+    const fixture = apiFixtures.find((f) => {
+      if (f.isKnockout) return false;
+      if (f.group !== match.group) return false;
+      const apiH = (f.homeTeamObj?.code || "").toUpperCase().trim();
+      const apiA = (f.awayTeamObj?.code || "").toUpperCase().trim();
+      return (apiH === h && apiA === a) || (apiH === a && apiA === h);
+    });
+
+    if (!fixture) return null;
+
+    if (fixture.status === "UPCOMING" || fixture.homeScore === "-" || fixture.awayScore === "-") {
+      return null;
+    }
+
+    const homeScore = normalizePredictorScore(fixture.homeScore);
+    const awayScore = normalizePredictorScore(fixture.awayScore);
 
     if (!hasValidPredictorScore(homeScore) || !hasValidPredictorScore(awayScore)) {
       return null;
     }
 
-    if (details.isSwapped) {
+    const apiH = (fixture.homeTeamObj?.code || "").toUpperCase().trim();
+    const isSwapped = (apiH === a);
+
+    if (isSwapped) {
       return { homeScore: awayScore, awayScore: homeScore };
     }
     return { homeScore, awayScore };
-  }, [liveGames, liveStadiums, teams]);
+  }, [apiFixtures]);
 
   const getAssignedLiveScoreForKoMatch = useCallback((home: string, away: string) => {
     if (!useRealScores || liveGames.length === 0) return null;
@@ -2855,8 +2852,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       { home: getWinner("K"), away: getWinner("L") },
     ];
 
-    if (useRealScores && liveGames && liveGames.length > 0) {
-      const liveR32 = liveGames
+    if (useRealScores && apiFixtures && apiFixtures.length > 0) {
+      const liveR32 = apiFixtures
         .filter((f: any) => f.isKnockout && f.stageName === "Round of 32")
         .sort((a, b) => a.match_no - b.match_no);
 
