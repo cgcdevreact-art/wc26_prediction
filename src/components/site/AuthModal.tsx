@@ -96,7 +96,7 @@ export function AuthModal({
 
         {/* Glow decoration */}
         <div className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-neon/15 blur-2xl" />
-        <div className="pointer-events-none absolute -right-16 -bottom-16 h-48 w-48 rounded-full bg-neon-2/15 blur-2xl" />ß
+        <div className="pointer-events-none absolute -right-16 -bottom-16 h-48 w-48 rounded-full bg-neon-2/15 blur-2xl" />
         <button
           onClick={onClose}
           className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground hover:bg-muted dark:hover:bg-white/5 hover:text-foreground transition"
