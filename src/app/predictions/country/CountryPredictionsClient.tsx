@@ -2102,7 +2102,7 @@ export default function CountryPredictionsClient({
             )}
           </div>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-            <label
+            {/* <label
               className={`inline-flex min-h-[56px] items-center gap-3 rounded-2xl border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${useRealScores
                 ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
                 : "border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 text-slate-400 dark:text-slate-500"
@@ -2120,7 +2120,7 @@ export default function CountryPredictionsClient({
                   Include Real-Time Results ({groupRealPercent}%)
                 </span>
               </div>
-            </label>
+            </label> */}
 
             {totalOverrides > 0 && (
               <label
