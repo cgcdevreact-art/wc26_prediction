@@ -86,19 +86,17 @@ export function AuthModal({
   return createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto flex justify-center p-4">
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-300"
         onClick={onClose}
       />
 
       {/* Modal Card */}
       <div className="relative my-auto w-full max-w-md overflow-hidden rounded-3xl border border-border dark:border-white/10 bg-card/95 dark:bg-[#0f172a]/95 p-6 shadow-2xl md:p-8 animate-fade-in text-foreground">
-        
+
         {/* Glow decoration */}
         <div className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-neon/15 blur-2xl" />
         <div className="pointer-events-none absolute -right-16 -bottom-16 h-48 w-48 rounded-full bg-neon-2/15 blur-2xl" />
-
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground hover:bg-muted dark:hover:bg-white/5 hover:text-foreground transition"
@@ -115,9 +113,9 @@ export function AuthModal({
           <h2 className="font-display text-2xl font-bold tracking-tight text-foreground dark:text-white mb-2 text-center">
             {mode === "signin" ? "Welcome Back" : "Create an Account"}
           </h2>
-          
+
           <p className="text-xs text-muted-foreground text-center mb-6 max-w-xs leading-relaxed">
-            {mode === "signin" 
+            {mode === "signin"
               ? "Sign in to save predictions and explore advanced analytical models."
               : "Register to unlock custom rating overrides, player stats, and track leaderboards."
             }

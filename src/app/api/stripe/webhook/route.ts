@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { stripe } from "@/lib/stripe";
+import { stripe, stripe2 } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import Stripe from "stripe";
 
@@ -9,20 +9,35 @@ export async function POST(request: Request) {
   const headersList = await headers();
   const signature = headersList.get("stripe-signature");
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const webhookSecret1 = process.env.STRIPE_WEBHOOK_SECRET;
+  const webhookSecret2 = process.env.STRIPE_WEBHOOK_SECRET_2;
 
-  if (!webhookSecret) {
-    console.error("STRIPE_WEBHOOK_SECRET is not set in environment variables.");
-    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+  const secrets = [webhookSecret1, webhookSecret2].filter(Boolean) as string[];
+
+  if (secrets.length === 0) {
+    console.error("No Stripe webhook secrets configured in environment variables (STRIPE_WEBHOOK_SECRET / STRIPE_WEBHOOK_SECRET_2).");
+    return NextResponse.json({ error: "Webhook secrets not configured" }, { status: 500 });
   }
 
-  let event: Stripe.Event;
+  let event: Stripe.Event | null = null;
+  let lastError: any = null;
+  let stripeClient = stripe;
 
-  try {
-    event = stripe.webhooks.constructEvent(body, signature || "", webhookSecret);
-  } catch (err: any) {
-    console.error(`Webhook signature verification failed: ${err.message}`);
-    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
+  for (let i = 0; i < secrets.length; i++) {
+    const secret = secrets[i];
+    try {
+      const currentClient = i === 0 ? stripe : stripe2;
+      event = currentClient.webhooks.constructEvent(body, signature || "", secret);
+      stripeClient = currentClient;
+      break; // Verification succeeded, stop trying
+    } catch (err: any) {
+      lastError = err;
+    }
+  }
+
+  if (!event) {
+    console.error(`Webhook signature verification failed for all secrets. Last error: ${lastError?.message}`);
+    return NextResponse.json({ error: `Webhook Error: ${lastError?.message}` }, { status: 400 });
   }
 
   try {
@@ -39,7 +54,7 @@ export async function POST(request: Request) {
 
         const subscriptionId = session.subscription as string;
         if (subscriptionId) {
-          const subscription = (await stripe.subscriptions.retrieve(subscriptionId)) as any;
+          const subscription = (await stripeClient.subscriptions.retrieve(subscriptionId)) as any;
           const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
 
           await prisma.user.update({
@@ -62,7 +77,8 @@ export async function POST(request: Request) {
         const subscriptionId = invoice.subscription as string;
 
         if (subscriptionId) {
-          const subscription = (await stripe.subscriptions.retrieve(subscriptionId)) as any;
+          const subscription = (await stripeClient.subscriptions.retrieve(subscriptionId)) as any;
+
           const currentPeriodEnd = new Date(subscription.current_period_end * 1000);
 
           // Find the user by subscription id and update their period end date
