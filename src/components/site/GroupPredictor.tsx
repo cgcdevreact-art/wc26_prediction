@@ -608,6 +608,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
   const [liveGames, setLiveGames] = useState<any[]>([]);
   const [liveStadiums, setLiveStadiums] = useState<any[]>([]);
   const [apiFixtures, setApiFixtures] = useState<any[]>([]);
+  const [isLoadingLiveData, setIsLoadingLiveData] = useState(true);
 
   const openAuthModal = (mode: "signin" | "signup" = "signin") => {
     router.push(buildAuthModalHref({
@@ -620,6 +621,7 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
 
   useEffect(() => {
     async function fetchLiveData() {
+      setIsLoadingLiveData(true);
       // Fetch mapped API fixtures + raw games/stadiums from our proxy endpoint to avoid CORS issues
       try {
         const fixturesRes = await fetch("/api/fixtures", { cache: "no-store" });
@@ -639,6 +641,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
         }
       } catch (fError) {
         console.error("Failed to load live games/fixtures from proxy API", fError);
+      } finally {
+        setIsLoadingLiveData(false);
       }
     }
 
@@ -3531,7 +3535,30 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       </div>
 
       {/* Highest Possibility Chart */}
-      {!onlyKnockout && (
+      {isLoadingLiveData ? (
+        <div className="flex w-full flex-col items-center justify-center gap-2 py-16 animate-fade-in">
+          <img
+            src="/lottie/World Cup!.svg"
+            alt="Loading tournament data"
+            className="h-64 w-64 object-contain"
+          />
+          <div className="flex flex-col items-center gap-3 -mt-2">
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse" />
+              <div className="h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse [animation-delay:200ms]" />
+              <div className="h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse [animation-delay:400ms]" />
+            </div>
+            <p className="text-sm font-bold tracking-widest uppercase text-cyan-600 dark:text-neon">
+              Syncing Real-Time Scores
+            </p>
+            <p className="text-xs text-muted-foreground/70 max-w-xs text-center">
+              Fetching the latest match results from the tournament...
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {!onlyKnockout && (
         <div className="w-full mb-8 rounded-3xl p-6 md:p-8 border border-border dark:border-white/5 bg-card dark:bg-[#121623] shadow-sm dark:shadow-lg animate-fade-in">
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -5117,6 +5144,8 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
           </div>
         );
       })()}
+        </>
+      )}
 
       {isGroupStageComplete && activeTab === "group" && pathname === "/simulator" && !simMatch && !upgradeModalOpen && (
         <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md -translate-x-1/2 animate-float animate-in fade-in slide-in-from-bottom-8 duration-500 sm:bottom-6 sm:w-[calc(100vw-2rem)]">
