@@ -26,7 +26,7 @@ const SECTIONS = [
     value: "wildcard",
     eyebrow: "Dream Route",
     title: "Your team didn't make the World Cup?",
-    sub: "Drop them in anyway. Build your custom country profile, swap them into the tournament brackets, and run their hypothetical path to glory.",
+    sub: "No worries join in the fun. Build your custom country profile, swap them into the tournament brackets, and run their hypothetical path to glory.",
     contentClassName: "pt-6",
     content: <WildcardCountrySection />,
   },
