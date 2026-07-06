@@ -12,6 +12,7 @@ export default function TeamsLayout({
       <main className="flex-grow">
         {children}
       </main>
+
       <Footer />
     </div>
   );

@@ -388,6 +388,26 @@ const KO_DETAILS: Record<string, { venue: string; date: string }[]> = {
   ]
 };
 
+// Maps API match_no (number) in liveR32 to the corresponding visual slot index (0-15) in the bracket
+const API_MATCH_NO_TO_SLOT_INDEX: Record<number, number> = {
+  73: 0,
+  75: 1,
+  74: 2,
+  77: 3,
+  76: 4,
+  78: 5,
+  79: 6,
+  80: 7,
+  83: 8,
+  84: 9,
+  81: 10,
+  82: 11,
+  86: 12,
+  88: 13,
+  85: 14,
+  87: 15
+};
+
 const MODEL_META = {
   base: {
     label: "Base",
@@ -619,6 +639,7 @@ export function GroupPredictor({
   const [liveGames, setLiveGames] = useState<any[]>([]);
   const [liveStadiums, setLiveStadiums] = useState<any[]>([]);
   const [apiFixtures, setApiFixtures] = useState<any[]>([]);
+  const [isLoadingLiveData, setIsLoadingLiveData] = useState(true);
 
   const openAuthModal = (mode: "signin" | "signup" = "signin") => {
     router.push(buildAuthModalHref({
@@ -630,43 +651,29 @@ export function GroupPredictor({
   };
 
   useEffect(() => {
-    // Fetch games + stadiums from worldcup26.ir live API.
     async function fetchLiveData() {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000);
-
-        const [gamesRes, stadiumsRes] = await Promise.all([
-          fetch("https://worldcup26.ir/get/games", { signal: controller.signal, cache: "no-store" }),
-          fetch("https://worldcup26.ir/get/stadiums", { signal: controller.signal, cache: "no-store" }),
-        ]);
-
-        clearTimeout(timeout);
-
-        if (!gamesRes.ok || !stadiumsRes.ok) throw new Error("API response not OK");
-
-        const gData = await gamesRes.json();
-        const sData = await stadiumsRes.json();
-
-        setLiveGames(gData.games || []);
-        setLiveStadiums(sData.stadiums || []);
-      } catch (error) {
-        console.error("Failed to load live games/stadiums from real API", error);
-        setLiveGames([]);
-        setLiveStadiums([]);
-      }
-
-      // Fetch mapped API fixtures from our proxy endpoint
+      setIsLoadingLiveData(true);
+      // Fetch mapped API fixtures + raw games/stadiums from our proxy endpoint to avoid CORS issues
       try {
         const fixturesRes = await fetch("/api/fixtures", { cache: "no-store" });
         if (fixturesRes.ok) {
           const fData = await fixturesRes.json();
-          if (fData.success && Array.isArray(fData.fixtures)) {
-            setApiFixtures(fData.fixtures);
+          if (fData.success) {
+            if (Array.isArray(fData.fixtures)) {
+              setApiFixtures(fData.fixtures);
+            }
+            if (Array.isArray(fData.games)) {
+              setLiveGames(fData.games);
+            }
+            if (Array.isArray(fData.stadiums)) {
+              setLiveStadiums(fData.stadiums);
+            }
           }
         }
       } catch (fError) {
-        console.error("Failed to load mapped fixtures from proxy API", fError);
+        console.error("Failed to load live games/fixtures from proxy API", fError);
+      } finally {
+        setIsLoadingLiveData(false);
       }
     }
 
@@ -895,7 +902,7 @@ export function GroupPredictor({
   }, [GROUPS_CONFIG, cupResults]);
 
   const [matches, setMatches] = useState<PredictorMatch[]>(initialMatches);
-  const [useRealScores, setUseRealScores] = useState(true);
+  const [useRealScores, setUseRealScores] = useState(!sharedData);
   const [preRealScoresMatches, setPreRealScoresMatches] = useState<PredictorMatch[] | null>(null);
 
   const disableRealScoresState = () => {
@@ -904,26 +911,40 @@ export function GroupPredictor({
   };
 
   const getAssignedLiveScoreForMatch = useCallback((match: PredictorMatch) => {
-    const suffix = parseInt(match.id.split("-")[1]);
-    const details = getGroupMatchDetails(match.group, suffix, liveGames, liveStadiums, match.homeCode, match.awayCode, teams);
-    if (!details || details.matchNumber <= 0) return null;
+    if (apiFixtures.length === 0) return null;
 
-    const game = liveGames.find((g: any) => parseInt(g.id) === details.matchNumber);
-    if (!game) return null;
-    if (!hasStartedLiveGame(game)) return null;
+    const h = match.homeCode.toUpperCase().trim();
+    const a = match.awayCode.toUpperCase().trim();
 
-    const homeScore = normalizePredictorScore(game.home_score);
-    const awayScore = normalizePredictorScore(game.away_score);
+    const fixture = apiFixtures.find((f) => {
+      if (f.isKnockout) return false;
+      if (f.group !== match.group) return false;
+      const apiH = (f.homeTeamObj?.code || "").toUpperCase().trim();
+      const apiA = (f.awayTeamObj?.code || "").toUpperCase().trim();
+      return (apiH === h && apiA === a) || (apiH === a && apiA === h);
+    });
+
+    if (!fixture) return null;
+
+    if (fixture.status === "UPCOMING" || fixture.homeScore === "-" || fixture.awayScore === "-") {
+      return null;
+    }
+
+    const homeScore = normalizePredictorScore(fixture.homeScore);
+    const awayScore = normalizePredictorScore(fixture.awayScore);
 
     if (!hasValidPredictorScore(homeScore) || !hasValidPredictorScore(awayScore)) {
       return null;
     }
 
-    if (details.isSwapped) {
+    const apiH = (fixture.homeTeamObj?.code || "").toUpperCase().trim();
+    const isSwapped = (apiH === a);
+
+    if (isSwapped) {
       return { homeScore: awayScore, awayScore: homeScore };
     }
     return { homeScore, awayScore };
-  }, [liveGames, liveStadiums, teams]);
+  }, [apiFixtures]);
 
   const getAssignedLiveScoreForKoMatch = useCallback((home: string, away: string) => {
     if (!useRealScores || liveGames.length === 0) return null;
@@ -1063,6 +1084,7 @@ export function GroupPredictor({
   };
 
   useEffect(() => {
+    if (isReadOnly) return;
     if (useRealScores && liveGames.length > 0) {
       const currentMatches = matchesRef.current;
       const updatedMatches = applyRealScores(currentMatches);
@@ -1078,7 +1100,7 @@ export function GroupPredictor({
         }
       }
     }
-  }, [liveGames, useRealScores, applyRealScores]);
+  }, [liveGames, useRealScores, applyRealScores, isReadOnly]);
 
   const groupRealPercent = useMemo(() => {
     const realGroupCount = matches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
@@ -1184,9 +1206,9 @@ export function GroupPredictor({
 
   const hydrateSharedData = useCallback((data: any[]) => {
     disableRealScoresState();
-    
-    const groupPreds = data.filter((p: any) => p.matchId < 100);
-    const koPreds = data.filter((p: any) => p.matchId >= 100 && p.matchId < 999000);
+
+    const groupPreds = data.filter((p: any) => p.type === "MATCH_SCORE" || (p.matchId < 100 && !p.type));
+    const koPreds = data.filter((p: any) => p.type === "KNOCKOUT_WINNER" || (p.matchId >= 100 && p.matchId < 999000 && !p.type));
 
     setMatches((prev) =>
       prev.map((m) => {
@@ -1210,6 +1232,14 @@ export function GroupPredictor({
     const nextScores: Record<string, { home: number | ""; away: number | "" }> = {};
     let loadedThirdWinner: string | null = null;
     let loadedThirdScores = { home: "" as number | "", away: "" as number | "" };
+
+    const nextSharedMatchups: Record<string, { home: string | null; away: string | null }[]> = {
+      r32: Array(16).fill(null).map(() => ({ home: null, away: null })),
+      r16: Array(8).fill(null).map(() => ({ home: null, away: null })),
+      qf: Array(4).fill(null).map(() => ({ home: null, away: null })),
+      sf: Array(2).fill(null).map(() => ({ home: null, away: null })),
+      final: Array(1).fill(null).map(() => ({ home: null, away: null })),
+    };
 
     koPreds.forEach((p: any) => {
       const id = p.matchId;
@@ -1236,6 +1266,15 @@ export function GroupPredictor({
           home: normalizePredictorScore(p.predictedHomeScore),
           away: normalizePredictorScore(p.predictedAwayScore)
         };
+        try {
+          const parsed = typeof p.predictedWinner === "string" ? JSON.parse(p.predictedWinner) : p.predictedWinner;
+          if (parsed && parsed.homeCode && parsed.awayCode) {
+            nextSharedMatchups[round][idx] = {
+              home: parsed.homeCode,
+              away: parsed.awayCode
+            };
+          }
+        } catch (e) {}
       }
     });
 
@@ -1243,6 +1282,7 @@ export function GroupPredictor({
     setKoScores(nextScores);
     setThirdWinner(loadedThirdWinner);
     setThirdScores(loadedThirdScores);
+    setSharedKoMatchups(nextSharedMatchups);
   }, []);
 
   useEffect(() => {
@@ -1398,8 +1438,7 @@ export function GroupPredictor({
     setIsSharingLoading(true);
     try {
       const payload = {
-        slotId: session ? currentSlot : undefined,
-        predictions: !session ? assembleFullSnapshot() : undefined,
+        predictions: assembleFullSnapshot(),
         modelUsed: selectedModel,
         title: currentSlot !== null && session ? slotNames[currentSlot] : undefined
       };
@@ -1446,6 +1485,8 @@ export function GroupPredictor({
     sf: Array(2).fill(null),
     final: Array(1).fill(null),
   });
+
+  const [sharedKoMatchups, setSharedKoMatchups] = useState<Record<string, { home: string | null; away: string | null }[]> | null>(null);
 
   // Knockout prediction scores state storing goals for each team
   const [koScores, setKoScores] = useState<Record<string, { home: number | ""; away: number | "" }>>({});
@@ -1580,7 +1621,8 @@ export function GroupPredictor({
 
     // Prevent "ghost" teams: if a manual winner is saved but is no longer in the match,
     // the saved simulation data is stale and must be ignored.
-    if (manualWinner && manualWinner !== home && manualWinner !== away) {
+    // In read-only mode (shared bracket), always trust the saved winner.
+    if (!isReadOnly && manualWinner && manualWinner !== home && manualWinner !== away) {
       return {
         homeScore: "" as const,
         awayScore: "" as const,
@@ -1608,7 +1650,7 @@ export function GroupPredictor({
       winnerCode: null,
       isReal: false,
     };
-  }, [useRealScores, apiFixtures, koScores, koWinners, thirdScores, thirdWinner, getLiveFixtureForTeams]);
+  }, [useRealScores, apiFixtures, koScores, koWinners, thirdScores, thirdWinner, getLiveFixtureForTeams, isReadOnly]);
 
   // 1v1 Simulator Modal State
   const [simMatch, setSimMatch] = useState<{
@@ -1970,7 +2012,7 @@ export function GroupPredictor({
 
   // Load predictions from DB on authentication
   useEffect(() => {
-    if (!session?.user?.id || hasLoadedInitialPredictions.current) return;
+    if (!session?.user?.id || hasLoadedInitialPredictions.current || isReadOnly) return;
 
     const fetchUserPredictions = async () => {
       const preds = await fetchAllUserPredictions();
@@ -2281,111 +2323,93 @@ export function GroupPredictor({
     const activeThirdWinner = updatedThirdWinner !== undefined ? updatedThirdWinner : thirdWinner;
     const activeThirdScores = updatedThirdScores || thirdScores;
 
-    activeWinners.r32.forEach((code, idx) => {
-      if (code) {
-        const scores = activeScores[`r32-${idx}`] || { home: "", away: "" };
-        const matchup = koMatchups.r32[idx] || { home: null, away: null };
-        payload.push({
-          matchId: 100 + idx,
-          type: koType,
-          predictedTeamId: teamCodeToInt(code),
-          predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
-          predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
-          predictedWinner: JSON.stringify({
-            homeCode: matchup.home,
-            awayCode: matchup.away,
-            winnerCode: code
-          })
-        });
+    const evaluateMatch = (round: string, matchIndex: number, home: string | null, away: string | null) => {
+      const manualWinner = round === "third" ? activeThirdWinner : (activeWinners[round as keyof typeof activeWinners]?.[matchIndex] ?? null);
+      const manualScores = round === "third" ? activeThirdScores : (activeScores[`${round}-${matchIndex}`] || { home: "", away: "" });
+      
+      const realMatch = useRealScores ? getLiveFixtureForTeams(home, away) : null;
+      if (realMatch && realMatch.status === "finished") {
+        return { winnerCode: realMatch.winnerCode, homeScore: realMatch.homeScore, awayScore: realMatch.awayScore };
       }
-    });
-    activeWinners.r16.forEach((code, idx) => {
-      if (code) {
-        const scores = activeScores[`r16-${idx}`] || { home: "", away: "" };
-        const matchup = koMatchups.r16[idx] || { home: null, away: null };
-        payload.push({
-          matchId: 200 + idx,
-          type: koType,
-          predictedTeamId: teamCodeToInt(code),
-          predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
-          predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
-          predictedWinner: JSON.stringify({
-            homeCode: matchup.home,
-            awayCode: matchup.away,
-            winnerCode: code
-          })
-        });
+      
+      const hasHome = manualScores.home !== "";
+      const hasAway = manualScores.away !== "";
+      if (hasHome || hasAway || manualWinner) {
+        const hScore = hasHome ? Number(manualScores.home) : ("" as const);
+        const aScore = hasAway ? Number(manualScores.away) : ("" as const);
+        const winner = manualWinner || (hasHome && hasAway ? (Number(manualScores.home) > Number(manualScores.away) ? home : away) : null);
+        return { winnerCode: winner, homeScore: hScore, awayScore: aScore };
       }
-    });
-    activeWinners.qf.forEach((code, idx) => {
-      if (code) {
-        const scores = activeScores[`qf-${idx}`] || { home: "", away: "" };
-        const matchup = koMatchups.qf[idx] || { home: null, away: null };
-        payload.push({
-          matchId: 300 + idx,
-          type: koType,
-          predictedTeamId: teamCodeToInt(code),
-          predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
-          predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
-          predictedWinner: JSON.stringify({
-            homeCode: matchup.home,
-            awayCode: matchup.away,
-            winnerCode: code
-          })
-        });
-      }
-    });
-    activeWinners.sf.forEach((code, idx) => {
-      if (code) {
-        const scores = activeScores[`sf-${idx}`] || { home: "", away: "" };
-        const matchup = koMatchups.sf[idx] || { home: null, away: null };
-        payload.push({
-          matchId: 400 + idx,
-          type: koType,
-          predictedTeamId: teamCodeToInt(code),
-          predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
-          predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
-          predictedWinner: JSON.stringify({
-            homeCode: matchup.home,
-            awayCode: matchup.away,
-            winnerCode: code
-          })
-        });
-      }
-    });
-    if (activeWinners.final[0]) {
-      const scores = activeScores[`final-0`] || { home: "", away: "" };
-      const matchup = koMatchups.final[0] || { home: null, away: null };
-      payload.push({
-        matchId: 500,
-        type: koType,
-        predictedTeamId: teamCodeToInt(activeWinners.final[0]),
-        predictedHomeScore: scores.home !== "" ? Number(scores.home) : null,
-        predictedAwayScore: scores.away !== "" ? Number(scores.away) : null,
-        predictedWinner: JSON.stringify({
-          homeCode: matchup.home,
-          awayCode: matchup.away,
-          winnerCode: activeWinners.final[0]
-        })
-      });
+      return { winnerCode: null, homeScore: "", awayScore: "" };
+    };
+
+    const resolvedMatchups: Record<string, { home: string | null; away: string | null }[]> = {
+      r32: r32Teams.map(p => ({ home: p?.home ?? null, away: p?.away ?? null })),
+      r16: [], qf: [], sf: [], final: []
+    };
+
+    for (let i = 0; i < 8; i++) {
+      const fh = resolvedMatchups.r32[2 * i];
+      const fa = resolvedMatchups.r32[2 * i + 1];
+      const wh = evaluateMatch("r32", 2 * i, fh.home, fh.away).winnerCode;
+      const wa = evaluateMatch("r32", 2 * i + 1, fa.home, fa.away).winnerCode;
+      resolvedMatchups.r16.push({ home: wh, away: wa });
     }
-    if (activeThirdWinner) {
-      const getLoser = (sfIdx: number) => {
-        const matchup = koMatchups.sf[sfIdx];
-        const winner = activeWinners.sf[sfIdx];
-        if (!matchup || !winner) return null;
-        return matchup.home === winner ? matchup.away : matchup.home;
-      };
+    for (let i = 0; i < 4; i++) {
+      const fh = resolvedMatchups.r16[2 * i];
+      const fa = resolvedMatchups.r16[2 * i + 1];
+      const wh = evaluateMatch("r16", 2 * i, fh.home, fh.away).winnerCode;
+      const wa = evaluateMatch("r16", 2 * i + 1, fa.home, fa.away).winnerCode;
+      resolvedMatchups.qf.push({ home: wh, away: wa });
+    }
+    for (let i = 0; i < 2; i++) {
+      const fh = resolvedMatchups.qf[2 * i];
+      const fa = resolvedMatchups.qf[2 * i + 1];
+      const wh = evaluateMatch("qf", 2 * i, fh.home, fh.away).winnerCode;
+      const wa = evaluateMatch("qf", 2 * i + 1, fa.home, fa.away).winnerCode;
+      resolvedMatchups.sf.push({ home: wh, away: wa });
+    }
+    const sf0 = resolvedMatchups.sf[0];
+    const sf1 = resolvedMatchups.sf[1];
+    const w_sf0 = evaluateMatch("sf", 0, sf0.home, sf0.away).winnerCode;
+    const w_sf1 = evaluateMatch("sf", 1, sf1.home, sf1.away).winnerCode;
+    resolvedMatchups.final.push({ home: w_sf0, away: w_sf1 });
+
+    const rounds: ("r32" | "r16" | "qf" | "sf" | "final")[] = ["r32", "r16", "qf", "sf", "final"];
+    const baseIds = { r32: 100, r16: 200, qf: 300, sf: 400, final: 500 };
+
+    rounds.forEach(round => {
+      resolvedMatchups[round].forEach((matchup, idx) => {
+        const matchState = evaluateMatch(round, idx, matchup.home, matchup.away);
+        if (matchState.winnerCode) {
+          payload.push({
+            matchId: baseIds[round] + idx,
+            type: koType,
+            predictedTeamId: teamCodeToInt(matchState.winnerCode),
+            predictedHomeScore: matchState.homeScore !== "" ? Number(matchState.homeScore) : null,
+            predictedAwayScore: matchState.awayScore !== "" ? Number(matchState.awayScore) : null,
+            predictedWinner: JSON.stringify({
+              homeCode: matchup.home,
+              awayCode: matchup.away,
+              winnerCode: matchState.winnerCode
+            })
+          });
+        }
+      });
+    });
+
+    const thirdMatchState = evaluateMatch("third", 0, sf0.home === w_sf0 ? sf0.away : sf0.home, sf1.home === w_sf1 ? sf1.away : sf1.home);
+    if (thirdMatchState.winnerCode) {
       payload.push({
         matchId: 501,
         type: koType,
-        predictedTeamId: teamCodeToInt(activeThirdWinner),
-        predictedHomeScore: activeThirdScores.home !== "" ? Number(activeThirdScores.home) : null,
-        predictedAwayScore: activeThirdScores.away !== "" ? Number(activeThirdScores.away) : null,
+        predictedTeamId: teamCodeToInt(thirdMatchState.winnerCode),
+        predictedHomeScore: thirdMatchState.homeScore !== "" ? Number(thirdMatchState.homeScore) : null,
+        predictedAwayScore: thirdMatchState.awayScore !== "" ? Number(thirdMatchState.awayScore) : null,
         predictedWinner: JSON.stringify({
-          homeCode: getLoser(0),
-          awayCode: getLoser(1),
-          winnerCode: activeThirdWinner
+          homeCode: sf0.home === w_sf0 ? sf0.away : sf0.home,
+          awayCode: sf1.home === w_sf1 ? sf1.away : sf1.home,
+          winnerCode: thirdMatchState.winnerCode
         })
       });
     }
@@ -2565,18 +2589,20 @@ export function GroupPredictor({
       const liveR32 = apiFixtures.filter((f) => f.isKnockout && f.stageName === "Round of 32");
       if (liveR32.length === 16) {
         const isValidCode = (c: string) => c && c.length === 3 && !c.match(/Winner|Runner|3rd|TBC|TBD/i);
-        return fallbackPairs.map((pair, idx) => {
-          const match = liveR32[idx];
-          if (match) {
+        const updatedPairs = [...fallbackPairs];
+        liveR32.forEach((match) => {
+          const matchNo = Number(match.match_no);
+          const slotIdx = API_MATCH_NO_TO_SLOT_INDEX[matchNo];
+          if (slotIdx !== undefined && slotIdx >= 0 && slotIdx < 16) {
             const h = match.homeTeamObj?.code;
             const a = match.awayTeamObj?.code;
-            return {
-              home: isValidCode(h) ? h.toUpperCase() : pair.home,
-              away: isValidCode(a) ? a.toUpperCase() : pair.away,
+            updatedPairs[slotIdx] = {
+              home: isValidCode(h) ? h.toUpperCase() : fallbackPairs[slotIdx].home,
+              away: isValidCode(a) ? a.toUpperCase() : fallbackPairs[slotIdx].away,
             };
           }
-          return pair;
         });
+        return updatedPairs;
       }
     }
 
@@ -2584,6 +2610,10 @@ export function GroupPredictor({
   }, [isGroupStageComplete, standings, thirdPlaceStandings, useRealScores, apiFixtures]);
 
   const koMatchups = useMemo(() => {
+    if (isReadOnly && sharedKoMatchups) {
+      return sharedKoMatchups;
+    }
+
     const matchups: Record<string, { home: string | null; away: string | null }[]> = {
       r32: [], r16: [], qf: [], sf: [], final: [],
     };
@@ -2644,7 +2674,7 @@ export function GroupPredictor({
     });
 
     return matchups;
-  }, [r32Teams, koWinners, useRealScores, apiFixtures, getKoMatchWinnerAndScore]);
+  }, [r32Teams, koWinners, useRealScores, apiFixtures, getKoMatchWinnerAndScore, isReadOnly, sharedKoMatchups]);
 
   const topTeamsData = useMemo(() => {
     const isBracketSynced = () => {
@@ -3119,27 +3149,25 @@ export function GroupPredictor({
       { home: getWinner("K"), away: getWinner("L") },
     ];
 
-    if (useRealScores && liveGames && liveGames.length > 0) {
-      const liveR32 = liveGames
-        .filter((f: any) => f.isKnockout && f.stageName === "Round of 32")
-        .sort((a, b) => a.match_no - b.match_no);
+    if (useRealScores && apiFixtures && apiFixtures.length > 0) {
+      const liveR32 = apiFixtures.filter((f: any) => f.isKnockout && f.stageName === "Round of 32");
 
       if (liveR32.length === 16) {
         const isValidCode = (c: string) => c && c.length === 3 && !c.match(/Winner|Runner|3rd|TBC|TBD/i);
-
-        return fallbackPairs.map((pair, idx) => {
-          const match = liveR32[idx];
-          if (match) {
+        const updatedPairs = [...fallbackPairs];
+        liveR32.forEach((match) => {
+          const matchNo = Number(match.match_no);
+          const slotIdx = API_MATCH_NO_TO_SLOT_INDEX[matchNo];
+          if (slotIdx !== undefined && slotIdx >= 0 && slotIdx < 16) {
             const liveHomeCode = (match.homeTeamObj?.code || "").trim().toUpperCase();
             const liveAwayCode = (match.awayTeamObj?.code || "").trim().toUpperCase();
-
-            return {
-              home: isValidCode(liveHomeCode) ? liveHomeCode : pair.home,
-              away: isValidCode(liveAwayCode) ? liveAwayCode : pair.away
+            updatedPairs[slotIdx] = {
+              home: isValidCode(liveHomeCode) ? liveHomeCode : fallbackPairs[slotIdx].home,
+              away: isValidCode(liveAwayCode) ? liveAwayCode : fallbackPairs[slotIdx].away
             };
           }
-          return pair;
         });
+        return updatedPairs;
       }
     }
 
@@ -3147,6 +3175,7 @@ export function GroupPredictor({
   };
 
   const syncKnockoutBracket = (currentMatches: PredictorMatch[]) => {
+    if (isReadOnly) return;
     // Clear the knockout bracket because the group stage standings have changed,
     // invalidating the previous teams in the bracket. We should not auto-simulate this!
     setKoWinners({
@@ -3753,14 +3782,7 @@ export function GroupPredictor({
                 </button>
               )}
 
-              <button
-                onClick={handleCreateShareLink}
-                disabled={isSharingLoading}
-                className={toolbarButtonClass}
-              >
-                <Share2 className="h-4 w-4 text-purple-450" />
-                {isSharingLoading ? "Sharing..." : "Share Bracket"}
-              </button>
+
 
               {onlyKnockout ? (
                 <>
@@ -3816,1482 +3838,1534 @@ export function GroupPredictor({
       </div>
 
       {/* Highest Possibility Chart */}
-      {!onlyKnockout && (
-        <div className="w-full mb-8 rounded-3xl p-6 md:p-8 border border-border dark:border-white/5 bg-card dark:bg-[#121623] shadow-sm dark:shadow-lg animate-fade-in">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mb-1">
-                Live win probability
-              </h3>
-              <h2 className="font-display text-2xl font-bold text-foreground dark:text-white">Top contenders</h2>
-            </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-500/10 dark:bg-gradient-to-br dark:from-yellow-600/40 dark:to-yellow-900/40 border border-yellow-500/20 dark:border-yellow-600/30">
-              <Trophy className="h-6 w-6 text-yellow-500" />
-            </div>
-          </div>
-
-          <div className="h-56 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topTeamsData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#6EE7B7" />
-                    <stop offset="100%" stopColor="#C084FC" />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="code"
-                  tick={{ fill: "#64748b", fontSize: 11, fontWeight: 600 }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickMargin={12}
-                />
-                <YAxis hide />
-                <Tooltip
-                  cursor={{ fill: "var(--color-muted)", opacity: 0.15 }}
-                  contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 12, fontSize: 13, boxShadow: "var(--shadow-glass)" }}
-                  formatter={(value: any, name: any, props: any) => {
-                    const isElim = props?.payload?.isEliminated;
-                    return [`${value}%${isElim ? ' (Out)' : ''}`, "Win Probability"];
-                  }}
-                  labelStyle={{ color: "var(--color-neon)", fontWeight: "bold", marginBottom: 6 }}
-                  itemStyle={{ color: "var(--foreground)" }}
-                />
-                <Bar
-                  dataKey="winProb"
-                  fill="url(#barGradient)"
-                  radius={[10, 10, 10, 10]}
-                  barSize={96}
-                  minPointSize={15}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-            {topTeamsData.slice(0, 4).map((team) => (
-              <div
-                key={team.code}
-                className="flex flex-col items-center justify-center bg-muted/30 dark:bg-white/5 border border-border dark:border-white/10 rounded-2xl py-4 shadow-glass transition-all animate-fade-in"
-              >
-                <CountryFlag
-                  code={team.code}
-                  flag={team.flag}
-                  name={team.name}
-                  className="mb-1 h-6 w-8 rounded object-cover drop-shadow-sm"
-                  emojiClassName="mb-1 text-xl leading-none"
-                />
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">{team.code}</span>
-                <span className="text-sm font-bold text-emerald-600 dark:text-[#6EE7B7] mt-1 flex items-center gap-1.5">
-                  <span>{team.winProb.toFixed(1)}%</span>
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeTab === "group" && (
-        <ScoreTrendGraph
-          matches={matches}
-          predictionMatches={useRealScores ? (preRealScoresMatches || initialMatches) : matches}
-          teams={teams}
-          liveGames={liveGames}
-          liveStadiums={liveStadiums}
-          getGroupMatchDetails={getGroupMatchDetails}
-        />
-      )}
-
-      {/* Tab Selectors */}
-      {!onlyKnockout && (
-        <div className="mb-8 flex flex-col gap-4 border-b border-border dark:border-white/10 md:flex-row md:items-end md:justify-between">
-          <div className="flex -mb-[1px]">
-            <button
-              onClick={() => setActiveTab("group")}
-              className={`px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "group"
-                ? "border-neon text-neon"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-            >
-              Group Stage
-            </button>
-            {isGroupStageComplete && (
-              <button
-                onClick={() => setActiveTab("knockout")}
-                className={`flex items-center gap-2 px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "knockout"
-                  ? "border-neon text-neon"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-              >
-                Knockout Bracket
-              </button>
-            )}
-          </div>
-
-          <div className="md:max-w-md pb-4 md:pb-3 w-full md:w-auto">
-            <SimulationEngineBadge model={selectedModel} />
-          </div>
-        </div>
-      )}
-
-      {/* Group Stage View */}
-      {activeTab === "group" && (
-        <div className="space-y-6">
-          {/* Real-life Scores Integrator */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl glass-strong border border-border/40 bg-slate-900/10 dark:bg-black/10 shadow-glass">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="use-actual-scores"
-                checked={useRealScores}
-                onChange={(e) => handleToggleRealScores(e.target.checked)}
-                className="h-5 w-5 rounded-md border-border bg-black/10 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-background cursor-pointer accent-cyan-500"
-              />
-              <label htmlFor="use-actual-scores" className="text-sm font-semibold text-foreground/90 select-none cursor-pointer">
-                Use Real-Time Results for group stage matches
-              </label>
-            </div>
+      {isLoadingLiveData ? (
+        <div className="flex w-full flex-col items-center justify-center gap-2 py-16 animate-fade-in">
+          <img
+            src="/lottie/World Cup!.svg"
+            alt="Loading tournament data"
+            className="h-64 w-64 object-contain"
+          />
+          <div className="flex flex-col items-center gap-3 -mt-2">
             <div className="flex items-center gap-2">
-              {pendingMatchesCount > 0 && (
-                <button
-                  type="button"
-                  onClick={simulatePendingMatches}
-                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-emerald-600 transition hover:bg-emerald-500/15 dark:text-emerald-400"
-                >
-                  <Play className="h-3.5 w-3.5" />
-                  <span>Simulate Pending Matches</span>
-                </button>
-              )}
-              {useRealScores && (
-                <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse">
-                  Real-Time scores assigned
-                </span>
-              )}
+              <div className="h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse" />
+              <div className="h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse [animation-delay:200ms]" />
+              <div className="h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse [animation-delay:400ms]" />
             </div>
-          </div>
-
-          <div className={`grid gap-4 sm:gap-6 ${fullWidth ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}>
-            {Object.keys(GROUPS_CONFIG).map((groupName) => {
-              const groupMatches = matches.filter((m) => m.group === groupName);
-              const groupStandings = standings[groupName];
-              const isGroupPredicted = groupMatches.length > 0 && groupMatches.every((m) => hasAssignedMatchScores(m));
-              const assignedRealDataMatches = groupMatches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
-              const realDataPercent = groupMatches.length > 0
-                ? Math.round((assignedRealDataMatches / groupMatches.length) * 100)
-                : 0;
-
-              return (
-                <div
-                  key={groupName}
-                  className={`glass-strong rounded-2xl p-4 border flex flex-col justify-between transition duration-300 shadow-glass ${isGroupPredicted
-                    ? "border-emerald-500/50 bg-emerald-500/5 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
-                    : "border-border hover:border-neon/30"
-                    }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="font-display font-bold text-lg text-gradient flex items-center gap-1.5">
-                        Group {groupName}
-                      </h2>
-                      {/* Quick Actions / Status for Single Group */}
-                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
-                        {isGroupPredicted ? (
-                          <>
-                            <span className="text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 shadow-sm flex items-center gap-1">
-                              <Check className="h-3 w-3" /> {useRealScores && realDataPercent > 0 ? `${realDataPercent}% Real Data` : "Simulated"}
-                            </span>
-                            <button
-                              onClick={() => setDeleteGroupTarget(groupName)}
-                              title="Reset Group"
-                              className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded-full transition"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            {(() => {
-                              const groupPending = groupMatches.filter((m) => !hasAssignedMatchScores(m)).length;
-                              if (groupPending > 0 && groupPending < groupMatches.length) {
-                                return (
-                                  <button
-                                    onClick={() => simulatePendingGroupMatches(groupName)}
-                                    title={`Simulate ${groupPending} pending match${groupPending > 1 ? "es" : ""}`}
-                                    className="text-emerald-500 hover:text-emerald-400 hover:underline transition font-black flex items-center gap-1"
-                                  >
-                                    <Play className="h-3 w-3" />
-                                    Simulate Pending ({groupPending})
-                                  </button>
-                                );
-                              }
-                              return (
-                                <button
-                                  onClick={() => {
-                                    setConfirmSimType("group");
-                                    setConfirmSimGroup(groupName);
-                                    setConfirmSimOpen(true);
-                                  }}
-                                  title="Predict Group"
-                                  className="text-cyan-500 hover:text-cyan-400 hover:underline transition font-black"
-                                >
-                                  Run Simulation
-                                </button>
-                              );
-                            })()}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <table className="w-full text-[11px] sm:text-xs text-left mb-4 border-collapse">
-                      <thead>
-                        <tr className="border-b border-border text-muted-foreground">
-                          <th className="pb-1.5 font-medium w-5">#</th>
-                          <th className="pb-1.5 font-medium">Team</th>
-                          <th className="pb-1.5 font-medium text-center w-10">Elo</th>
-                          <th className="pb-1.5 font-medium text-center w-8">Att</th>
-                          <th className="pb-1.5 font-medium text-center w-8">Def</th>
-                          <th className="pb-1.5 font-medium text-right w-24">Top Player</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {groupStandings.map((row, idx) => {
-                          const qualify = idx < 2;
-                          const teamPlayers = getTeamPlayers(row.code);
-                          const topPlayer = teamPlayers[0];
-                          const topPlayerName = topPlayer ? (topPlayer["Name on Shirt"] || topPlayer["Player Name"]) : "";
-                          const rawRating = topPlayer ? (topPlayer["Overall Rating"] || "") : "";
-                          const topPlayerRating = (rawRating && String(rawRating).toLowerCase() !== "nan") ? rawRating : "";
-                          const topPlayerDisp = topPlayerName ? `${topPlayerName} (${topPlayerRating})` : "N/A";
-
-                          return (
-                            <tr
-                              key={row.code}
-                              className={`border-b border-border/50 dark:border-white/5 last:border-0 ${qualify ? "text-foreground font-medium animate-pulse-ring/10" : "text-muted-foreground"
-                                }`}
-                            >
-                              <td className="py-1">
-                                <span
-                                  className={`inline-block w-4 h-4 text-[9px] font-bold text-center rounded leading-4 ${idx === 0 ? "bg-neon/20 text-neon" : idx === 1 ? "bg-neon-2/20 text-neon-2" : "bg-muted dark:bg-white/5 text-muted-foreground"
-                                    }`}
-                                >
-                                  {idx + 1}
-                                </span>
-                              </td>
-                              <td className="py-1 truncate flex items-center gap-1.5 w-full sm:min-w-[120px]">
-                                <CountryFlag
-                                  code={row.team.code}
-                                  flag={row.team.flag}
-                                  name={row.team.name}
-                                  className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
-                                  emojiClassName="text-base shrink-0 leading-none"
-                                />
-                                <span className="truncate flex items-center gap-1" title={row.team.name}>
-                                  {row.team.name}
-                                  {row.team.isCustom && !bypassOverrides && !storeTeams[row.team.code]?.isOverrideDisabled && (
-                                    <span title="Custom team stats active" className="inline-flex shrink-0">
-                                      <Sparkles className="h-3 w-3 text-purple-500 fill-purple-500/20 animate-pulse" />
-                                    </span>
-                                  )}
-                                </span>
-                              </td>
-                              <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
-                                {row.team.elo && Number.isFinite(row.team.elo) ? Math.round(row.team.elo) : "-"}
-                              </td>
-                              <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
-                                {(() => {
-                                  const val = row.team.attack;
-                                  if (val === undefined || val === null || !Number.isFinite(val)) return "-";
-                                  if (val < 10) {
-                                    const minM = 0.75;
-                                    const maxM = 1.10;
-                                    const minR = 50;
-                                    const maxR = 95;
-                                    const rating = ((val - minM) / (maxM - minM)) * (maxR - minR) + minR;
-                                    const rounded = Math.max(15, Math.min(99, Math.round(rating)));
-                                    return Number.isFinite(rounded) ? rounded : "-";
-                                  }
-                                  const rounded = Math.round(val);
-                                  return Number.isFinite(rounded) ? rounded : "-";
-                                })()}
-                              </td>
-                              <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
-                                {(() => {
-                                  const val = row.team.defense;
-                                  if (val === undefined || val === null || !Number.isFinite(val)) return "-";
-                                  if (val < 10) {
-                                    const minM = 0.75;
-                                    const maxM = 1.10;
-                                    const minR = 50;
-                                    const maxR = 95;
-                                    const rating = ((val - minM) / (maxM - minM)) * (maxR - minR) + minR;
-                                    const rounded = Math.max(15, Math.min(99, Math.round(rating)));
-                                    return Number.isFinite(rounded) ? rounded : "-";
-                                  }
-                                  const rounded = Math.round(val);
-                                  return Number.isFinite(rounded) ? rounded : "-";
-                                })()}
-                              </td>
-                              <td className="py-1 text-right text-muted-foreground truncate max-w-[100px] flex items-center justify-end gap-1" title={topPlayerDisp}>
-                                <span className={`${topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled ? "text-purple-400 font-bold" : "text-neon/90"} font-medium`}>
-                                  {topPlayerName || "N/A"}
-                                </span>
-                                {topPlayerRating && <span className="text-[10px] ml-1 text-foreground/50 dark:text-white/40">({topPlayerRating})</span>}
-                                {topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled && (
-                                  <span title="Player stats edited" className="inline-flex shrink-0">
-                                    <Sparkles className="h-2.5 w-2.5 text-purple-500 fill-purple-500/20" />
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="border-t border-border pt-3 space-y-2.5">
-                    {groupMatches.map((m) => {
-                      const tHome = getTeam(m.homeCode);
-                      const tAway = getTeam(m.awayCode);
-
-                      const matchSuffix = parseInt(m.id.split("-")[1]);
-                      const details = getGroupMatchDetails(groupName, matchSuffix, liveGames, liveStadiums, m.homeCode, m.awayCode, teams);
-
-                      const isReal = getAssignedLiveScoreForMatch(m);
-                      const isSimulated = useRealScores && hasAssignedMatchScores(m) && !isReal;
-
-                      return (
-                        <div key={m.id} className="flex items-center justify-between text-xs py-2 border-b border-border last:border-0 hover:bg-black/5 dark:hover:bg-white/5 px-2 rounded-xl transition duration-200 gap-2">
-                          {/* Match Info Column */}
-                          <div className="flex flex-col text-[9px] text-muted-foreground w-16 shrink-0 leading-tight gap-0.5">
-                            <span className="font-semibold text-foreground/75">{details.date}</span>
-                            <span>{details.time}</span>
-                            {isSimulated ? (
-                              <span className="inline-block text-[8px] font-sans px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 w-fit font-bold uppercase tracking-wide">
-                                Simulated
-                              </span>
-                            ) : (
-                              useRealScores && isReal && (
-                                <span className="inline-block text-[8px] font-sans px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 w-fit font-bold uppercase tracking-wide">
-                                  Real
-                                </span>
-                              )
-                            )}
-                            <span className="opacity-40">#{details.matchNumber}</span>
-                            {(((storeTeams[m.homeCode]?.isCustom && !storeTeams[m.homeCode]?.isOverrideDisabled) || (storeTeams[m.awayCode]?.isCustom && !storeTeams[m.awayCode]?.isOverrideDisabled)) && !bypassOverrides) && (
-                              <span className="inline-block text-[7px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 w-fit font-black uppercase tracking-widest leading-none mt-0.5" title="Simulation includes overridden players/stats">
-                                Adjusted
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Match Core (Teams & Score) */}
-                          <div className="flex-1 flex items-center justify-center gap-1.5 min-w-0">
-                            {/* Home Team */}
-                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
-                              <span className="truncate font-semibold text-foreground/90 text-right text-[11px] sm:text-xs">{tHome.name}</span>
-                              <CountryFlag
-                                code={tHome.code}
-                                flag={tHome.flag}
-                                name={tHome.name}
-                                className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
-                                emojiClassName="text-base shrink-0 leading-none"
-                              />
-                            </div>
-
-                            {/* Score Display */}
-                            <div className="flex items-center gap-1 shrink-0 bg-black/10 dark:bg-black/40 px-2 py-1 rounded-lg border border-border font-mono text-xs font-bold w-12 justify-center">
-                              <span className={hasValidPredictorScore(m.homeScore) ? "text-neon" : "text-foreground/30"}>
-                                {hasValidPredictorScore(m.homeScore) ? m.homeScore : "-"}
-                              </span>
-                              <span className="text-foreground/30">:</span>
-                              <span className={hasValidPredictorScore(m.awayScore) ? "text-neon" : "text-foreground/30"}>
-                                {hasValidPredictorScore(m.awayScore) ? m.awayScore : "-"}
-                              </span>
-                            </div>
-
-                            {/* Away Team */}
-                            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                              <CountryFlag
-                                code={tAway.code}
-                                flag={tAway.flag}
-                                name={tAway.name}
-                                className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
-                                emojiClassName="text-base shrink-0 leading-none"
-                              />
-                              <span className="truncate font-semibold text-foreground/90 text-[11px] sm:text-xs">{tAway.name}</span>
-                            </div>
-                          </div>
-
-                          {/* Simulate Match button */}
-                          {!isReadOnly && (
-                            <button
-                              onClick={() => handleOpenSimulator({
-                                type: "group",
-                                id: m.id,
-                                homeCode: m.homeCode,
-                                awayCode: m.awayCode,
-                                homeScore: m.homeScore,
-                                awayScore: m.awayScore,
-                                details
-                              })}
-                              title="Simulate Match 1v1"
-                              className="p-1.5 bg-muted dark:bg-zinc-800 border border-border dark:border-zinc-700 text-foreground/60 dark:text-muted-foreground hover:bg-neon dark:hover:bg-neon hover:text-black dark:hover:text-black hover:border-neon dark:hover:border-neon hover:scale-105 rounded-xl transition duration-200 shrink-0 ml-1 flex items-center justify-center"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.0" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-
-
-          {/* Third Place Standings Grid */}
-          <div className="glass rounded-2xl p-6 border border-white/5 max-w-4xl mx-auto shadow-glass">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-4">
-              <div>
-                <h3 className="font-display font-bold text-xl flex items-center gap-2">
-                  <Award className="h-5 w-5 text-neon" />
-                  3rd Place Standings
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  The best 8 third-place teams qualify for the Round of 32. Marked green below.
-                </p>
-              </div>
-              <div className="shrink-0 flex items-center gap-2 text-xs">
-                <span className="w-2.5 h-2.5 bg-neon rounded-full" /> Qualified (Top 8)
-                <span className="w-2.5 h-2.5 bg-destructive rounded-full ml-2" /> Eliminated
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm border-collapse">
-                <thead>
-                  <tr className="border-b border-white/10 text-muted-foreground">
-                    <th className="pb-2 font-medium w-12">Rank</th>
-                    <th className="pb-2 font-medium w-16 text-center">Group</th>
-                    <th className="pb-2 font-medium">Team</th>
-                    <th className="pb-2 font-medium text-center w-12">Pld</th>
-                    <th className="pb-2 font-medium text-center w-12">GD</th>
-                    <th className="pb-2 font-medium text-center w-12">GF</th>
-                    <th className="pb-2 font-medium text-right w-16">Pts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {thirdPlaceStandings.map((row, idx) => {
-                    const qualified = idx < 8;
-                    const borderClass = qualified
-                      ? "border-l-4 border-l-neon bg-neon/5 font-semibold"
-                      : "border-l-4 border-l-destructive/50 opacity-60";
-
-                    return (
-                      <tr
-                        key={row.code}
-                        className={`border-b border-white/5 hover:bg-white/5 last:border-0 transition ${borderClass}`}
-                      >
-                        <td className="py-2.5 pl-3 font-semibold">{idx + 1}</td>
-                        <td className="py-2.5 text-center font-bold text-gradient">Group {row.group}</td>
-                        <td className="py-2.5 flex items-center gap-2">
-                          <CountryFlag
-                            code={row.team.code}
-                            flag={row.team.flag}
-                            name={row.team.name}
-                            className="h-5 w-7 shrink-0 rounded object-cover"
-                            emojiClassName="text-xl leading-none"
-                          />
-                          <span className="font-medium">{row.team.name}</span>
-                        </td>
-                        <td className="py-2.5 text-center font-mono">{row.played}</td>
-                        <td className="py-2.5 text-center font-mono">
-                          {row.gd > 0 ? `+${row.gd}` : row.gd}
-                        </td>
-                        <td className="py-2.5 text-center font-mono">{row.gf}</td>
-                        <td
-                          className={`py-2.5 text-right pr-4 font-display font-bold text-base ${qualified ? "text-neon" : "text-muted-foreground"
-                            }`}
-                        >
-                          {row.pts}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {thirdPlaceStandings.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-muted-foreground text-xs">
-                        Predict group scores above to populate third-place rankings.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <p className="text-sm font-bold tracking-widest uppercase text-cyan-600 dark:text-neon">
+              Syncing Real-Time Scores
+            </p>
+            <p className="text-xs text-muted-foreground/70 max-w-xs text-center">
+              Fetching the latest match results from the tournament...
+            </p>
           </div>
         </div>
-      )}
-
-      {/* Knockout Bracket View */}
-      {activeTab === "knockout" && (
-        <div id="knockout-bracket-view" className="space-y-6 md:space-y-8 animate-in slide-in-from-right-8 fade-in duration-500 pt-4">
-          {!isGroupStageComplete ? (
-            <div className="glass-strong rounded-3xl p-12 text-center max-w-xl mx-auto flex flex-col items-center gap-4 border border-white/10 my-8 shadow-glass bg-black/40">
-              <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground">
-                <Lock className="h-8 w-8" />
+      ) : (
+        <>
+          {!onlyKnockout && (
+            <div className="w-full mb-8 rounded-3xl p-6 md:p-8 border border-border dark:border-white/5 bg-card dark:bg-[#121623] shadow-sm dark:shadow-lg animate-fade-in">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h3 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 mb-1">
+                    Live win probability
+                  </h3>
+                  <h2 className="font-display text-2xl font-bold text-foreground dark:text-white">Top contenders</h2>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-500/10 dark:bg-gradient-to-br dark:from-yellow-600/40 dark:to-yellow-900/40 border border-yellow-500/20 dark:border-yellow-600/30">
+                  <Trophy className="h-6 w-6 text-yellow-500" />
+                </div>
               </div>
-              <h3 className="font-display font-bold text-2xl text-gradient">Knockout Bracket Locked</h3>
-              <p className="text-sm text-muted-foreground">
-                The Knockout stage requires all 72 group stage matches to have predicted scores before teams can be seeded.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                <button
-                  onClick={async () => {
-                    const allowed = await consumeCredit();
-                    if (allowed) {
-                      handleAiPredict();
-                      setActiveTab("group");
-                    }
-                  }}
-                  className="flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-neon to-neon-2 px-6 py-2.5 text-sm font-semibold text-background hover:opacity-90 transition shadow-neon"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Simulate Group Stage with AI
-                </button>
+
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topTeamsData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#6EE7B7" />
+                        <stop offset="100%" stopColor="#C084FC" />
+                      </linearGradient>
+                    </defs>
+                    <XAxis
+                      dataKey="code"
+                      tick={{ fill: "#64748b", fontSize: 11, fontWeight: 600 }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickMargin={12}
+                    />
+                    <YAxis hide />
+                    <Tooltip
+                      cursor={{ fill: "var(--color-muted)", opacity: 0.15 }}
+                      contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 12, fontSize: 13, boxShadow: "var(--shadow-glass)" }}
+                      formatter={(value: any, name: any, props: any) => {
+                        const isElim = props?.payload?.isEliminated;
+                        return [`${value}%${isElim ? ' (Out)' : ''}`, "Win Probability"];
+                      }}
+                      labelStyle={{ color: "var(--color-neon)", fontWeight: "bold", marginBottom: 6 }}
+                      itemStyle={{ color: "var(--foreground)" }}
+                    />
+                    <Bar
+                      dataKey="winProb"
+                      fill="url(#barGradient)"
+                      radius={[10, 10, 10, 10]}
+                      barSize={96}
+                      minPointSize={15}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+                {topTeamsData.slice(0, 4).map((team) => (
+                  <div
+                    key={team.code}
+                    className="flex flex-col items-center justify-center bg-muted/30 dark:bg-white/5 border border-border dark:border-white/10 rounded-2xl py-4 shadow-glass transition-all animate-fade-in"
+                  >
+                    <CountryFlag
+                      code={team.code}
+                      flag={team.flag}
+                      name={team.name}
+                      className="mb-1 h-6 w-8 rounded object-cover drop-shadow-sm"
+                      emojiClassName="mb-1 text-xl leading-none"
+                    />
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">{team.code}</span>
+                    <span className="text-sm font-bold text-emerald-600 dark:text-[#6EE7B7] mt-1 flex items-center gap-1.5">
+                      <span>{team.winProb.toFixed(1)}%</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "group" && (
+            <ScoreTrendGraph
+              matches={matches}
+              predictionMatches={useRealScores ? (preRealScoresMatches || initialMatches) : matches}
+              teams={teams}
+              liveGames={liveGames}
+              liveStadiums={liveStadiums}
+              getGroupMatchDetails={getGroupMatchDetails}
+            />
+          )}
+
+          {/* Tab Selectors */}
+          {!onlyKnockout && (
+            <div className="mb-8 flex flex-col gap-4 border-b border-border dark:border-white/10 md:flex-row md:items-end md:justify-between">
+              <div className="flex -mb-[1px]">
                 <button
                   onClick={() => setActiveTab("group")}
-                  className="rounded-lg glass border border-white/10 px-6 py-2.5 text-sm font-semibold hover:bg-white/5 transition"
+                  className={`px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "group"
+                    ? "border-neon text-neon"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
                 >
-                  Predict Manually
+                  Group Stage
                 </button>
+                {isGroupStageComplete && (
+                  <button
+                    onClick={() => setActiveTab("knockout")}
+                    className={`flex items-center gap-2 px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "knockout"
+                      ? "border-neon text-neon"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                      }`}
+                  >
+                    Knockout Bracket
+                  </button>
+                )}
+              </div>
+
+              <div className="md:max-w-md pb-4 md:pb-3 w-full md:w-auto">
+                <SimulationEngineBadge model={selectedModel} />
               </div>
             </div>
-          ) : (
-            <div className="space-y-8 animate-fade-in">
-              {(() => {
-                const renderCompactGroupCard = (groupName: string) => {
-                  const groupStandings = standings[groupName] || [];
+          )}
+
+          {/* Group Stage View */}
+          {activeTab === "group" && (
+            <div className="space-y-6">
+              {/* Real-life Scores Integrator */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl glass-strong border border-border/40 bg-slate-900/10 dark:bg-black/10 shadow-glass">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="use-actual-scores"
+                    checked={useRealScores}
+                    onChange={(e) => handleToggleRealScores(e.target.checked)}
+                    className="h-5 w-5 rounded-md border-border bg-black/10 text-cyan-600 focus:ring-cyan-500 focus:ring-offset-background cursor-pointer accent-cyan-500"
+                  />
+                  <label htmlFor="use-actual-scores" className="text-sm font-semibold text-foreground/90 select-none cursor-pointer">
+                    Use Real-Time Results for group stage matches
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  {pendingMatchesCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={simulatePendingMatches}
+                      className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-emerald-600 transition hover:bg-emerald-500/15 dark:text-emerald-400"
+                    >
+                      <Play className="h-3.5 w-3.5" />
+                      <span>Simulate Pending Matches</span>
+                    </button>
+                  )}
+                  {useRealScores && (
+                    <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse">
+                      Real-Time scores assigned
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className={`grid gap-4 sm:gap-6 ${fullWidth ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}>
+                {Object.keys(GROUPS_CONFIG).map((groupName) => {
+                  const groupMatches = matches.filter((m) => m.group === groupName);
+                  const groupStandings = standings[groupName];
+                  const isGroupPredicted = groupMatches.length > 0 && groupMatches.every((m) => hasAssignedMatchScores(m));
+                  const assignedRealDataMatches = groupMatches.filter((m) => getAssignedLiveScoreForMatch(m)).length;
+                  const realDataPercent = groupMatches.length > 0
+                    ? Math.round((assignedRealDataMatches / groupMatches.length) * 100)
+                    : 0;
+
                   return (
-                    <div key={groupName} className="w-56 bg-muted/80 dark:bg-black/40 border border-border dark:border-white/5 rounded-2xl p-3 shrink-0 flex flex-col justify-between hover:border-foreground/20 dark:hover:border-white/10 transition duration-200">
-                      <div className="text-center font-display font-bold text-xs text-gradient pb-1.5 border-b border-border dark:border-white/5 mb-1.5">
-                        Group {groupName}
-                      </div>
-                      <div className="space-y-1">
-                        {groupStandings.map((row, idx) => {
-                          const qualify = idx < 2;
-                          return (
-                            <div key={row.code} className="flex items-center justify-between text-[11px] py-0.5">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="text-[10px] text-muted-foreground w-3 text-center">{idx + 1}</span>
-                                <CountryFlag
-                                  code={row.team.code}
-                                  flag={row.team.flag}
-                                  name={row.team.name}
-                                  className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
-                                  emojiClassName="text-sm shrink-0 leading-none"
-                                />
-                                <span className={`truncate font-medium ${qualify ? "text-neon font-semibold" : "text-muted-foreground"}`}>
-                                  {row.team.name}
+                    <div
+                      key={groupName}
+                      className={`glass-strong rounded-2xl p-4 border flex flex-col justify-between transition duration-300 shadow-glass ${isGroupPredicted
+                        ? "border-emerald-500/50 bg-emerald-500/5 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                        : "border-border hover:border-neon/30"
+                        }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <h2 className="font-display font-bold text-lg text-gradient flex items-center gap-1.5">
+                            Group {groupName}
+                          </h2>
+                          {/* Quick Actions / Status for Single Group */}
+                          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                            {isGroupPredicted ? (
+                              <>
+                                <span className="text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 shadow-sm flex items-center gap-1">
+                                  <Check className="h-3 w-3" /> {useRealScores && realDataPercent > 0 ? `${realDataPercent}% Real Data` : "Simulated"}
                                 </span>
+                                <button
+                                  onClick={() => setDeleteGroupTarget(groupName)}
+                                  title="Reset Group"
+                                  className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded-full transition"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {(() => {
+                                  const groupPending = groupMatches.filter((m) => !hasAssignedMatchScores(m)).length;
+                                  if (groupPending > 0 && groupPending < groupMatches.length) {
+                                    return (
+                                      <button
+                                        onClick={() => simulatePendingGroupMatches(groupName)}
+                                        title={`Simulate ${groupPending} pending match${groupPending > 1 ? "es" : ""}`}
+                                        className="text-emerald-500 hover:text-emerald-400 hover:underline transition font-black flex items-center gap-1"
+                                      >
+                                        <Play className="h-3 w-3" />
+                                        Simulate Pending ({groupPending})
+                                      </button>
+                                    );
+                                  }
+                                  return (
+                                    <button
+                                      onClick={() => {
+                                        setConfirmSimType("group");
+                                        setConfirmSimGroup(groupName);
+                                        setConfirmSimOpen(true);
+                                      }}
+                                      title="Predict Group"
+                                      className="text-cyan-500 hover:text-cyan-400 hover:underline transition font-black"
+                                    >
+                                      Run Simulation
+                                    </button>
+                                  );
+                                })()}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <table className="w-full text-[11px] sm:text-xs text-left mb-4 border-collapse">
+                          <thead>
+                            <tr className="border-b border-border text-muted-foreground">
+                              <th className="pb-1.5 font-medium w-5">#</th>
+                              <th className="pb-1.5 font-medium">Team</th>
+                              <th className="pb-1.5 font-medium text-center w-10">Elo</th>
+                              <th className="pb-1.5 font-medium text-center w-8">Att</th>
+                              <th className="pb-1.5 font-medium text-center w-8">Def</th>
+                              <th className="pb-1.5 font-medium text-right w-24">Top Player</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {groupStandings.map((row, idx) => {
+                              const qualify = idx < 2;
+                              const teamPlayers = getTeamPlayers(row.code);
+                              const topPlayer = teamPlayers[0];
+                              const topPlayerName = topPlayer ? (topPlayer["Name on Shirt"] || topPlayer["Player Name"]) : "";
+                              const rawRating = topPlayer ? (topPlayer["Overall Rating"] || "") : "";
+                              const topPlayerRating = (rawRating && String(rawRating).toLowerCase() !== "nan") ? rawRating : "";
+                              const topPlayerDisp = topPlayerName ? `${topPlayerName} (${topPlayerRating})` : "N/A";
+
+                              return (
+                                <tr
+                                  key={row.code}
+                                  className={`border-b border-border/50 dark:border-white/5 last:border-0 ${qualify ? "text-foreground font-medium animate-pulse-ring/10" : "text-muted-foreground"
+                                    }`}
+                                >
+                                  <td className="py-1">
+                                    <span
+                                      className={`inline-block w-4 h-4 text-[9px] font-bold text-center rounded leading-4 ${idx === 0 ? "bg-neon/20 text-neon" : idx === 1 ? "bg-neon-2/20 text-neon-2" : "bg-muted dark:bg-white/5 text-muted-foreground"
+                                        }`}
+                                    >
+                                      {idx + 1}
+                                    </span>
+                                  </td>
+                                  <td className="py-1 truncate flex items-center gap-1.5 w-full sm:min-w-[120px]">
+                                    <CountryFlag
+                                      code={row.team.code}
+                                      flag={row.team.flag}
+                                      name={row.team.name}
+                                      className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                      emojiClassName="text-base shrink-0 leading-none"
+                                    />
+                                    <span className="truncate flex items-center gap-1" title={row.team.name}>
+                                      {row.team.name}
+                                      {row.team.isCustom && !bypassOverrides && !storeTeams[row.team.code]?.isOverrideDisabled && (
+                                        <span title="Custom team stats active" className="inline-flex shrink-0">
+                                          <Sparkles className="h-3 w-3 text-purple-500 fill-purple-500/20 animate-pulse" />
+                                        </span>
+                                      )}
+                                    </span>
+                                  </td>
+                                  <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
+                                    {row.team.elo && Number.isFinite(row.team.elo) ? Math.round(row.team.elo) : "-"}
+                                  </td>
+                                  <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
+                                    {(() => {
+                                      const val = row.team.attack;
+                                      if (val === undefined || val === null || !Number.isFinite(val)) return "-";
+                                      if (val < 10) {
+                                        const minM = 0.75;
+                                        const maxM = 1.10;
+                                        const minR = 50;
+                                        const maxR = 95;
+                                        const rating = ((val - minM) / (maxM - minM)) * (maxR - minR) + minR;
+                                        const rounded = Math.max(15, Math.min(99, Math.round(rating)));
+                                        return Number.isFinite(rounded) ? rounded : "-";
+                                      }
+                                      const rounded = Math.round(val);
+                                      return Number.isFinite(rounded) ? rounded : "-";
+                                    })()}
+                                  </td>
+                                  <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
+                                    {(() => {
+                                      const val = row.team.defense;
+                                      if (val === undefined || val === null || !Number.isFinite(val)) return "-";
+                                      if (val < 10) {
+                                        const minM = 0.75;
+                                        const maxM = 1.10;
+                                        const minR = 50;
+                                        const maxR = 95;
+                                        const rating = ((val - minM) / (maxM - minM)) * (maxR - minR) + minR;
+                                        const rounded = Math.max(15, Math.min(99, Math.round(rating)));
+                                        return Number.isFinite(rounded) ? rounded : "-";
+                                      }
+                                      const rounded = Math.round(val);
+                                      return Number.isFinite(rounded) ? rounded : "-";
+                                    })()}
+                                  </td>
+                                  <td className="py-1 text-right text-muted-foreground truncate max-w-[100px] flex items-center justify-end gap-1" title={topPlayerDisp}>
+                                    <span className={`${topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled ? "text-purple-400 font-bold" : "text-neon/90"} font-medium`}>
+                                      {topPlayerName || "N/A"}
+                                    </span>
+                                    {topPlayerRating && <span className="text-[10px] ml-1 text-foreground/50 dark:text-white/40">({topPlayerRating})</span>}
+                                    {topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled && (
+                                      <span title="Player stats edited" className="inline-flex shrink-0">
+                                        <Sparkles className="h-2.5 w-2.5 text-purple-500 fill-purple-500/20" />
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="border-t border-border pt-3 space-y-2.5">
+                        {groupMatches.map((m) => {
+                          const tHome = getTeam(m.homeCode);
+                          const tAway = getTeam(m.awayCode);
+
+                          const matchSuffix = parseInt(m.id.split("-")[1]);
+                          const details = getGroupMatchDetails(groupName, matchSuffix, liveGames, liveStadiums, m.homeCode, m.awayCode, teams);
+
+                          const isReal = getAssignedLiveScoreForMatch(m);
+                          const isSimulated = useRealScores && hasAssignedMatchScores(m) && !isReal;
+
+                          return (
+                            <div key={m.id} className="flex items-center justify-between text-xs py-2 border-b border-border last:border-0 hover:bg-black/5 dark:hover:bg-white/5 px-2 rounded-xl transition duration-200 gap-2">
+                              {/* Match Info Column */}
+                              <div className="flex flex-col text-[9px] text-muted-foreground w-16 shrink-0 leading-tight gap-0.5">
+                                <span className="font-semibold text-foreground/75">{details.date}</span>
+                                <span>{details.time}</span>
+                                {isSimulated ? (
+                                  <span className="inline-block text-[8px] font-sans px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 w-fit font-bold uppercase tracking-wide">
+                                    Simulated
+                                  </span>
+                                ) : (
+                                  useRealScores && isReal && (
+                                    <span className="inline-block text-[8px] font-sans px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 w-fit font-bold uppercase tracking-wide">
+                                      Real
+                                    </span>
+                                  )
+                                )}
+                                <span className="opacity-40">#{details.matchNumber}</span>
+                                {(((storeTeams[m.homeCode]?.isCustom && !storeTeams[m.homeCode]?.isOverrideDisabled) || (storeTeams[m.awayCode]?.isCustom && !storeTeams[m.awayCode]?.isOverrideDisabled)) && !bypassOverrides) && (
+                                  <span className="inline-block text-[7px] font-sans px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 w-fit font-black uppercase tracking-widest leading-none mt-0.5" title="Simulation includes overridden players/stats">
+                                    Adjusted
+                                  </span>
+                                )}
                               </div>
-                              <span className="font-mono text-[9px] text-muted-foreground/60">{row.team.elo && Number.isFinite(row.team.elo) ? Math.round(row.team.elo) : "-"}</span>
+
+                              {/* Match Core (Teams & Score) */}
+                              <div className="flex-1 flex items-center justify-center gap-1.5 min-w-0">
+                                {/* Home Team */}
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+                                  <span className="truncate font-semibold text-foreground/90 text-right text-[11px] sm:text-xs">{tHome.name}</span>
+                                  <CountryFlag
+                                    code={tHome.code}
+                                    flag={tHome.flag}
+                                    name={tHome.name}
+                                    className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                    emojiClassName="text-base shrink-0 leading-none"
+                                  />
+                                </div>
+
+                                {/* Score Display */}
+                                <div className="flex items-center gap-1 shrink-0 bg-black/10 dark:bg-black/40 px-2 py-1 rounded-lg border border-border font-mono text-xs font-bold w-12 justify-center">
+                                  <span className={hasValidPredictorScore(m.homeScore) ? "text-neon" : "text-foreground/30"}>
+                                    {hasValidPredictorScore(m.homeScore) ? m.homeScore : "-"}
+                                  </span>
+                                  <span className="text-foreground/30">:</span>
+                                  <span className={hasValidPredictorScore(m.awayScore) ? "text-neon" : "text-foreground/30"}>
+                                    {hasValidPredictorScore(m.awayScore) ? m.awayScore : "-"}
+                                  </span>
+                                </div>
+
+                                {/* Away Team */}
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                  <CountryFlag
+                                    code={tAway.code}
+                                    flag={tAway.flag}
+                                    name={tAway.name}
+                                    className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                    emojiClassName="text-base shrink-0 leading-none"
+                                  />
+                                  <span className="truncate font-semibold text-foreground/90 text-[11px] sm:text-xs">{tAway.name}</span>
+                                </div>
+                              </div>
+
+                              {/* Simulate Match button */}
+                              {!isReadOnly && (
+                                <button
+                                  onClick={() => handleOpenSimulator({
+                                    type: "group",
+                                    id: m.id,
+                                    homeCode: m.homeCode,
+                                    awayCode: m.awayCode,
+                                    homeScore: m.homeScore,
+                                    awayScore: m.awayScore,
+                                    details
+                                  })}
+                                  title="Simulate Match 1v1"
+                                  className="p-1.5 bg-muted dark:bg-zinc-800 border border-border dark:border-zinc-700 text-foreground/60 dark:text-muted-foreground hover:bg-neon dark:hover:bg-neon hover:text-black dark:hover:text-black hover:border-neon dark:hover:border-neon hover:scale-105 rounded-xl transition duration-200 shrink-0 ml-1 flex items-center justify-center"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.0" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                              )}
                             </div>
                           );
                         })}
                       </div>
                     </div>
                   );
-                };
-
-                return (
-                  <>
-                    <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => handleAiPredictKnockoutsWithCredits()}
-                          className="flex items-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-6 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-neon shadow-neon"
-                        >
-                          <Sparkles className="h-4 w-4" />
-                          Simulate Remaining Bracket
-                        </button>
-                        <button
-                          onClick={() => setResetTarget("knockouts")}
-                          className="flex items-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-muted-foreground hover:text-foreground"
-                          title="Reset Knockout Bracket"
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                          Reset
-                        </button>
-                        {useRealScores && (
-                          <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1.5 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse flex items-center gap-1.5">
-                            <Zap className="h-3.5 w-3.5 fill-cyan-500/20 text-cyan-500" />
-                            Real-Time Data Included
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Zoom Controls */}
-                      <div className="flex items-center gap-2 bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 rounded-xl p-1 shrink-0">
-                        <button
-                          onClick={() => setZoomScale(prev => Math.max(50, prev - 10))}
-                          className="p-1.5 rounded-lg hover:bg-card dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
-                          title="Zoom Out"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <span className="text-xs font-mono font-bold w-12 text-center text-foreground">
-                          {zoomScale}%
-                        </span>
-                        <button
-                          onClick={() => setZoomScale(prev => Math.min(150, prev + 10))}
-                          className="p-1.5 rounded-lg hover:bg-card dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
-                          title="Zoom In"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setZoomScale(85)}
-                          className="text-[10px] font-bold px-2 py-1 rounded-md hover:bg-card dark:hover:bg-white/10 text-neon transition cursor-pointer"
-                        >
-                          Reset
-                        </button>
-                      </div>
-                    </div>
-
-
-
-                    {/* Horizontal Scrollable Bracket Tree */}
-                    <div className="w-full select-none border border-border dark:border-white/5 rounded-3xl bg-muted/40 dark:bg-black/20 p-2 md:p-4">
-                      <div
-                        className="flex gap-4 items-stretch w-full px-2 lg:px-4 py-4 overflow-x-auto scrollbar-custom min-h-[760px] lg:min-h-[820px]"
-                        style={{ zoom: zoomScale / 100 }}
-                      >
-
-                        {/* Far Left Column: Groups A-F */}
-                        <div className="flex flex-col w-56 min-w-[224px] shrink-0 justify-between py-2 gap-2">
-                          <div className="text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
-                            Groups A - F
-                          </div>
-                          {["A", "B", "C", "D", "E", "F"].map((groupName) => renderCompactGroupCard(groupName))}
-                        </div>
-
-                        {/* Left Column 1: Round of 32 */}
-                        <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
-                          <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
-                            <span>Round of 32</span>
-                            <button
-                              onClick={() => handleSimulateRound("r32")}
-                              title="Simulate Round of 32"
-                              className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
-                            >
-                              <Zap className="h-3.5 w-3.5 fill-neon/20" />
-                            </button>
-                          </div>
-                          <div className="flex-1 flex flex-col justify-around gap-2.5 py-1">
-                            {koMatchups.r32.slice(0, 8).map((m, idx) => {
-                              const matchState = getKoMatchWinnerAndScore("r32", idx, m.home, m.away);
-                              return (
-                                <KnockoutMatchCard isReadOnly={isReadOnly}
-                                  key={`r32-left-${idx}`}
-                                  round="r32"
-                                  matchIndex={idx}
-                                  homeCode={m.home}
-                                  awayCode={m.away}
-                                  winnerCode={matchState.winnerCode}
-                                  homeScore={matchState.homeScore}
-                                  awayScore={matchState.awayScore}
-                                  isReal={matchState.isReal}
-                                  onScoreChange={(side, val) => handleKoScoreChange("r32", idx, side, val)}
-                                  onSelectWinner={(code) => handleSelectKoWinner("r32", idx, code)}
-                                  onSimulateClick={() => handleOpenSimulator({
-                                    type: "knockout",
-                                    round: "r32",
-                                    matchIndex: idx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.r32[idx]
-                                  })}
-                                  onEditScoreClick={() => handleOpenScoreEditModal("r32", idx, m.home, m.away, "Match " + (idx + 1))}
-                                  label={`Match ${idx + 1}`}
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Left Column 2: Round of 16 */}
-                        <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
-                          <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
-                            <span>Round of 16</span>
-                            <button
-                              onClick={() => handleSimulateRound("r16")}
-                              title="Simulate Round of 16"
-                              className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
-                            >
-                              <Zap className="h-3.5 w-3.5 fill-neon/20" />
-                            </button>
-                          </div>
-                          <div className="flex-1 flex flex-col justify-around py-4">
-                            {koMatchups.r16.slice(0, 4).map((m, idx) => {
-                              const matchState = getKoMatchWinnerAndScore("r16", idx, m.home, m.away);
-                              return (
-                                <KnockoutMatchCard isReadOnly={isReadOnly}
-                                  key={`r16-left-${idx}`}
-                                  round="r16"
-                                  matchIndex={idx}
-                                  homeCode={m.home}
-                                  awayCode={m.away}
-                                  winnerCode={matchState.winnerCode}
-                                  homeScore={matchState.homeScore}
-                                  awayScore={matchState.awayScore}
-                                  isReal={matchState.isReal}
-                                  onScoreChange={(side, val) => handleKoScoreChange("r16", idx, side, val)}
-                                  onSelectWinner={(code) => handleSelectKoWinner("r16", idx, code)}
-                                  onSimulateClick={() => handleOpenSimulator({
-                                    type: "knockout",
-                                    round: "r16",
-                                    matchIndex: idx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.r16[idx]
-                                  })}
-                                  on1v1Click={() => setSelected1v1Match({
-                                    round: "r16",
-                                    matchIndex: idx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.r16[idx]
-                                  })}
-                                  onEditScoreClick={() => handleOpenScoreEditModal("r16", idx, m.home, m.away, "Match " + (idx + 1))}
-                                  label={`Match ${idx + 1}`}
-                                  lockedMessage="TBD (R32)"
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Left Column 3: Quarter-Finals */}
-                        <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
-                          <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
-                            <span>Quarter-Finals</span>
-                            <button
-                              onClick={() => handleSimulateRound("qf")}
-                              title="Simulate Quarter-Finals"
-                              className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
-                            >
-                              <Zap className="h-3.5 w-3.5 fill-neon/20" />
-                            </button>
-                          </div>
-                          <div className="flex-1 flex flex-col justify-around py-8">
-                            {koMatchups.qf.slice(0, 2).map((m, idx) => {
-                              const matchState = getKoMatchWinnerAndScore("qf", idx, m.home, m.away);
-                              return (
-                                <KnockoutMatchCard isReadOnly={isReadOnly}
-                                  key={`qf-left-${idx}`}
-                                  round="qf"
-                                  matchIndex={idx}
-                                  homeCode={m.home}
-                                  awayCode={m.away}
-                                  winnerCode={matchState.winnerCode}
-                                  homeScore={matchState.homeScore}
-                                  awayScore={matchState.awayScore}
-                                  isReal={matchState.isReal}
-                                  onScoreChange={(side, val) => handleKoScoreChange("qf", idx, side, val)}
-                                  onSelectWinner={(code) => handleSelectKoWinner("qf", idx, code)}
-                                  onSimulateClick={() => handleOpenSimulator({
-                                    type: "knockout",
-                                    round: "qf",
-                                    matchIndex: idx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.qf[idx]
-                                  })}
-                                  on1v1Click={() => setSelected1v1Match({
-                                    round: "qf",
-                                    matchIndex: idx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.qf[idx]
-                                  })}
-                                  onEditScoreClick={() => handleOpenScoreEditModal("qf", idx, m.home, m.away, "QF Match " + (idx + 1))}
-                                  label={`QF Match ${idx + 1}`}
-                                  lockedMessage="TBD (R16)"
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Left Column 4: Semi-Finals */}
-                        <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
-                          <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
-                            <span>Semi-Finals</span>
-                            <button
-                              onClick={() => handleSimulateRound("sf")}
-                              title="Simulate Semi-Finals"
-                              className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
-                            >
-                              <Zap className="h-3.5 w-3.5 fill-neon/20" />
-                            </button>
-                          </div>
-                          <div className="flex-1 flex flex-col justify-around py-12">
-                            {koMatchups.sf.slice(0, 1).map((m, idx) => {
-                              const matchState = getKoMatchWinnerAndScore("sf", idx, m.home, m.away);
-                              return (
-                                <KnockoutMatchCard isReadOnly={isReadOnly}
-                                  key={`sf-left-${idx}`}
-                                  round="sf"
-                                  matchIndex={idx}
-                                  homeCode={m.home}
-                                  awayCode={m.away}
-                                  winnerCode={matchState.winnerCode}
-                                  homeScore={matchState.homeScore}
-                                  awayScore={matchState.awayScore}
-                                  isReal={matchState.isReal}
-                                  onScoreChange={(side, val) => handleKoScoreChange("sf", idx, side, val)}
-                                  onSelectWinner={(code) => handleSelectKoWinner("sf", idx, code)}
-                                  onSimulateClick={() => handleOpenSimulator({
-                                    type: "knockout",
-                                    round: "sf",
-                                    matchIndex: idx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.sf[idx]
-                                  })}
-                                  on1v1Click={() => setSelected1v1Match({
-                                    round: "sf",
-                                    matchIndex: idx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.sf[idx]
-                                  })}
-                                  onEditScoreClick={() => handleOpenScoreEditModal("sf", idx, m.home, m.away, "SF Match " + (idx + 1))}
-                                  label={`SF Match ${idx + 1}`}
-                                  lockedMessage="TBD (QF)"
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Center Column: Trophy, Final, 3rd Place Match, and Champion */}
-                        <div className="flex flex-col w-64 min-w-[256px] shrink-0 gap-3 justify-center">
-                          {/* Trophy / Champion Celebration */}
-                          <div className="text-center mb-4">
-                            {(() => {
-                              const finalMatch = koMatchups.final[0];
-                              const finalWinner = getKoMatchWinnerAndScore("final", 0, finalMatch.home, finalMatch.away).winnerCode;
-                              return finalWinner ? (
-                                <div className="glass-strong rounded-3xl p-6 border border-neon/50 shadow-neon flex flex-col items-center gap-4 text-center animate-float bg-muted/30 dark:bg-black/40">
-                                  <div className="w-16 h-16 rounded-full bg-gradient-to-r from-neon to-neon-2 flex items-center justify-center text-background text-3xl font-bold shadow-md">
-                                    🏆
-                                  </div>
-                                  <div>
-                                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-semibold">
-                                      World Cup Champion
-                                    </div>
-                                    <div className="text-2xl font-display font-bold mt-2 flex items-center gap-1.5 justify-center">
-                                      <CountryFlag
-                                        code={getTeam(finalWinner).code}
-                                        flag={getTeam(finalWinner).flag}
-                                        name={getTeam(finalWinner).name}
-                                        className="h-6 w-8 shrink-0 rounded object-cover"
-                                        emojiClassName="text-2xl leading-none"
-                                      />
-                                      <span className="text-gradient truncate max-w-[180px]">{getTeam(finalWinner).name}</span>
-                                    </div>
-                                    <div className="text-[10px] text-muted-foreground mt-1">
-                                      Elo: {getTeam(finalWinner).elo} · FIFA #{getTeam(finalWinner).rank}
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="glass rounded-3xl p-6 border border-border dark:border-white/5 flex flex-col items-center gap-3 text-center opacity-60">
-                                  <div className="text-4xl animate-pulse">🏆</div>
-                                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-                                    FIFA World Cup Trophy
-                                  </div>
-                                  <div className="text-[10px] text-muted-foreground">
-                                    Simulate or predict matches to crown the champion
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                          {/* World Cup Final Match */}
-                          <div className="flex flex-col gap-2">
-                            <div className="text-center font-display font-bold text-xs tracking-wider uppercase text-gold pb-2 border-b border-white/10 mb-2">
-                              World Cup Final
-                            </div>
-                            {(() => {
-                              const finalMatch = koMatchups.final[0];
-                              const matchState = getKoMatchWinnerAndScore("final", 0, finalMatch.home, finalMatch.away);
-                              return (
-                                <KnockoutMatchCard isReadOnly={isReadOnly}
-                                  round="final"
-                                  matchIndex={0}
-                                  homeCode={finalMatch.home}
-                                  awayCode={finalMatch.away}
-                                  winnerCode={matchState.winnerCode}
-                                  homeScore={matchState.homeScore}
-                                  awayScore={matchState.awayScore}
-                                  isReal={matchState.isReal}
-                                  onScoreChange={(side, val) => handleKoScoreChange("final", 0, side, val)}
-                                  onSelectWinner={(code) => handleSelectKoWinner("final", 0, code)}
-                                  onSimulateClick={() => handleOpenSimulator({
-                                    type: "knockout",
-                                    round: "final",
-                                    matchIndex: 0,
-                                    homeCode: finalMatch.home!,
-                                    awayCode: finalMatch.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.final[0]
-                                  })}
-                                  on1v1Click={() => setSelected1v1Match({
-                                    round: "final",
-                                    matchIndex: 0,
-                                    homeCode: finalMatch.home!,
-                                    awayCode: finalMatch.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.final[0]
-                                  })}
-                                  onEditScoreClick={() => handleOpenScoreEditModal("final", 0, finalMatch.home, finalMatch.away, "Final")}
-                                  label="Final"
-                                  lockedMessage="TBD (SF Winners)"
-                                />
-                              );
-                            })()}
-                          </div>
-
-                          {/* 3rd Place Match */}
-                          <div className="flex flex-col gap-2 mt-4">
-                            <div className="text-center font-display font-bold text-xs tracking-wider uppercase text-muted-foreground pb-2 border-b border-white/10 mb-2">
-                              3rd Place Match
-                            </div>
-                            {(() => {
-                              const matchState = getKoMatchWinnerAndScore("third", 0, sfLosers.home, sfLosers.away);
-                              return (
-                                <KnockoutMatchCard isReadOnly={isReadOnly}
-                                  round="third"
-                                  matchIndex={0}
-                                  homeCode={sfLosers.home}
-                                  awayCode={sfLosers.away}
-                                  winnerCode={matchState.winnerCode}
-                                  homeScore={matchState.homeScore}
-                                  awayScore={matchState.awayScore}
-                                  isReal={matchState.isReal}
-                                  onScoreChange={handleThirdScoreChange}
-                                  onSelectWinner={handleSelectThirdWinner}
-                                  onSimulateClick={() => handleOpenSimulator({
-                                    type: "third",
-                                    homeCode: sfLosers.home!,
-                                    awayCode: sfLosers.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.third[0]
-                                  })}
-                                  on1v1Click={() => setSelected1v1Match({
-                                    round: "third",
-                                    matchIndex: 0,
-                                    homeCode: sfLosers.home!,
-                                    awayCode: sfLosers.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.third[0]
-                                  })}
-                                  onEditScoreClick={() => handleOpenScoreEditModal("third", 0, sfLosers.home, sfLosers.away, "3rd Place")}
-                                  label="3rd Place"
-                                  lockedMessage="TBD (SF Losers)"
-                                />
-                              );
-                            })()}
-                          </div>
-                        </div>
-
-                        {/* Right Column 4: Semi-Finals */}
-                        <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
-                          <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
-                            <span>Semi-Finals</span>
-                            <button
-                              onClick={() => handleSimulateRound("sf")}
-                              title="Simulate Semi-Finals"
-                              className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
-                            >
-                              <Zap className="h-3.5 w-3.5 fill-neon/20" />
-                            </button>
-                          </div>
-                          <div className="flex-1 flex flex-col justify-around py-12">
-                            {koMatchups.sf.slice(1, 2).map((m, idx) => {
-                              const realIdx = idx + 1;
-                              const matchState = getKoMatchWinnerAndScore("sf", realIdx, m.home, m.away);
-                              return (
-                                <KnockoutMatchCard isReadOnly={isReadOnly}
-                                  key={`sf-right-${realIdx}`}
-                                  round="sf"
-                                  matchIndex={realIdx}
-                                  homeCode={m.home}
-                                  awayCode={m.away}
-                                  winnerCode={matchState.winnerCode}
-                                  homeScore={matchState.homeScore}
-                                  awayScore={matchState.awayScore}
-                                  isReal={matchState.isReal}
-                                  onScoreChange={(side, val) => handleKoScoreChange("sf", realIdx, side, val)}
-                                  onSelectWinner={(code) => handleSelectKoWinner("sf", realIdx, code)}
-                                  onSimulateClick={() => handleOpenSimulator({
-                                    type: "knockout",
-                                    round: "sf",
-                                    matchIndex: realIdx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.sf[realIdx]
-                                  })}
-                                  on1v1Click={() => setSelected1v1Match({
-                                    round: "sf",
-                                    matchIndex: realIdx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.sf[realIdx]
-                                  })}
-                                  onEditScoreClick={() => handleOpenScoreEditModal("sf", realIdx, m.home, m.away, "SF Match " + (realIdx + 1))}
-                                  label={`SF Match ${realIdx + 1}`}
-                                  lockedMessage="TBD (QF)"
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Right Column 3: Quarter-Finals */}
-                        <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
-                          <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
-                            <span>Quarter-Finals</span>
-                            <button
-                              onClick={() => handleSimulateRound("qf")}
-                              title="Simulate Quarter-Finals"
-                              className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
-                            >
-                              <Zap className="h-3.5 w-3.5 fill-neon/20" />
-                            </button>
-                          </div>
-                          <div className="flex-1 flex flex-col justify-around py-8">
-                            {koMatchups.qf.slice(2, 4).map((m, idx) => {
-                              const realIdx = idx + 2;
-                              const matchState = getKoMatchWinnerAndScore("qf", realIdx, m.home, m.away);
-                              return (
-                                <KnockoutMatchCard isReadOnly={isReadOnly}
-                                  key={`qf-right-${realIdx}`}
-                                  round="qf"
-                                  matchIndex={realIdx}
-                                  homeCode={m.home}
-                                  awayCode={m.away}
-                                  winnerCode={matchState.winnerCode}
-                                  homeScore={matchState.homeScore}
-                                  awayScore={matchState.awayScore}
-                                  isReal={matchState.isReal}
-                                  onScoreChange={(side, val) => handleKoScoreChange("qf", realIdx, side, val)}
-                                  onSelectWinner={(code) => handleSelectKoWinner("qf", realIdx, code)}
-                                  onSimulateClick={() => handleOpenSimulator({
-                                    type: "knockout",
-                                    round: "qf",
-                                    matchIndex: realIdx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.qf[realIdx]
-                                  })}
-                                  on1v1Click={() => setSelected1v1Match({
-                                    round: "qf",
-                                    matchIndex: realIdx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.qf[realIdx]
-                                  })}
-                                  onEditScoreClick={() => handleOpenScoreEditModal("qf", realIdx, m.home, m.away, "QF Match " + (realIdx + 1))}
-                                  label={`QF Match ${realIdx + 1}`}
-                                  lockedMessage="TBD (R16)"
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Right Column 2: Round of 16 */}
-                        <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
-                          <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
-                            <span>Round of 16</span>
-                            <button
-                              onClick={() => handleSimulateRound("r16")}
-                              title="Simulate Round of 16"
-                              className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
-                            >
-                              <Zap className="h-3.5 w-3.5 fill-neon/20" />
-                            </button>
-                          </div>
-                          <div className="flex-1 flex flex-col justify-around py-4">
-                            {koMatchups.r16.slice(4, 8).map((m, idx) => {
-                              const realIdx = idx + 4;
-                              const matchState = getKoMatchWinnerAndScore("r16", realIdx, m.home, m.away);
-                              return (
-                                <KnockoutMatchCard isReadOnly={isReadOnly}
-                                  key={`r16-right-${realIdx}`}
-                                  round="r16"
-                                  matchIndex={realIdx}
-                                  homeCode={m.home}
-                                  awayCode={m.away}
-                                  winnerCode={matchState.winnerCode}
-                                  homeScore={matchState.homeScore}
-                                  awayScore={matchState.awayScore}
-                                  isReal={matchState.isReal}
-                                  onScoreChange={(side, val) => handleKoScoreChange("r16", realIdx, side, val)}
-                                  onSelectWinner={(code) => handleSelectKoWinner("r16", realIdx, code)}
-                                  onSimulateClick={() => handleOpenSimulator({
-                                    type: "knockout",
-                                    round: "r16",
-                                    matchIndex: realIdx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.r16[realIdx]
-                                  })}
-                                  on1v1Click={() => setSelected1v1Match({
-                                    round: "r16",
-                                    matchIndex: realIdx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.r16[realIdx]
-                                  })}
-                                  onEditScoreClick={() => handleOpenScoreEditModal("r16", realIdx, m.home, m.away, "Match " + (realIdx + 1))}
-                                  label={`Match ${realIdx + 1}`}
-                                  lockedMessage="TBD (R32)"
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Right Column 1: Round of 32 */}
-                        <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
-                          <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
-                            <span>Round of 32</span>
-                            <button
-                              onClick={() => handleSimulateRound("r32")}
-                              title="Simulate Round of 32"
-                              className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
-                            >
-                              <Zap className="h-3.5 w-3.5 fill-neon/20" />
-                            </button>
-                          </div>
-                          <div className="flex-1 flex flex-col justify-around gap-2.5 py-1">
-                            {koMatchups.r32.slice(8, 16).map((m, idx) => {
-                              const realIdx = idx + 8;
-                              const matchState = getKoMatchWinnerAndScore("r32", realIdx, m.home, m.away);
-                              return (
-                                <KnockoutMatchCard isReadOnly={isReadOnly}
-                                  key={`r32-right-${realIdx}`}
-                                  round="r32"
-                                  matchIndex={realIdx}
-                                  homeCode={m.home}
-                                  awayCode={m.away}
-                                  winnerCode={matchState.winnerCode}
-                                  homeScore={matchState.homeScore}
-                                  awayScore={matchState.awayScore}
-                                  isReal={matchState.isReal}
-                                  onScoreChange={(side, val) => handleKoScoreChange("r32", realIdx, side, val)}
-                                  onSelectWinner={(code) => handleSelectKoWinner("r32", realIdx, code)}
-                                  onSimulateClick={() => handleOpenSimulator({
-                                    type: "knockout",
-                                    round: "r32",
-                                    matchIndex: realIdx,
-                                    homeCode: m.home!,
-                                    awayCode: m.away!,
-                                    homeScore: matchState.homeScore,
-                                    awayScore: matchState.awayScore,
-                                    details: KO_DETAILS.r32[realIdx]
-                                  })}
-                                  onEditScoreClick={() => handleOpenScoreEditModal("r32", realIdx, m.home, m.away, "Match " + (realIdx + 1))}
-                                  label={`Match ${realIdx + 1}`}
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Far Right Column: Groups G-L */}
-                        <div className="flex flex-col w-56 min-w-[224px] shrink-0 justify-between py-2 gap-2">
-                          <div className="text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
-                            Groups G - L
-                          </div>
-                          {["G", "H", "I", "J", "K", "L"].map((groupName) => renderCompactGroupCard(groupName))}
-                        </div>
-
-                      </div>
-                    </div>
-
-                  </>
-                );
-              })()}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 1v1 Match Simulator Modal */}
-      {simMatch && (() => {
-        const homeTeam = getTeam(simMatch.homeCode);
-        const awayTeam = getTeam(simMatch.awayCode);
-        const homeSupport = simCrowdSupport;
-        const awaySupport = 100 - simCrowdSupport;
-
-        let crowdLeadText = "Equal Support";
-        if (simCrowdSupport > 50) crowdLeadText = `🔥 ${homeTeam.name}`;
-        else if (simCrowdSupport < 50) crowdLeadText = `🔥 ${awayTeam.name}`;
-
-        return (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-            <div className="bg-card/95 dark:bg-zinc-900/95 border border-border dark:border-zinc-800 rounded-3xl w-full max-w-xl text-foreground dark:text-white overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
-              {/* Modal Header */}
-              <div className="p-5 border-b border-border dark:border-zinc-800 flex items-center justify-between bg-muted/20 dark:bg-zinc-950/40">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-muted dark:bg-zinc-800 border border-border dark:border-zinc-700 flex items-center justify-center text-lg shadow-inner">
-                    ⚽
-                  </div>
-                  <div>
-                    <h3 className="font-display font-bold text-lg text-foreground dark:text-white">Match Simulation</h3>
-                    <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap">
-                      <span>📅 {simMatch.details.date}</span>
-                      <span className="opacity-30">•</span>
-                      <span>⏰ {simMatch.details.time || "08:00 PM"}</span>
-                      {simMatch.details.matchNumber && (
-                        <>
-                          <span className="opacity-30">•</span>
-                          <span>🔢 #{simMatch.details.matchNumber}</span>
-                        </>
-                      )}
-                      <span className="opacity-30">•</span>
-                      <span className="text-neon-2">📍 {simMatch.details.venue}</span>
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSimMatch(null)}
-                  className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground dark:hover:text-white transition"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                })}
               </div>
 
-              {/* Scrollable Content */}
-              <div className="p-6 overflow-y-auto space-y-6 flex-1">
 
-                {/* Model Selection */}
-                <div className="space-y-2 relative z-50">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Simulation Engine</span>
-                    <div
-                      className="relative"
-                      onMouseEnter={() => setSimModelDropdownOpen(true)}
-                      onMouseLeave={() => setSimModelDropdownOpen(false)}
-                    >
-                      <button
-                        onClick={() => setSimModelDropdownOpen(!simModelDropdownOpen)}
-                        className="flex cursor-pointer items-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-[11px] font-medium rounded-lg px-2.5 py-1.5 text-foreground transition duration-200 select-none outline-none"
-                      >
-                        {selectedModel === "pro" && <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />}
-                        {selectedModel === "advanced" && <Brain className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />}
-                        {selectedModel === "base" && <Cpu className="h-3.5 w-3.5 text-emerald-600 dark:text-neon shrink-0" />}
-                        <span>
-                          {selectedModel === "pro" && "Pro Model"}
-                          {selectedModel === "advanced" && "Advanced Model"}
-                          {selectedModel === "base" && "Base Model"}
-                        </span>
-                        <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
-                      </button>
 
-                      {simModelDropdownOpen && (
-                        <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-border dark:border-white/10 bg-white/95 dark:bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
-                          <button
-                            onClick={() => {
-                              handleModelChange("base");
-                              setSimModelDropdownOpen(false);
-                            }}
-                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${selectedModel === "base" ? "text-emerald-600 dark:text-neon font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"}`}
+              {/* Third Place Standings Grid */}
+              <div className="glass rounded-2xl p-6 border border-white/5 max-w-4xl mx-auto shadow-glass">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-4">
+                  <div>
+                    <h3 className="font-display font-bold text-xl flex items-center gap-2">
+                      <Award className="h-5 w-5 text-neon" />
+                      3rd Place Standings
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      The best 8 third-place teams qualify for the Round of 32. Marked green below.
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2 text-xs">
+                    <span className="w-2.5 h-2.5 bg-neon rounded-full" /> Qualified (Top 8)
+                    <span className="w-2.5 h-2.5 bg-destructive rounded-full ml-2" /> Eliminated
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/10 text-muted-foreground">
+                        <th className="pb-2 font-medium w-12">Rank</th>
+                        <th className="pb-2 font-medium w-16 text-center">Group</th>
+                        <th className="pb-2 font-medium">Team</th>
+                        <th className="pb-2 font-medium text-center w-12">Pld</th>
+                        <th className="pb-2 font-medium text-center w-12">GD</th>
+                        <th className="pb-2 font-medium text-center w-12">GF</th>
+                        <th className="pb-2 font-medium text-right w-16">Pts</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {thirdPlaceStandings.map((row, idx) => {
+                        const qualified = idx < 8;
+                        const borderClass = qualified
+                          ? "border-l-4 border-l-neon bg-neon/5 font-semibold"
+                          : "border-l-4 border-l-destructive/50 opacity-60";
+
+                        return (
+                          <tr
+                            key={row.code}
+                            className={`border-b border-white/5 hover:bg-white/5 last:border-0 transition ${borderClass}`}
                           >
-                            <div className="flex items-center gap-2">
-                              <Cpu className="h-3.5 w-3.5 text-emerald-600 dark:text-neon shrink-0" />
-                              <div>
-                                <div className="text-foreground font-semibold">Base Model</div>
-                                <div className="text-[10px] text-muted-foreground">Elo / Att / Def stats</div>
-                              </div>
-                            </div>
-                            {selectedModel === "base" && <Check className="h-3.5 w-3.5" />}
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              handleModelChange("advanced");
-                              setSimModelDropdownOpen(false);
-                            }}
-                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 mt-1 ${selectedModel === "advanced" ? "text-blue-600 dark:text-blue-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"}`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <Brain className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                              <div>
-                                <div className="text-foreground font-semibold">Advanced Model</div>
-                                <div className="text-[10px] text-muted-foreground">Avg player overall ratings</div>
-                              </div>
-                            </div>
-                            {selectedModel === "advanced" && <Check className="h-3.5 w-3.5" />}
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              handleModelChange("pro");
-                              setSimModelDropdownOpen(false);
-                            }}
-                            className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 mt-1 ${selectedModel === "pro" ? "text-purple-600 dark:text-purple-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"}`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
-                              <div>
-                                <div className="text-foreground font-semibold">Pro Model</div>
-                                <div className="text-[10px] text-muted-foreground">Deep player attributes</div>
-                              </div>
-                            </div>
-                            {selectedModel === "pro" && <Check className="h-3.5 w-3.5" />}
-                          </button>
-                        </div>
+                            <td className="py-2.5 pl-3 font-semibold">{idx + 1}</td>
+                            <td className="py-2.5 text-center font-bold text-gradient">Group {row.group}</td>
+                            <td className="py-2.5 flex items-center gap-2">
+                              <CountryFlag
+                                code={row.team.code}
+                                flag={row.team.flag}
+                                name={row.team.name}
+                                className="h-5 w-7 shrink-0 rounded object-cover"
+                                emojiClassName="text-xl leading-none"
+                              />
+                              <span className="font-medium">{row.team.name}</span>
+                            </td>
+                            <td className="py-2.5 text-center font-mono">{row.played}</td>
+                            <td className="py-2.5 text-center font-mono">
+                              {row.gd > 0 ? `+${row.gd}` : row.gd}
+                            </td>
+                            <td className="py-2.5 text-center font-mono">{row.gf}</td>
+                            <td
+                              className={`py-2.5 text-right pr-4 font-display font-bold text-base ${qualified ? "text-neon" : "text-muted-foreground"
+                                }`}
+                            >
+                              {row.pts}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {thirdPlaceStandings.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="py-8 text-center text-muted-foreground text-xs">
+                            Predict group scores above to populate third-place rankings.
+                          </td>
+                        </tr>
                       )}
-                    </div>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Knockout Bracket View */}
+          {activeTab === "knockout" && (
+            <div id="knockout-bracket-view" className="space-y-6 md:space-y-8 animate-in slide-in-from-right-8 fade-in duration-500 pt-4">
+              {!isGroupStageComplete ? (
+                <div className="glass-strong rounded-3xl p-12 text-center max-w-xl mx-auto flex flex-col items-center gap-4 border border-white/10 my-8 shadow-glass bg-black/40">
+                  <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground">
+                    <Lock className="h-8 w-8" />
+                  </div>
+                  <h3 className="font-display font-bold text-2xl text-gradient">Knockout Bracket Locked</h3>
+                  <p className="text-sm text-muted-foreground">
+                    The Knockout stage requires all 72 group stage matches to have predicted scores before teams can be seeded.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                    <button
+                      onClick={async () => {
+                        const allowed = await consumeCredit();
+                        if (allowed) {
+                          handleAiPredict();
+                          setActiveTab("group");
+                        }
+                      }}
+                      className="flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-neon to-neon-2 px-6 py-2.5 text-sm font-semibold text-background hover:opacity-90 transition shadow-neon"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Simulate Group Stage with AI
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("group")}
+                      className="rounded-lg glass border border-white/10 px-6 py-2.5 text-sm font-semibold hover:bg-white/5 transition"
+                    >
+                      Predict Manually
+                    </button>
                   </div>
                 </div>
+              ) : (
+                <div className="space-y-8 animate-fade-in">
+                  {(() => {
+                    const renderCompactGroupCard = (groupName: string) => {
+                      const groupStandings = standings[groupName] || [];
+                      return (
+                        <div key={groupName} className="w-56 bg-muted/80 dark:bg-black/40 border border-border dark:border-white/5 rounded-2xl p-3 shrink-0 flex flex-col justify-between hover:border-foreground/20 dark:hover:border-white/10 transition duration-200">
+                          <div className="text-center font-display font-bold text-xs text-gradient pb-1.5 border-b border-border dark:border-white/5 mb-1.5">
+                            Group {groupName}
+                          </div>
+                          <div className="space-y-1">
+                            {groupStandings.map((row, idx) => {
+                              const qualify = idx < 2;
+                              return (
+                                <div key={row.code} className="flex items-center justify-between text-[11px] py-0.5">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-[10px] text-muted-foreground w-3 text-center">{idx + 1}</span>
+                                    <CountryFlag
+                                      code={row.team.code}
+                                      flag={row.team.flag}
+                                      name={row.team.name}
+                                      className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                      emojiClassName="text-sm shrink-0 leading-none"
+                                    />
+                                    <span className={`truncate font-medium ${qualify ? "text-neon font-semibold" : "text-muted-foreground"}`}>
+                                      {row.team.name}
+                                    </span>
+                                  </div>
+                                  <span className="font-mono text-[9px] text-muted-foreground/60">{row.team.elo && Number.isFinite(row.team.elo) ? Math.round(row.team.elo) : "-"}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    };
 
-                {/* Temperature Slider */}
-                <TemperatureSlider
-                  value={simTemperature}
-                  onChange={setSimTemperature}
-                />
+                    return (
+                      <>
+                        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleAiPredictKnockoutsWithCredits()}
+                              className="flex items-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-6 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-neon shadow-neon"
+                            >
+                              <Sparkles className="h-4 w-4" />
+                              Simulate Remaining Bracket
+                            </button>
+                            <button
+                              onClick={() => setResetTarget("knockouts")}
+                              className="flex items-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-muted-foreground hover:text-foreground"
+                              title="Reset Knockout Bracket"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                              Reset
+                            </button>
+                            {!isReadOnly && (
+                              <label
+                                className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-semibold cursor-pointer select-none transition ${useRealScores
+                                    ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)] animate-pulse"
+                                    : "bg-muted dark:bg-white/5 border border-border dark:border-white/10 text-muted-foreground hover:text-foreground"
+                                  }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={useRealScores}
+                                  onChange={(e) => handleToggleRealScores(e.target.checked)}
+                                  className="h-4 w-4 rounded border-slate-300 dark:border-white/20 bg-slate-100 dark:bg-slate-800 text-cyan-600 focus:ring-cyan-500 cursor-pointer accent-cyan-500"
+                                />
+                                <div className="flex items-center gap-1.5">
+                                  <Zap className={`h-3.5 w-3.5 transition-all duration-300 ${useRealScores ? "text-cyan-500 fill-cyan-500 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)] animate-pulse" : "text-slate-400 dark:text-slate-500"}`} />
+                                  <span className="font-bold leading-none select-none uppercase tracking-wider">
+                                    Include Real-Time Results ({groupRealPercent}%)
+                                  </span>
+                                </div>
+                              </label>
+                            )}
+                          </div>
 
-                {/* Crowd Support */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Crowd Support</span>
-                    <span className="text-[10px] font-bold text-neon uppercase tracking-wide">{crowdLeadText}</span>
-                  </div>
-                  <div className="space-y-1 bg-muted/10 dark:bg-zinc-850/40 p-3 rounded-xl border border-border dark:border-zinc-800/50">
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={simCrowdSupport}
-                      onChange={(e) => setSimCrowdSupport(parseInt(e.target.value))}
-                      className="w-full h-1.5 bg-muted dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-neon focus:outline-none"
-                    />
-                    <div className="flex justify-between text-[10px] font-semibold text-muted-foreground pt-1">
-                      <span>{homeSupport}% {homeTeam.name}</span>
-                      <span>{awaySupport}% {awayTeam.name}</span>
-                    </div>
-                  </div>
+                          {/* Share & Zoom controls wrapper */}
+                          <div className="flex items-center gap-3 shrink-0">
+                            {!isReadOnly && (
+                              <button
+                                onClick={handleCreateShareLink}
+                                disabled={isSharingLoading}
+                                className="flex items-center gap-2 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold px-4 py-2.5 text-xs transition duration-200"
+                              >
+                                <Share2 className="h-4 w-4" />
+                                <span>{isSharingLoading ? "Sharing..." : "Share Bracket"}</span>
+                              </button>
+                            )}
+
+                            {/* Zoom Controls */}
+                            <div className="flex items-center gap-2 bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 rounded-xl p-1">
+                              <button
+                                onClick={() => setZoomScale(prev => Math.max(50, prev - 10))}
+                                className="p-1.5 rounded-lg hover:bg-card dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                                title="Zoom Out"
+                              >
+                                <Minus className="h-4 w-4" />
+                              </button>
+                              <span className="text-xs font-mono font-bold w-12 text-center text-foreground">
+                                {zoomScale}%
+                              </span>
+                              <button
+                                onClick={() => setZoomScale(prev => Math.min(150, prev + 10))}
+                                className="p-1.5 rounded-lg hover:bg-card dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                                title="Zoom In"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => setZoomScale(85)}
+                                className="text-[10px] font-bold px-2 py-1 rounded-md hover:bg-card dark:hover:bg-white/10 text-neon transition cursor-pointer"
+                              >
+                                Reset
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+
+
+                        {/* Horizontal Scrollable Bracket Tree */}
+                        <div className="w-full select-none border border-border dark:border-white/5 rounded-3xl bg-muted/40 dark:bg-black/20 p-2 md:p-4">
+                          <div
+                            className="flex gap-4 items-stretch w-full px-2 lg:px-4 py-4 overflow-x-auto scrollbar-custom min-h-[760px] lg:min-h-[820px]"
+                            style={{ zoom: zoomScale / 100 }}
+                          >
+
+                            {/* Far Left Column: Groups A-F */}
+                            <div className="flex flex-col w-56 min-w-[224px] shrink-0 justify-between py-2 gap-2">
+                              <div className="text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
+                                Groups A - F
+                              </div>
+                              {["A", "B", "C", "D", "E", "F"].map((groupName) => renderCompactGroupCard(groupName))}
+                            </div>
+
+                            {/* Left Column 1: Round of 32 */}
+                            <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
+                              <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
+                                <span>Round of 32</span>
+                                <button
+                                  onClick={() => handleSimulateRound("r32")}
+                                  title="Simulate Round of 32"
+                                  className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
+                                >
+                                  <Zap className="h-3.5 w-3.5 fill-neon/20" />
+                                </button>
+                              </div>
+                              <div className="flex-1 flex flex-col justify-around gap-2.5 py-1">
+                                {koMatchups.r32.slice(0, 8).map((m, idx) => {
+                                  const matchState = getKoMatchWinnerAndScore("r32", idx, m.home, m.away);
+                                  return (
+                                    <KnockoutMatchCard isReadOnly={isReadOnly}
+                                      key={`r32-left-${idx}`}
+                                      round="r32"
+                                      matchIndex={idx}
+                                      homeCode={m.home}
+                                      awayCode={m.away}
+                                      winnerCode={matchState.winnerCode}
+                                      homeScore={matchState.homeScore}
+                                      awayScore={matchState.awayScore}
+                                      isReal={matchState.isReal}
+                                      onScoreChange={(side, val) => handleKoScoreChange("r32", idx, side, val)}
+                                      onSelectWinner={(code) => handleSelectKoWinner("r32", idx, code)}
+                                      onSimulateClick={() => handleOpenSimulator({
+                                        type: "knockout",
+                                        round: "r32",
+                                        matchIndex: idx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.r32[idx]
+                                      })}
+                                      onEditScoreClick={() => handleOpenScoreEditModal("r32", idx, m.home, m.away, "Match " + (idx + 1))}
+                                      label={`Match ${idx + 1}`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Left Column 2: Round of 16 */}
+                            <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
+                              <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
+                                <span>Round of 16</span>
+                                <button
+                                  onClick={() => handleSimulateRound("r16")}
+                                  title="Simulate Round of 16"
+                                  className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
+                                >
+                                  <Zap className="h-3.5 w-3.5 fill-neon/20" />
+                                </button>
+                              </div>
+                              <div className="flex-1 flex flex-col justify-around py-4">
+                                {koMatchups.r16.slice(0, 4).map((m, idx) => {
+                                  const matchState = getKoMatchWinnerAndScore("r16", idx, m.home, m.away);
+                                  return (
+                                    <KnockoutMatchCard isReadOnly={isReadOnly}
+                                      key={`r16-left-${idx}`}
+                                      round="r16"
+                                      matchIndex={idx}
+                                      homeCode={m.home}
+                                      awayCode={m.away}
+                                      winnerCode={matchState.winnerCode}
+                                      homeScore={matchState.homeScore}
+                                      awayScore={matchState.awayScore}
+                                      isReal={matchState.isReal}
+                                      onScoreChange={(side, val) => handleKoScoreChange("r16", idx, side, val)}
+                                      onSelectWinner={(code) => handleSelectKoWinner("r16", idx, code)}
+                                      onSimulateClick={() => handleOpenSimulator({
+                                        type: "knockout",
+                                        round: "r16",
+                                        matchIndex: idx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.r16[idx]
+                                      })}
+                                      on1v1Click={() => setSelected1v1Match({
+                                        round: "r16",
+                                        matchIndex: idx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.r16[idx]
+                                      })}
+                                      onEditScoreClick={() => handleOpenScoreEditModal("r16", idx, m.home, m.away, "Match " + (idx + 1))}
+                                      label={`Match ${idx + 1}`}
+                                      lockedMessage="TBD (R32)"
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Left Column 3: Quarter-Finals */}
+                            <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
+                              <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
+                                <span>Quarter-Finals</span>
+                                <button
+                                  onClick={() => handleSimulateRound("qf")}
+                                  title="Simulate Quarter-Finals"
+                                  className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
+                                >
+                                  <Zap className="h-3.5 w-3.5 fill-neon/20" />
+                                </button>
+                              </div>
+                              <div className="flex-1 flex flex-col justify-around py-8">
+                                {koMatchups.qf.slice(0, 2).map((m, idx) => {
+                                  const matchState = getKoMatchWinnerAndScore("qf", idx, m.home, m.away);
+                                  return (
+                                    <KnockoutMatchCard isReadOnly={isReadOnly}
+                                      key={`qf-left-${idx}`}
+                                      round="qf"
+                                      matchIndex={idx}
+                                      homeCode={m.home}
+                                      awayCode={m.away}
+                                      winnerCode={matchState.winnerCode}
+                                      homeScore={matchState.homeScore}
+                                      awayScore={matchState.awayScore}
+                                      isReal={matchState.isReal}
+                                      onScoreChange={(side, val) => handleKoScoreChange("qf", idx, side, val)}
+                                      onSelectWinner={(code) => handleSelectKoWinner("qf", idx, code)}
+                                      onSimulateClick={() => handleOpenSimulator({
+                                        type: "knockout",
+                                        round: "qf",
+                                        matchIndex: idx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.qf[idx]
+                                      })}
+                                      on1v1Click={() => setSelected1v1Match({
+                                        round: "qf",
+                                        matchIndex: idx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.qf[idx]
+                                      })}
+                                      onEditScoreClick={() => handleOpenScoreEditModal("qf", idx, m.home, m.away, "QF Match " + (idx + 1))}
+                                      label={`QF Match ${idx + 1}`}
+                                      lockedMessage="TBD (R16)"
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Left Column 4: Semi-Finals */}
+                            <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
+                              <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
+                                <span>Semi-Finals</span>
+                                <button
+                                  onClick={() => handleSimulateRound("sf")}
+                                  title="Simulate Semi-Finals"
+                                  className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
+                                >
+                                  <Zap className="h-3.5 w-3.5 fill-neon/20" />
+                                </button>
+                              </div>
+                              <div className="flex-1 flex flex-col justify-around py-12">
+                                {koMatchups.sf.slice(0, 1).map((m, idx) => {
+                                  const matchState = getKoMatchWinnerAndScore("sf", idx, m.home, m.away);
+                                  return (
+                                    <KnockoutMatchCard isReadOnly={isReadOnly}
+                                      key={`sf-left-${idx}`}
+                                      round="sf"
+                                      matchIndex={idx}
+                                      homeCode={m.home}
+                                      awayCode={m.away}
+                                      winnerCode={matchState.winnerCode}
+                                      homeScore={matchState.homeScore}
+                                      awayScore={matchState.awayScore}
+                                      isReal={matchState.isReal}
+                                      onScoreChange={(side, val) => handleKoScoreChange("sf", idx, side, val)}
+                                      onSelectWinner={(code) => handleSelectKoWinner("sf", idx, code)}
+                                      onSimulateClick={() => handleOpenSimulator({
+                                        type: "knockout",
+                                        round: "sf",
+                                        matchIndex: idx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.sf[idx]
+                                      })}
+                                      on1v1Click={() => setSelected1v1Match({
+                                        round: "sf",
+                                        matchIndex: idx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.sf[idx]
+                                      })}
+                                      onEditScoreClick={() => handleOpenScoreEditModal("sf", idx, m.home, m.away, "SF Match " + (idx + 1))}
+                                      label={`SF Match ${idx + 1}`}
+                                      lockedMessage="TBD (QF)"
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Center Column: Trophy, Final, 3rd Place Match, and Champion */}
+                            <div className="flex flex-col w-64 min-w-[256px] shrink-0 gap-3 justify-center">
+                              {/* Trophy / Champion Celebration */}
+                              <div className="text-center mb-4">
+                                {(() => {
+                                  const finalMatch = koMatchups.final[0];
+                                  const finalWinner = getKoMatchWinnerAndScore("final", 0, finalMatch.home, finalMatch.away).winnerCode;
+                                  return finalWinner ? (
+                                    <div className="glass-strong rounded-3xl p-6 border border-neon/50 shadow-neon flex flex-col items-center gap-4 text-center animate-float bg-muted/30 dark:bg-black/40">
+                                      <div className="w-16 h-16 rounded-full bg-gradient-to-r from-neon to-neon-2 flex items-center justify-center text-background text-3xl font-bold shadow-md">
+                                        🏆
+                                      </div>
+                                      <div>
+                                        <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground font-semibold">
+                                          World Cup Champion
+                                        </div>
+                                        <div className="text-2xl font-display font-bold mt-2 flex items-center gap-1.5 justify-center">
+                                          <CountryFlag
+                                            code={getTeam(finalWinner).code}
+                                            flag={getTeam(finalWinner).flag}
+                                            name={getTeam(finalWinner).name}
+                                            className="h-6 w-8 shrink-0 rounded object-cover"
+                                            emojiClassName="text-2xl leading-none"
+                                          />
+                                          <span className="text-gradient truncate max-w-[180px]">{getTeam(finalWinner).name}</span>
+                                        </div>
+                                        <div className="text-[10px] text-muted-foreground mt-1">
+                                          Elo: {getTeam(finalWinner).elo} · FIFA #{getTeam(finalWinner).rank}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="glass rounded-3xl p-6 border border-border dark:border-white/5 flex flex-col items-center gap-3 text-center opacity-60">
+                                      <div className="text-4xl animate-pulse">🏆</div>
+                                      <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+                                        FIFA World Cup Trophy
+                                      </div>
+                                      <div className="text-[10px] text-muted-foreground">
+                                        Simulate or predict matches to crown the champion
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+
+                              {/* World Cup Final Match */}
+                              <div className="flex flex-col gap-2">
+                                <div className="text-center font-display font-bold text-xs tracking-wider uppercase text-gold pb-2 border-b border-white/10 mb-2">
+                                  World Cup Final
+                                </div>
+                                {(() => {
+                                  const finalMatch = koMatchups.final[0];
+                                  const matchState = getKoMatchWinnerAndScore("final", 0, finalMatch.home, finalMatch.away);
+                                  return (
+                                    <KnockoutMatchCard isReadOnly={isReadOnly}
+                                      round="final"
+                                      matchIndex={0}
+                                      homeCode={finalMatch.home}
+                                      awayCode={finalMatch.away}
+                                      winnerCode={matchState.winnerCode}
+                                      homeScore={matchState.homeScore}
+                                      awayScore={matchState.awayScore}
+                                      isReal={matchState.isReal}
+                                      onScoreChange={(side, val) => handleKoScoreChange("final", 0, side, val)}
+                                      onSelectWinner={(code) => handleSelectKoWinner("final", 0, code)}
+                                      onSimulateClick={() => handleOpenSimulator({
+                                        type: "knockout",
+                                        round: "final",
+                                        matchIndex: 0,
+                                        homeCode: finalMatch.home!,
+                                        awayCode: finalMatch.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.final[0]
+                                      })}
+                                      on1v1Click={() => setSelected1v1Match({
+                                        round: "final",
+                                        matchIndex: 0,
+                                        homeCode: finalMatch.home!,
+                                        awayCode: finalMatch.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.final[0]
+                                      })}
+                                      onEditScoreClick={() => handleOpenScoreEditModal("final", 0, finalMatch.home, finalMatch.away, "Final")}
+                                      label="Final"
+                                      lockedMessage="TBD (SF Winners)"
+                                    />
+                                  );
+                                })()}
+                              </div>
+
+                              {/* 3rd Place Match */}
+                              <div className="flex flex-col gap-2 mt-4">
+                                <div className="text-center font-display font-bold text-xs tracking-wider uppercase text-muted-foreground pb-2 border-b border-white/10 mb-2">
+                                  3rd Place Match
+                                </div>
+                                {(() => {
+                                  const matchState = getKoMatchWinnerAndScore("third", 0, sfLosers.home, sfLosers.away);
+                                  return (
+                                    <KnockoutMatchCard isReadOnly={isReadOnly}
+                                      round="third"
+                                      matchIndex={0}
+                                      homeCode={sfLosers.home}
+                                      awayCode={sfLosers.away}
+                                      winnerCode={matchState.winnerCode}
+                                      homeScore={matchState.homeScore}
+                                      awayScore={matchState.awayScore}
+                                      isReal={matchState.isReal}
+                                      onScoreChange={handleThirdScoreChange}
+                                      onSelectWinner={handleSelectThirdWinner}
+                                      onSimulateClick={() => handleOpenSimulator({
+                                        type: "third",
+                                        homeCode: sfLosers.home!,
+                                        awayCode: sfLosers.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.third[0]
+                                      })}
+                                      on1v1Click={() => setSelected1v1Match({
+                                        round: "third",
+                                        matchIndex: 0,
+                                        homeCode: sfLosers.home!,
+                                        awayCode: sfLosers.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.third[0]
+                                      })}
+                                      onEditScoreClick={() => handleOpenScoreEditModal("third", 0, sfLosers.home, sfLosers.away, "3rd Place")}
+                                      label="3rd Place"
+                                      lockedMessage="TBD (SF Losers)"
+                                    />
+                                  );
+                                })()}
+                              </div>
+                            </div>
+
+                            {/* Right Column 4: Semi-Finals */}
+                            <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
+                              <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
+                                <span>Semi-Finals</span>
+                                <button
+                                  onClick={() => handleSimulateRound("sf")}
+                                  title="Simulate Semi-Finals"
+                                  className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
+                                >
+                                  <Zap className="h-3.5 w-3.5 fill-neon/20" />
+                                </button>
+                              </div>
+                              <div className="flex-1 flex flex-col justify-around py-12">
+                                {koMatchups.sf.slice(1, 2).map((m, idx) => {
+                                  const realIdx = idx + 1;
+                                  const matchState = getKoMatchWinnerAndScore("sf", realIdx, m.home, m.away);
+                                  return (
+                                    <KnockoutMatchCard isReadOnly={isReadOnly}
+                                      key={`sf-right-${realIdx}`}
+                                      round="sf"
+                                      matchIndex={realIdx}
+                                      homeCode={m.home}
+                                      awayCode={m.away}
+                                      winnerCode={matchState.winnerCode}
+                                      homeScore={matchState.homeScore}
+                                      awayScore={matchState.awayScore}
+                                      isReal={matchState.isReal}
+                                      onScoreChange={(side, val) => handleKoScoreChange("sf", realIdx, side, val)}
+                                      onSelectWinner={(code) => handleSelectKoWinner("sf", realIdx, code)}
+                                      onSimulateClick={() => handleOpenSimulator({
+                                        type: "knockout",
+                                        round: "sf",
+                                        matchIndex: realIdx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.sf[realIdx]
+                                      })}
+                                      on1v1Click={() => setSelected1v1Match({
+                                        round: "sf",
+                                        matchIndex: realIdx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.sf[realIdx]
+                                      })}
+                                      onEditScoreClick={() => handleOpenScoreEditModal("sf", realIdx, m.home, m.away, "SF Match " + (realIdx + 1))}
+                                      label={`SF Match ${realIdx + 1}`}
+                                      lockedMessage="TBD (QF)"
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Right Column 3: Quarter-Finals */}
+                            <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
+                              <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
+                                <span>Quarter-Finals</span>
+                                <button
+                                  onClick={() => handleSimulateRound("qf")}
+                                  title="Simulate Quarter-Finals"
+                                  className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
+                                >
+                                  <Zap className="h-3.5 w-3.5 fill-neon/20" />
+                                </button>
+                              </div>
+                              <div className="flex-1 flex flex-col justify-around py-8">
+                                {koMatchups.qf.slice(2, 4).map((m, idx) => {
+                                  const realIdx = idx + 2;
+                                  const matchState = getKoMatchWinnerAndScore("qf", realIdx, m.home, m.away);
+                                  return (
+                                    <KnockoutMatchCard isReadOnly={isReadOnly}
+                                      key={`qf-right-${realIdx}`}
+                                      round="qf"
+                                      matchIndex={realIdx}
+                                      homeCode={m.home}
+                                      awayCode={m.away}
+                                      winnerCode={matchState.winnerCode}
+                                      homeScore={matchState.homeScore}
+                                      awayScore={matchState.awayScore}
+                                      isReal={matchState.isReal}
+                                      onScoreChange={(side, val) => handleKoScoreChange("qf", realIdx, side, val)}
+                                      onSelectWinner={(code) => handleSelectKoWinner("qf", realIdx, code)}
+                                      onSimulateClick={() => handleOpenSimulator({
+                                        type: "knockout",
+                                        round: "qf",
+                                        matchIndex: realIdx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.qf[realIdx]
+                                      })}
+                                      on1v1Click={() => setSelected1v1Match({
+                                        round: "qf",
+                                        matchIndex: realIdx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.qf[realIdx]
+                                      })}
+                                      onEditScoreClick={() => handleOpenScoreEditModal("qf", realIdx, m.home, m.away, "QF Match " + (realIdx + 1))}
+                                      label={`QF Match ${realIdx + 1}`}
+                                      lockedMessage="TBD (R16)"
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Right Column 2: Round of 16 */}
+                            <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
+                              <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
+                                <span>Round of 16</span>
+                                <button
+                                  onClick={() => handleSimulateRound("r16")}
+                                  title="Simulate Round of 16"
+                                  className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
+                                >
+                                  <Zap className="h-3.5 w-3.5 fill-neon/20" />
+                                </button>
+                              </div>
+                              <div className="flex-1 flex flex-col justify-around py-4">
+                                {koMatchups.r16.slice(4, 8).map((m, idx) => {
+                                  const realIdx = idx + 4;
+                                  const matchState = getKoMatchWinnerAndScore("r16", realIdx, m.home, m.away);
+                                  return (
+                                    <KnockoutMatchCard isReadOnly={isReadOnly}
+                                      key={`r16-right-${realIdx}`}
+                                      round="r16"
+                                      matchIndex={realIdx}
+                                      homeCode={m.home}
+                                      awayCode={m.away}
+                                      winnerCode={matchState.winnerCode}
+                                      homeScore={matchState.homeScore}
+                                      awayScore={matchState.awayScore}
+                                      isReal={matchState.isReal}
+                                      onScoreChange={(side, val) => handleKoScoreChange("r16", realIdx, side, val)}
+                                      onSelectWinner={(code) => handleSelectKoWinner("r16", realIdx, code)}
+                                      onSimulateClick={() => handleOpenSimulator({
+                                        type: "knockout",
+                                        round: "r16",
+                                        matchIndex: realIdx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.r16[realIdx]
+                                      })}
+                                      on1v1Click={() => setSelected1v1Match({
+                                        round: "r16",
+                                        matchIndex: realIdx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.r16[realIdx]
+                                      })}
+                                      onEditScoreClick={() => handleOpenScoreEditModal("r16", realIdx, m.home, m.away, "Match " + (realIdx + 1))}
+                                      label={`Match ${realIdx + 1}`}
+                                      lockedMessage="TBD (R32)"
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Right Column 1: Round of 32 */}
+                            <div className="flex flex-col w-56 min-w-[224px] shrink-0 gap-3">
+                              <div className="flex items-center justify-between text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
+                                <span>Round of 32</span>
+                                <button
+                                  onClick={() => handleSimulateRound("r32")}
+                                  title="Simulate Round of 32"
+                                  className="p-1 rounded hover:bg-white/10 text-neon hover:scale-110 transition shrink-0"
+                                >
+                                  <Zap className="h-3.5 w-3.5 fill-neon/20" />
+                                </button>
+                              </div>
+                              <div className="flex-1 flex flex-col justify-around gap-2.5 py-1">
+                                {koMatchups.r32.slice(8, 16).map((m, idx) => {
+                                  const realIdx = idx + 8;
+                                  const matchState = getKoMatchWinnerAndScore("r32", realIdx, m.home, m.away);
+                                  return (
+                                    <KnockoutMatchCard isReadOnly={isReadOnly}
+                                      key={`r32-right-${realIdx}`}
+                                      round="r32"
+                                      matchIndex={realIdx}
+                                      homeCode={m.home}
+                                      awayCode={m.away}
+                                      winnerCode={matchState.winnerCode}
+                                      homeScore={matchState.homeScore}
+                                      awayScore={matchState.awayScore}
+                                      isReal={matchState.isReal}
+                                      onScoreChange={(side, val) => handleKoScoreChange("r32", realIdx, side, val)}
+                                      onSelectWinner={(code) => handleSelectKoWinner("r32", realIdx, code)}
+                                      onSimulateClick={() => handleOpenSimulator({
+                                        type: "knockout",
+                                        round: "r32",
+                                        matchIndex: realIdx,
+                                        homeCode: m.home!,
+                                        awayCode: m.away!,
+                                        homeScore: matchState.homeScore,
+                                        awayScore: matchState.awayScore,
+                                        details: KO_DETAILS.r32[realIdx]
+                                      })}
+                                      onEditScoreClick={() => handleOpenScoreEditModal("r32", realIdx, m.home, m.away, "Match " + (realIdx + 1))}
+                                      label={`Match ${realIdx + 1}`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Far Right Column: Groups G-L */}
+                            <div className="flex flex-col w-56 min-w-[224px] shrink-0 justify-between py-2 gap-2">
+                              <div className="text-center font-display font-bold text-xs tracking-wider uppercase text-neon pb-2 border-b border-white/10 mb-2">
+                                Groups G - L
+                              </div>
+                              {["G", "H", "I", "J", "K", "L"].map((groupName) => renderCompactGroupCard(groupName))}
+                            </div>
+
+                          </div>
+                        </div>
+
+                      </>
+                    );
+                  })()}
                 </div>
+              )}
+            </div>
+          )}
 
-                {/* Symmetrical Match Card (Flags & Simulated Score) */}
-                <div className="grid grid-cols-3 items-center bg-muted/20 dark:bg-zinc-950/60 p-4 rounded-2xl border border-border dark:border-zinc-800">
-                  {/* Home Team */}
-                  <div className="flex flex-col items-center text-center space-y-1">
-                    <CountryFlag
-                      code={homeTeam.code}
-                      flag={homeTeam.flag}
-                      name={homeTeam.name}
-                      className="h-8 w-10 rounded object-cover drop-shadow-md"
-                      emojiClassName="text-3xl leading-none"
-                    />
-                    <span className="font-display font-bold text-sm leading-tight max-w-[120px] truncate">{homeTeam.name}</span>
-                    <span className="text-[10px] text-muted-foreground/80 font-mono">Rating: {homeTeam.elo.toFixed(0)}</span>
-                  </div>
+          {/* 1v1 Match Simulator Modal */}
+          {simMatch && (() => {
+            const homeTeam = getTeam(simMatch.homeCode);
+            const awayTeam = getTeam(simMatch.awayCode);
+            const homeSupport = simCrowdSupport;
+            const awaySupport = 100 - simCrowdSupport;
 
-                  {/* Score */}
-                  <div className="flex flex-col items-center justify-center space-y-1">
-                    <div className="text-3xl font-mono font-black tracking-tight text-foreground dark:text-white flex items-center gap-2">
-                      <span className="bg-muted dark:bg-zinc-800 px-3 py-1 rounded-xl border border-border dark:border-zinc-700 min-w-[2.5rem] text-center shadow-inner text-foreground dark:text-white">
-                        {simHomeGoals !== "" ? simHomeGoals : "-"}
-                      </span>
-                      <span className="text-muted-foreground/40">:</span>
-                      <span className="bg-muted dark:bg-zinc-800 px-3 py-1 rounded-xl border border-border dark:border-zinc-700 min-w-[2.5rem] text-center shadow-inner text-foreground dark:text-white">
-                        {simAwayGoals !== "" ? simAwayGoals : "-"}
-                      </span>
+            let crowdLeadText = "Equal Support";
+            if (simCrowdSupport > 50) crowdLeadText = `🔥 ${homeTeam.name}`;
+            else if (simCrowdSupport < 50) crowdLeadText = `🔥 ${awayTeam.name}`;
+
+            return (
+              <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+                <div className="bg-card/95 dark:bg-zinc-900/95 border border-border dark:border-zinc-800 rounded-3xl w-full max-w-xl text-foreground dark:text-white overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
+                  {/* Modal Header */}
+                  <div className="p-5 border-b border-border dark:border-zinc-800 flex items-center justify-between bg-muted/20 dark:bg-zinc-950/40">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-muted dark:bg-zinc-800 border border-border dark:border-zinc-700 flex items-center justify-center text-lg shadow-inner">
+                        ⚽
+                      </div>
+                      <div>
+                        <h3 className="font-display font-bold text-lg text-foreground dark:text-white">Match Simulation</h3>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <span>📅 {simMatch.details.date}</span>
+                          <span className="opacity-30">•</span>
+                          <span>⏰ {simMatch.details.time || "08:00 PM"}</span>
+                          {simMatch.details.matchNumber && (
+                            <>
+                              <span className="opacity-30">•</span>
+                              <span>🔢 #{simMatch.details.matchNumber}</span>
+                            </>
+                          )}
+                          <span className="opacity-30">•</span>
+                          <span className="text-neon-2">📍 {simMatch.details.venue}</span>
+                        </p>
+                      </div>
                     </div>
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-neon mt-1 bg-neon/10 px-2 py-0.5 rounded-full border border-neon/20">
-                      {simHomeGoals !== "" ? (useRealScores && simMatch && getAssignedLiveScoreForMatch({ id: simMatch.id || "", group: "", homeCode: simMatch.homeCode, awayCode: simMatch.awayCode, homeScore: "", awayScore: "" }) ? "Real Data" : "Simulated") : "Not Simulated"}
-                    </span>
+                    <button
+                      onClick={() => setSimMatch(null)}
+                      className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground dark:hover:text-white transition"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
 
-                  {/* Away Team */}
-                  <div className="flex flex-col items-center text-center space-y-1">
-                    <CountryFlag
-                      code={awayTeam.code}
-                      flag={awayTeam.flag}
-                      name={awayTeam.name}
-                      className="h-8 w-10 rounded object-cover drop-shadow-md"
-                      emojiClassName="text-3xl leading-none"
-                    />
-                    <span className="font-display font-bold text-sm leading-tight max-w-[120px] truncate">{awayTeam.name}</span>
-                    <span className="text-[10px] text-muted-foreground/80 font-mono">Rating: {awayTeam.elo.toFixed(0)}</span>
-                  </div>
-                </div>
+                  {/* Scrollable Content */}
+                  <div className="p-6 overflow-y-auto space-y-6 flex-1">
 
-                {/* Team Condition Modifiers */}
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Home Team Modifiers */}
-                  <div className="space-y-4 p-4 rounded-2xl bg-muted/10 dark:bg-zinc-850/20 border border-border dark:border-zinc-800/50">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-neon-2 border-b border-border dark:border-zinc-800 pb-1.5 block">
-                      {homeTeam.name} Stats
-                    </span>
+                    {/* Model Selection */}
+                    <div className="space-y-2 relative z-50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Simulation Engine</span>
+                        <div
+                          className="relative"
+                          onMouseEnter={() => setSimModelDropdownOpen(true)}
+                          onMouseLeave={() => setSimModelDropdownOpen(false)}
+                        >
+                          <button
+                            onClick={() => setSimModelDropdownOpen(!simModelDropdownOpen)}
+                            className="flex cursor-pointer items-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-[11px] font-medium rounded-lg px-2.5 py-1.5 text-foreground transition duration-200 select-none outline-none"
+                          >
+                            {selectedModel === "pro" && <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />}
+                            {selectedModel === "advanced" && <Brain className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />}
+                            {selectedModel === "base" && <Cpu className="h-3.5 w-3.5 text-emerald-600 dark:text-neon shrink-0" />}
+                            <span>
+                              {selectedModel === "pro" && "Pro Model"}
+                              {selectedModel === "advanced" && "Advanced Model"}
+                              {selectedModel === "base" && "Base Model"}
+                            </span>
+                            <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
+                          </button>
 
-                    <div className="flex flex-col gap-4 pt-2">
-                      <StaminaBar
-                        value={simHomePhysical}
-                        onChange={setSimHomePhysical}
-                      />
-                      <AlignmentGauge
-                        value={simHomeDiscipline}
-                        onChange={setSimHomeDiscipline}
-                      />
+                          {simModelDropdownOpen && (
+                            <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-border dark:border-white/10 bg-white/95 dark:bg-[#070b19]/95 backdrop-blur-md p-1.5 shadow-2xl animate-fade-in z-50">
+                              <button
+                                onClick={() => {
+                                  handleModelChange("base");
+                                  setSimModelDropdownOpen(false);
+                                }}
+                                className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 ${selectedModel === "base" ? "text-emerald-600 dark:text-neon font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Cpu className="h-3.5 w-3.5 text-emerald-600 dark:text-neon shrink-0" />
+                                  <div>
+                                    <div className="text-foreground font-semibold">Base Model</div>
+                                    <div className="text-[10px] text-muted-foreground">Elo / Att / Def stats</div>
+                                  </div>
+                                </div>
+                                {selectedModel === "base" && <Check className="h-3.5 w-3.5" />}
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  handleModelChange("advanced");
+                                  setSimModelDropdownOpen(false);
+                                }}
+                                className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 mt-1 ${selectedModel === "advanced" ? "text-blue-600 dark:text-blue-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Brain className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                                  <div>
+                                    <div className="text-foreground font-semibold">Advanced Model</div>
+                                    <div className="text-[10px] text-muted-foreground">Avg player overall ratings</div>
+                                  </div>
+                                </div>
+                                {selectedModel === "advanced" && <Check className="h-3.5 w-3.5" />}
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  handleModelChange("pro");
+                                  setSimModelDropdownOpen(false);
+                                }}
+                                className={`flex items-center justify-between w-full rounded-lg px-2.5 py-2 text-left text-xs transition hover:bg-black/5 dark:hover:bg-white/5 mt-1 ${selectedModel === "pro" ? "text-purple-600 dark:text-purple-400 font-semibold bg-black/5 dark:bg-white/[0.02]" : "text-muted-foreground"}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Sparkles className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                                  <div>
+                                    <div className="text-foreground font-semibold">Pro Model</div>
+                                    <div className="text-[10px] text-muted-foreground">Deep player attributes</div>
+                                  </div>
+                                </div>
+                                {selectedModel === "pro" && <Check className="h-3.5 w-3.5" />}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Player Out Dropdown */}
-                    {/* <div className="pt-2">
+                    {/* Temperature Slider */}
+                    <TemperatureSlider
+                      value={simTemperature}
+                      onChange={setSimTemperature}
+                    />
+
+                    {/* Crowd Support */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Crowd Support</span>
+                        <span className="text-[10px] font-bold text-neon uppercase tracking-wide">{crowdLeadText}</span>
+                      </div>
+                      <div className="space-y-1 bg-muted/10 dark:bg-zinc-850/40 p-3 rounded-xl border border-border dark:border-zinc-800/50">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={simCrowdSupport}
+                          onChange={(e) => setSimCrowdSupport(parseInt(e.target.value))}
+                          className="w-full h-1.5 bg-muted dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-neon focus:outline-none"
+                        />
+                        <div className="flex justify-between text-[10px] font-semibold text-muted-foreground pt-1">
+                          <span>{homeSupport}% {homeTeam.name}</span>
+                          <span>{awaySupport}% {awayTeam.name}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Symmetrical Match Card (Flags & Simulated Score) */}
+                    <div className="grid grid-cols-3 items-center bg-muted/20 dark:bg-zinc-950/60 p-4 rounded-2xl border border-border dark:border-zinc-800">
+                      {/* Home Team */}
+                      <div className="flex flex-col items-center text-center space-y-1">
+                        <CountryFlag
+                          code={homeTeam.code}
+                          flag={homeTeam.flag}
+                          name={homeTeam.name}
+                          className="h-8 w-10 rounded object-cover drop-shadow-md"
+                          emojiClassName="text-3xl leading-none"
+                        />
+                        <span className="font-display font-bold text-sm leading-tight max-w-[120px] truncate">{homeTeam.name}</span>
+                        <span className="text-[10px] text-muted-foreground/80 font-mono">Rating: {homeTeam.elo.toFixed(0)}</span>
+                      </div>
+
+                      {/* Score */}
+                      <div className="flex flex-col items-center justify-center space-y-1">
+                        <div className="text-3xl font-mono font-black tracking-tight text-foreground dark:text-white flex items-center gap-2">
+                          <span className="bg-muted dark:bg-zinc-800 px-3 py-1 rounded-xl border border-border dark:border-zinc-700 min-w-[2.5rem] text-center shadow-inner text-foreground dark:text-white">
+                            {simHomeGoals !== "" ? simHomeGoals : "-"}
+                          </span>
+                          <span className="text-muted-foreground/40">:</span>
+                          <span className="bg-muted dark:bg-zinc-800 px-3 py-1 rounded-xl border border-border dark:border-zinc-700 min-w-[2.5rem] text-center shadow-inner text-foreground dark:text-white">
+                            {simAwayGoals !== "" ? simAwayGoals : "-"}
+                          </span>
+                        </div>
+                        <span className="text-[9px] uppercase font-bold tracking-wider text-neon mt-1 bg-neon/10 px-2 py-0.5 rounded-full border border-neon/20">
+                          {simHomeGoals !== "" ? (useRealScores && simMatch && getAssignedLiveScoreForMatch({ id: simMatch.id || "", group: "", homeCode: simMatch.homeCode, awayCode: simMatch.awayCode, homeScore: "", awayScore: "" }) ? "Real Data" : "Simulated") : "Not Simulated"}
+                        </span>
+                      </div>
+
+                      {/* Away Team */}
+                      <div className="flex flex-col items-center text-center space-y-1">
+                        <CountryFlag
+                          code={awayTeam.code}
+                          flag={awayTeam.flag}
+                          name={awayTeam.name}
+                          className="h-8 w-10 rounded object-cover drop-shadow-md"
+                          emojiClassName="text-3xl leading-none"
+                        />
+                        <span className="font-display font-bold text-sm leading-tight max-w-[120px] truncate">{awayTeam.name}</span>
+                        <span className="text-[10px] text-muted-foreground/80 font-mono">Rating: {awayTeam.elo.toFixed(0)}</span>
+                      </div>
+                    </div>
+
+                    {/* Team Condition Modifiers */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Home Team Modifiers */}
+                      <div className="space-y-4 p-4 rounded-2xl bg-muted/10 dark:bg-zinc-850/20 border border-border dark:border-zinc-800/50">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-neon-2 border-b border-border dark:border-zinc-800 pb-1.5 block">
+                          {homeTeam.name} Stats
+                        </span>
+
+                        <div className="flex flex-col gap-4 pt-2">
+                          <StaminaBar
+                            value={simHomePhysical}
+                            onChange={setSimHomePhysical}
+                          />
+                          <AlignmentGauge
+                            value={simHomeDiscipline}
+                            onChange={setSimHomeDiscipline}
+                          />
+                        </div>
+
+                        {/* Player Out Dropdown */}
+                        {/* <div className="pt-2">
                       <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-1">Missing Player Penalty</span>
                       <select
                         value={simHomePlayerOut}
@@ -5306,27 +5380,27 @@ export function GroupPredictor({
                         ))}
                       </select>
                     </div> */}
-                  </div>
+                      </div>
 
-                  {/* Away Team Modifiers */}
-                  <div className="space-y-4 p-4 rounded-2xl bg-muted/10 dark:bg-zinc-850/20 border border-border dark:border-zinc-800/50">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-neon-2 border-b border-border dark:border-zinc-800 pb-1.5 block">
-                      {awayTeam.name} Stats
-                    </span>
+                      {/* Away Team Modifiers */}
+                      <div className="space-y-4 p-4 rounded-2xl bg-muted/10 dark:bg-zinc-850/20 border border-border dark:border-zinc-800/50">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-neon-2 border-b border-border dark:border-zinc-800 pb-1.5 block">
+                          {awayTeam.name} Stats
+                        </span>
 
-                    <div className="flex flex-col gap-4 pt-2">
-                      <StaminaBar
-                        value={simAwayPhysical}
-                        onChange={setSimAwayPhysical}
-                      />
-                      <AlignmentGauge
-                        value={simAwayDiscipline}
-                        onChange={setSimAwayDiscipline}
-                      />
-                    </div>
+                        <div className="flex flex-col gap-4 pt-2">
+                          <StaminaBar
+                            value={simAwayPhysical}
+                            onChange={setSimAwayPhysical}
+                          />
+                          <AlignmentGauge
+                            value={simAwayDiscipline}
+                            onChange={setSimAwayDiscipline}
+                          />
+                        </div>
 
-                    {/* Player Out Dropdown */}
-                    {/* <div className="pt-2">
+                        {/* Player Out Dropdown */}
+                        {/* <div className="pt-2">
                       <span className="text-[9px] uppercase font-bold text-muted-foreground block mb-1">Missing Player Penalty</span>
                       <select
                         value={simAwayPlayerOut}
@@ -5341,69 +5415,71 @@ export function GroupPredictor({
                         ))}
                       </select>
                     </div> */}
+                      </div>
+                    </div>
+
+                    {/* Win/Draw/Loss Probabilities */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[9px] uppercase font-bold text-muted-foreground">
+                        <span>{homeTeam.name} Win %</span>
+                        {simMatch.type === "group" && <span>Draw %</span>}
+                        <span>{awayTeam.name} Win %</span>
+                      </div>
+                      {/* Segmented Progress Bar */}
+                      <div className="h-3.5 rounded-full overflow-hidden flex w-full border border-border dark:border-zinc-800 shadow-inner bg-muted/20 dark:bg-zinc-950">
+                        <div
+                          className="bg-[#22c55e] transition-all duration-300 flex items-center justify-center text-[9px] font-bold text-zinc-950"
+                          style={{ width: `${simProbabilities.homeWin}%` }}
+                        />
+                        {simMatch.type === "group" && (
+                          <div
+                            className="bg-zinc-500/80 transition-all duration-300 flex items-center justify-center text-[9px] font-bold text-white"
+                            style={{ width: `${simProbabilities.draw}%` }}
+                          />
+                        )}
+                        <div
+                          className="bg-[#ef4444] transition-all duration-300 flex items-center justify-center text-[9px] font-bold text-white"
+                          style={{ width: `${simProbabilities.awayWin}%` }}
+                        />
+                      </div>
+                      {/* Value Labels */}
+                      <div className="flex justify-between text-xs font-mono font-bold px-1 text-foreground dark:text-white">
+                        <span className="text-[#22c55e]">{simProbabilities.homeWin}%</span>
+                        {simMatch.type === "group" && <span className="text-zinc-400">{simProbabilities.draw}%</span>}
+                        <span className="text-[#ef4444]">{simProbabilities.awayWin}%</span>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="p-4 border-t border-border dark:border-zinc-850 flex gap-3 bg-muted/20 dark:bg-zinc-950/40 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleReSimulate}
+                      disabled={!hasControlsChanged && simHomeGoals !== "" && simAwayGoals !== ""}
+                      className="flex-1 bg-muted dark:bg-zinc-800/80 hover:bg-black/5 dark:hover:bg-zinc-700 hover:text-foreground dark:hover:text-white text-foreground/90 dark:text-white/90 border border-border dark:border-zinc-700 py-3 rounded-2xl flex items-center justify-center gap-2 transition duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Re-Simulate</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleApplyResult}
+                      disabled={simHomeGoals === "" || simAwayGoals === ""}
+                      className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-zinc-950 font-bold py-3 rounded-2xl flex items-center justify-center gap-2 transition duration-200 shadow-[0_0_15px_rgba(34,197,94,0.3)] disabled:shadow-none"
+                    >
+                      <Check className="w-4 h-4 stroke-[3px]" />
+                      <span>Apply Result</span>
+                    </button>
                   </div>
                 </div>
-
-                {/* Win/Draw/Loss Probabilities */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-[9px] uppercase font-bold text-muted-foreground">
-                    <span>{homeTeam.name} Win %</span>
-                    {simMatch.type === "group" && <span>Draw %</span>}
-                    <span>{awayTeam.name} Win %</span>
-                  </div>
-                  {/* Segmented Progress Bar */}
-                  <div className="h-3.5 rounded-full overflow-hidden flex w-full border border-border dark:border-zinc-800 shadow-inner bg-muted/20 dark:bg-zinc-950">
-                    <div
-                      className="bg-[#22c55e] transition-all duration-300 flex items-center justify-center text-[9px] font-bold text-zinc-950"
-                      style={{ width: `${simProbabilities.homeWin}%` }}
-                    />
-                    {simMatch.type === "group" && (
-                      <div
-                        className="bg-zinc-500/80 transition-all duration-300 flex items-center justify-center text-[9px] font-bold text-white"
-                        style={{ width: `${simProbabilities.draw}%` }}
-                      />
-                    )}
-                    <div
-                      className="bg-[#ef4444] transition-all duration-300 flex items-center justify-center text-[9px] font-bold text-white"
-                      style={{ width: `${simProbabilities.awayWin}%` }}
-                    />
-                  </div>
-                  {/* Value Labels */}
-                  <div className="flex justify-between text-xs font-mono font-bold px-1 text-foreground dark:text-white">
-                    <span className="text-[#22c55e]">{simProbabilities.homeWin}%</span>
-                    {simMatch.type === "group" && <span className="text-zinc-400">{simProbabilities.draw}%</span>}
-                    <span className="text-[#ef4444]">{simProbabilities.awayWin}%</span>
-                  </div>
-                </div>
-
               </div>
-
-              {/* Modal Footer */}
-              <div className="p-4 border-t border-border dark:border-zinc-850 flex gap-3 bg-muted/20 dark:bg-zinc-950/40 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleReSimulate}
-                  disabled={!hasControlsChanged && simHomeGoals !== "" && simAwayGoals !== ""}
-                  className="flex-1 bg-muted dark:bg-zinc-800/80 hover:bg-black/5 dark:hover:bg-zinc-700 hover:text-foreground dark:hover:text-white text-foreground/90 dark:text-white/90 border border-border dark:border-zinc-700 py-3 rounded-2xl flex items-center justify-center gap-2 transition duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  <span>Re-Simulate</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleApplyResult}
-                  disabled={simHomeGoals === "" || simAwayGoals === ""}
-                  className="flex-1 bg-[#22c55e] hover:bg-[#16a34a] disabled:opacity-50 text-zinc-950 font-bold py-3 rounded-2xl flex items-center justify-center gap-2 transition duration-200 shadow-[0_0_15px_rgba(34,197,94,0.3)] disabled:shadow-none"
-                >
-                  <Check className="w-4 h-4 stroke-[3px]" />
-                  <span>Apply Result</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+            );
+          })()}
+        </>
+      )}
 
       {isGroupStageComplete && activeTab === "group" && pathname === "/simulator" && !simMatch && !upgradeModalOpen && (
         <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md -translate-x-1/2 animate-float animate-in fade-in slide-in-from-bottom-8 duration-500 sm:bottom-6 sm:w-[calc(100vw-2rem)]">
@@ -6119,10 +6195,10 @@ export function GroupPredictor({
 
       {/* Share Link Dialog */}
       <Dialog open={shareLinkModalOpen} onOpenChange={setShareLinkModalOpen}>
-        <DialogContent className="sm:max-w-md bg-slate-900 border border-slate-800 text-white rounded-2xl p-6">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white rounded-2xl p-6">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold font-display text-white">Share Your Predictions</DialogTitle>
-            <DialogDescription className="text-slate-400 text-xs">
+            <DialogTitle className="text-xl font-bold font-display text-slate-900 dark:text-white">Share Your Predictions</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400 text-xs">
               Anyone with this link can view your predicted bracket and results in read-only mode.
             </DialogDescription>
           </DialogHeader>
@@ -6132,7 +6208,7 @@ export function GroupPredictor({
                 id="share-link-input"
                 readOnly
                 value={generatedShareUrl}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500 font-mono"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-cyan-500 font-mono"
               />
             </div>
             <button
@@ -6140,34 +6216,34 @@ export function GroupPredictor({
                 navigator.clipboard.writeText(generatedShareUrl);
                 toast.success("Link copied to clipboard!");
               }}
-              className="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold px-4 py-2 rounded-lg text-xs transition duration-200"
+              className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold px-4 py-2 rounded-lg text-xs transition duration-200 cursor-pointer"
             >
               Copy
             </button>
           </div>
-          <div className="flex justify-center gap-4 mt-6 border-t border-slate-800 pt-4">
+          <div className="flex justify-center gap-3 mt-6 border-t border-slate-200 dark:border-slate-800 pt-4">
             <a
               href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                `Check out my FIFA World Cup 2026 predictions bracket! 🏆 Predicted Champion: ${
-                  koWinners.final[0] || "TBD"
+                `Check out my FIFA World Cup 2026 predictions bracket! 🏆 Predicted Champion: ${koWinners.final[0] || "TBD"
                 } @wc26_predict \n\n`
               )}&url=${encodeURIComponent(generatedShareUrl)}`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition"
+              className="flex items-center gap-2 text-xs font-semibold px-4 py-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-lg transition"
             >
-              <Share2 className="h-3.5 w-3.5 text-cyan-400" /> Share on X
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-current"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 22.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>
+              Share on X
             </a>
             <a
               href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                `Check out my FIFA World Cup 2026 bracket predictions! 🏆 champion: ${
-                  koWinners.final[0] || "TBD"
+                `Check out my FIFA World Cup 2026 bracket predictions! 🏆 champion: ${koWinners.final[0] || "TBD"
                 } - ${generatedShareUrl}`
               )}`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 text-xs text-slate-450 hover:text-white transition"
+              className="flex items-center gap-2 text-xs font-semibold px-4 py-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-lg transition"
             >
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"></path></svg>
               WhatsApp
             </a>
           </div>
@@ -6279,7 +6355,7 @@ function KnockoutMatchCard({
               {details.venue} · {details.date}
             </span>
           )}
-          {on1v1Click && (
+          {/* {on1v1Click && (
             <button
               type="button"
               onClick={(e) => {
@@ -6291,7 +6367,7 @@ function KnockoutMatchCard({
             >
               <Brain className="h-3.5 w-3.5" />
             </button>
-          )}
+          )} */}
           {onSimulateClick && !isReal && !isReadOnly && (
             <button
               type="button"

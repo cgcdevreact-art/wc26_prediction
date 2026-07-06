@@ -18,6 +18,7 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+
   const getModalDetails = () => {
     switch (reason) {
       case "guest":

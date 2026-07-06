@@ -6,7 +6,7 @@ export default function AdminDashboard() {
     <>
       <AdminHeader
         title="Dashboard"
-        description="Overview of WC26 Predict platform"
+        description="Overview of 26WC Prediction"
       />
       <DashboardContent />
     </>
