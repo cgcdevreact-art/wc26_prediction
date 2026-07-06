@@ -28,6 +28,9 @@ model User {
   teamOverrides     UserTeamOverride[]
   playerOverrides   UserPlayerOverride[]
   customCountries   UserCustomCountry[]
+  shareLinks        ShareLink[]
+  marketVotes       MarketVote[]
+  marketComments    MarketComment[]
 
   stripeCustomerId       String?   @unique
   stripeSubscriptionId  String?   @unique
@@ -467,5 +470,82 @@ model UserCustomCountry {
   updatedAt    DateTime @updatedAt
 
   @@unique([userId, code])
+  @@index([userId])
+}
+
+model ShareLink {
+  id            String   @id @default(cuid())
+  userId        String?  // Nullable to support anonymous/guest shares
+  title         String?  @default("My World Cup 2026 Bracket")
+  description   String?
+  
+  // The complete serialized predictions array (group matches + knockouts)
+  snapshot      Json
+  
+  // Cached metadata fields for high-speed queries & OG rendering
+  championCode  String?  // E.g. "BRA"
+  finalist1Code String?  // E.g. "BRA"
+  finalist2Code String?  // E.g. "FRA"
+  modelUsed     String   @default("base") // base, advanced, pro
+  
+  // Stats
+  views         Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model MarketMatch {
+  id             String   @id @default(cuid())
+  homeTeamName   String
+  homeTeamCode   String
+  homeTeamFlag   String
+  awayTeamName   String
+  awayTeamCode   String
+  awayTeamFlag   String
+  matchDate      DateTime
+  stage          String   @default("Group Stage")
+  status         String   @default("upcoming") // upcoming, live, finished
+  
+  votes          MarketVote[]
+  comments       MarketComment[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model MarketVote {
+  id             String   @id @default(cuid())
+  userId         String
+  marketMatchId  String
+  vote           String   // "HOME", "DRAW", "AWAY"
+  
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketMatch    MarketMatch @relation(fields: [marketMatchId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, marketMatchId])
+  @@index([marketMatchId])
+  @@index([userId])
+}
+
+model MarketComment {
+  id             String   @id @default(cuid())
+  userId         String
+  marketMatchId  String
+  content        String
+  
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketMatch    MarketMatch @relation(fields: [marketMatchId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([marketMatchId])
   @@index([userId])
 }

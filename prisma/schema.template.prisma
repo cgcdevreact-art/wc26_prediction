@@ -29,6 +29,8 @@ model User {
   playerOverrides   UserPlayerOverride[]
   customCountries   UserCustomCountry[]
   shareLinks        ShareLink[]
+  marketVotes       MarketVote[]
+  marketComments    MarketComment[]
 
   stripeCustomerId       String?   @unique
   stripeSubscriptionId  String?   @unique
@@ -493,5 +495,57 @@ model ShareLink {
   // Relations
   user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+}
+
+model MarketMatch {
+  id             String   @id @default(cuid())
+  homeTeamName   String
+  homeTeamCode   String
+  homeTeamFlag   String
+  awayTeamName   String
+  awayTeamCode   String
+  awayTeamFlag   String
+  matchDate      DateTime
+  stage          String   @default("Group Stage")
+  status         String   @default("upcoming") // upcoming, live, finished
+  
+  votes          MarketVote[]
+  comments       MarketComment[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model MarketVote {
+  id             String   @id @default(cuid())
+  userId         String
+  marketMatchId  String
+  vote           String   // "HOME", "DRAW", "AWAY"
+  
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketMatch    MarketMatch @relation(fields: [marketMatchId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, marketMatchId])
+  @@index([marketMatchId])
+  @@index([userId])
+}
+
+model MarketComment {
+  id             String   @id @default(cuid())
+  userId         String
+  marketMatchId  String
+  content        String
+  
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketMatch    MarketMatch @relation(fields: [marketMatchId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([marketMatchId])
   @@index([userId])
 }

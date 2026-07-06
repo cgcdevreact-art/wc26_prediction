@@ -7,13 +7,22 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ProbabilityExplorer } from "@/components/site/ProbabilityExplorer";
 import { WildcardCountrySection } from "@/components/site/WildcardCountrySection";
 import { FixturesExplorer } from "@/components/site/FixturesExplorer";
+import { MatchProbabilitiesList } from "@/components/site/MatchProbabilitiesList";
 import { ChevronDown } from "lucide-react";
 
-const DEFAULT_OPEN_SECTIONS = ["fixtures"];
+const DEFAULT_OPEN_SECTIONS = ["markets", "fixtures"];
 export const HOME_SECTION_OPEN_EVENT = "wc26:open-home-section";
 const PROBABILITY_SECTION_VALUE = "probability";
 
 const SECTIONS = [
+  {
+    value: "markets",
+    eyebrow: "Live Match Predictions",
+    title: "Crowd-sourced win probabilities.",
+    sub: "Predict match outcomes and discuss with the community. Percentages shift in real-time based on active votes.",
+    contentClassName: "pt-6",
+    content: <MatchProbabilitiesList />,
+  },
   {
     value: "probability",
     eyebrow: "Team Probability Explorer",
