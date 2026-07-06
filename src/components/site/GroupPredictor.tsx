@@ -387,6 +387,26 @@ const KO_DETAILS: Record<string, { venue: string; date: string }[]> = {
   ]
 };
 
+// Maps API match_no (number) in liveR32 to the corresponding visual slot index (0-15) in the bracket
+const API_MATCH_NO_TO_SLOT_INDEX: Record<number, number> = {
+  73: 0,
+  75: 1,
+  74: 2,
+  77: 3,
+  76: 4,
+  78: 5,
+  79: 6,
+  80: 7,
+  83: 8,
+  84: 9,
+  81: 10,
+  82: 11,
+  86: 12,
+  88: 13,
+  85: 14,
+  87: 15
+};
+
 const MODEL_META = {
   base: {
     label: "Base",
@@ -2302,18 +2322,20 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
       const liveR32 = apiFixtures.filter((f) => f.isKnockout && f.stageName === "Round of 32");
       if (liveR32.length === 16) {
         const isValidCode = (c: string) => c && c.length === 3 && !c.match(/Winner|Runner|3rd|TBC|TBD/i);
-        return fallbackPairs.map((pair, idx) => {
-          const match = liveR32[idx];
-          if (match) {
+        const updatedPairs = [...fallbackPairs];
+        liveR32.forEach((match) => {
+          const matchNo = Number(match.match_no);
+          const slotIdx = API_MATCH_NO_TO_SLOT_INDEX[matchNo];
+          if (slotIdx !== undefined && slotIdx >= 0 && slotIdx < 16) {
             const h = match.homeTeamObj?.code;
             const a = match.awayTeamObj?.code;
-            return {
-              home: isValidCode(h) ? h.toUpperCase() : pair.home,
-              away: isValidCode(a) ? a.toUpperCase() : pair.away,
+            updatedPairs[slotIdx] = {
+              home: isValidCode(h) ? h.toUpperCase() : fallbackPairs[slotIdx].home,
+              away: isValidCode(a) ? a.toUpperCase() : fallbackPairs[slotIdx].away,
             };
           }
-          return pair;
         });
+        return updatedPairs;
       }
     }
 
@@ -2857,26 +2879,24 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
     ];
 
     if (useRealScores && apiFixtures && apiFixtures.length > 0) {
-      const liveR32 = apiFixtures
-        .filter((f: any) => f.isKnockout && f.stageName === "Round of 32")
-        .sort((a, b) => a.match_no - b.match_no);
+      const liveR32 = apiFixtures.filter((f: any) => f.isKnockout && f.stageName === "Round of 32");
 
       if (liveR32.length === 16) {
         const isValidCode = (c: string) => c && c.length === 3 && !c.match(/Winner|Runner|3rd|TBC|TBD/i);
-
-        return fallbackPairs.map((pair, idx) => {
-          const match = liveR32[idx];
-          if (match) {
+        const updatedPairs = [...fallbackPairs];
+        liveR32.forEach((match) => {
+          const matchNo = Number(match.match_no);
+          const slotIdx = API_MATCH_NO_TO_SLOT_INDEX[matchNo];
+          if (slotIdx !== undefined && slotIdx >= 0 && slotIdx < 16) {
             const liveHomeCode = (match.homeTeamObj?.code || "").trim().toUpperCase();
             const liveAwayCode = (match.awayTeamObj?.code || "").trim().toUpperCase();
-
-            return {
-              home: isValidCode(liveHomeCode) ? liveHomeCode : pair.home,
-              away: isValidCode(liveAwayCode) ? liveAwayCode : pair.away
+            updatedPairs[slotIdx] = {
+              home: isValidCode(liveHomeCode) ? liveHomeCode : fallbackPairs[slotIdx].home,
+              away: isValidCode(liveAwayCode) ? liveAwayCode : fallbackPairs[slotIdx].away
             };
           }
-          return pair;
         });
+        return updatedPairs;
       }
     }
 
@@ -4167,12 +4187,26 @@ export function GroupPredictor({ defaultTab = "group", onlyKnockout = false, ful
                           <RefreshCw className="h-4 w-4" />
                           Reset
                         </button>
-                        {useRealScores && (
-                          <span className="text-xs font-black text-cyan-500 dark:text-cyan-400 uppercase tracking-widest bg-cyan-500/10 dark:bg-cyan-950/40 px-2.5 py-1.5 rounded-lg border border-cyan-500/20 shadow-sm animate-pulse flex items-center gap-1.5">
-                            <Zap className="h-3.5 w-3.5 fill-cyan-500/20 text-cyan-500" />
-                            Real-Time Data Included
-                          </span>
-                        )}
+                        <label
+                          className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-semibold cursor-pointer select-none transition ${
+                            useRealScores
+                              ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)] animate-pulse"
+                              : "bg-muted dark:bg-white/5 border border-border dark:border-white/10 text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={useRealScores}
+                            onChange={(e) => handleToggleRealScores(e.target.checked)}
+                            className="h-4 w-4 rounded border-slate-300 dark:border-white/20 bg-slate-100 dark:bg-slate-800 text-cyan-600 focus:ring-cyan-500 cursor-pointer accent-cyan-500"
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <Zap className={`h-3.5 w-3.5 transition-all duration-300 ${useRealScores ? "text-cyan-500 fill-cyan-500 scale-110 drop-shadow-[0_0_8px_rgba(6,182,212,0.6)] animate-pulse" : "text-slate-400 dark:text-slate-500"}`} />
+                            <span className="font-bold leading-none select-none uppercase tracking-wider">
+                              Include Real-Time Results ({groupRealPercent}%)
+                            </span>
+                          </div>
+                        </label>
                       </div>
 
                       {/* Zoom Controls */}
