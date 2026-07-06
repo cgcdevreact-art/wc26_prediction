@@ -49,7 +49,7 @@ export default async function SharedBracketPage({ params }: { params: any }) {
   }
 
   // If this is a country prediction instead of a bracket prediction, route them to the Country Predictor
-  if (Array.isArray(share.snapshot) && share.snapshot[0]?.type?.startsWith("COUNTRY_PROJECTION")) {
+  if (Array.isArray(share.snapshot) && (share.snapshot[0] as any)?.type?.startsWith("COUNTRY_PROJECTION")) {
     redirect(`/predictions/country?shareId=${shareId}`);
   }
 

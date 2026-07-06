@@ -296,13 +296,13 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
 
       // Average Age
       const ages = c.players
-        .map(p => parseFloat(p["Age on 2026-06-11"] || "") || parseFloat(p.Age || "") || 0)
+        .map(p => parseFloat((p as any)["Age on 2026-06-11"] || "") || parseFloat((p as any).Age || "") || 0)
         .filter(Boolean);
       const avgAge = ages.length ? Math.round((ages.reduce((sum, val) => sum + val, 0) / ages.length) * 10) / 10 : 0;
 
       // Average Height
       const heights = c.players
-        .map(p => parseInt(p["Height (cm)"] || "", 10) || 0)
+        .map(p => parseInt((p as any)["Height (cm)"] || "", 10) || 0)
         .filter(Boolean);
       const avgHeight = heights.length ? Math.round(heights.reduce((sum, val) => sum + val, 0) / heights.length) : 0;
 
@@ -724,9 +724,9 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
 
                           <div className="flex flex-col">
                             <div className="flex items-center gap-2">
-                              {player["Squad No."] && (
-                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 font-mono">
-                                  #{player["Squad No."]}
+                              {(player as any)["Squad No."] && (
+                                <span className="text-xs font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-white/5 px-1.5 py-0.5 rounded">
+                                  #{(player as any)["Squad No."]}
                                 </span>
                               )}
                               <span className="font-semibold text-sm text-slate-900 dark:text-white">
@@ -746,10 +746,10 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                                 </span>
                               </div>
                               {/* Age & Height */}
-                              {(player["Age on 2026-06-11"] || player["Height (cm)"]) && (
+                              {((player as any)["Age on 2026-06-11"] || (player as any)["Height (cm)"]) && (
                                 <span className="text-[10px] text-slate-450 dark:text-slate-550 font-medium">
-                                  • {player["Age on 2026-06-11"] ? `${Math.floor(parseFloat(player["Age on 2026-06-11"]))}y` : ""}
-                                  {player["Height (cm)"] ? ` ${player["Height (cm)"]}cm` : ""}
+                                  • {(player as any)["Age on 2026-06-11"] ? `${Math.floor(parseFloat((player as any)["Age on 2026-06-11"]))}y` : ""}
+                                  {(player as any)["Height (cm)"] ? ` ${(player as any)["Height (cm)"]}cm` : ""}
                                 </span>
                               )}
                             </div>
