@@ -79,9 +79,9 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
       )}
       <div className="mt-8 grid gap-5 lg:grid-cols-2 min-w-0">
         <div className="glass-strong rounded-2xl p-5 min-w-0 overflow-hidden">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+          <div className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] items-center gap-3 w-full">
             <TeamPicker value={a} onChange={handleTeamAChange} excludeCode={b} accent="neon" />
-            <button onClick={() => { setA(b); setB(a); }} className="grid h-10 w-10 place-items-center rounded-full bg-white/5 hover:bg-white/10" aria-label="swap">
+            <button onClick={() => { setA(b); setB(a); }} className="grid h-10 w-10 place-items-center rounded-full bg-white/5 hover:bg-white/10 rotate-90 sm:rotate-0 transition duration-200" aria-label="swap">
               <ArrowLeftRight className="h-4 w-4" />
             </button>
             <TeamPicker value={b} onChange={handleTeamBChange} excludeCode={a} accent="neon-2" />
@@ -159,7 +159,7 @@ function TeamPicker({
   const ring = accent === "neon" ? "ring-neon/40" : "ring-[var(--color-neon-2)]/40";
   const availableTeams = teams.filter((team) => team.code === value || team.code !== excludeCode);
   return (
-      <div className={`rounded-2xl bg-white/5 p-3 ring-1 ${ring}`}>
+    <div className={`rounded-2xl bg-white/5 p-3 ring-1 w-full ${ring}`}>
       <div className="flex items-center gap-3">
         <CountryFlag
           code={t.code}

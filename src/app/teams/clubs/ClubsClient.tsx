@@ -4,6 +4,213 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Search, Trophy, Globe, Award, Users, ChevronLeft, ChevronRight, X, Sparkles, Shield } from "lucide-react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 
+const FIFA_TO_FULL_NAME: Record<string, string> = {
+  AFG: "Afghanistan",
+  ALB: "Albania",
+  ALG: "Algeria",
+  AND: "Andorra",
+  ANG: "Angola",
+  ANT: "Antigua & Barbuda",
+  ARG: "Argentina",
+  ARM: "Armenia",
+  ARU: "Aruba",
+  ASA: "American Samoa",
+  AUS: "Australia",
+  AUT: "Austria",
+  AZE: "Azerbaijan",
+  BAH: "Bahamas",
+  BAN: "Bangladesh",
+  BDI: "Burundi",
+  BEL: "Belgium",
+  BEN: "Benin",
+  BER: "Bermuda",
+  BFA: "Burkina Faso",
+  BHR: "Bahrain",
+  BIH: "Bosnia & Herzegovina",
+  BLR: "Belarus",
+  BLZ: "Belize",
+  BOL: "Bolivia",
+  BOT: "Botswana",
+  BRA: "Brazil",
+  BRU: "Brunei",
+  BUL: "Bulgaria",
+  CAM: "Cambodia",
+  CAN: "Canada",
+  CAY: "Cayman Islands",
+  CGO: "Congo",
+  CHA: "Chad",
+  CHI: "Chile",
+  CHN: "China",
+  CIV: "Ivory Coast",
+  CMR: "Cameroon",
+  COD: "DR Congo",
+  COK: "Cook Islands",
+  COL: "Colombia",
+  COM: "Comoros",
+  CPV: "Cape Verde",
+  CRC: "Costa Rica",
+  CRO: "Croatia",
+  CTA: "Central African Republic",
+  CUB: "Cuba",
+  CUR: "Curaçao",
+  CUW: "Curaçao",
+  CYP: "Cyprus",
+  CZE: "Czech Republic",
+  DEN: "Denmark",
+  DJI: "Djibouti",
+  DMA: "Dominica",
+  DOM: "Dominican Republic",
+  ECU: "Ecuador",
+  EGY: "Egypt",
+  ENG: "England",
+  EQG: "Equatorial Guinea",
+  ERI: "Eritrea",
+  ESP: "Spain",
+  EST: "Estonia",
+  ETH: "Ethiopia",
+  FIJ: "Fiji",
+  FIN: "Finland",
+  FRA: "France",
+  FRG: "Germany",
+  FRO: "Faroe Islands",
+  GAB: "Gabon",
+  GAM: "Gambia",
+  GEO: "Georgia",
+  GER: "Germany",
+  GHA: "Ghana",
+  GIB: "Gibraltar",
+  GPE: "Guadeloupe",
+  GRN: "Grenada",
+  GUA: "Guatemala",
+  GUI: "Guinea",
+  GUM: "Guam",
+  GUY: "Guyana",
+  HAI: "Haiti",
+  HKG: "Hong Kong",
+  HON: "Honduras",
+  HUN: "Hungary",
+  INA: "Indonesia",
+  IND: "India",
+  IRL: "Ireland",
+  IRN: "Iran",
+  IRQ: "Iraq",
+  ISL: "Iceland",
+  ISR: "Israel",
+  ITA: "Italy",
+  JAM: "Jamaica",
+  JOR: "Jordan",
+  JPN: "Japan",
+  KAZ: "Kazakhstan",
+  KEN: "Kenya",
+  KGZ: "Kyrgyzstan",
+  KOR: "South Korea",
+  KSA: "Saudi Arabia",
+  KUW: "Kuwait",
+  LAO: "Laos",
+  LVA: "Latvia",
+  LBN: "Lebanon",
+  LBR: "Liberia",
+  LBY: "Libya",
+  LCA: "Saint Lucia",
+  LES: "Lesotho",
+  LIE: "Liechtenstein",
+  LTU: "Lithuania",
+  LUX: "Luxembourg",
+  MAC: "Macau",
+  MAD: "Madagascar",
+  MAR: "Morocco",
+  MAS: "Malaysia",
+  MDA: "Moldova",
+  MDV: "Maldives",
+  MEX: "Mexico",
+  MGL: "Mongolia",
+  MKD: "North Macedonia",
+  MLI: "Mali",
+  MLT: "Malta",
+  MNE: "Montenegro",
+  MOZ: "Mozambique",
+  MRI: "Mauritius",
+  MSH: "Montserrat",
+  MTN: "Mauritania",
+  MWI: "Malawi",
+  MYA: "Myanmar",
+  NAM: "Namibia",
+  NCA: "Nicaragua",
+  NED: "Netherlands",
+  NEP: "Nepal",
+  NGA: "Nigeria",
+  NIG: "Niger",
+  NIR: "Northern Ireland",
+  NOR: "Norway",
+  NZL: "New Zealand",
+  OMA: "Oman",
+  PAK: "Pakistan",
+  PAN: "Panama",
+  PAR: "Paraguay",
+  PER: "Peru",
+  PHI: "Philippines",
+  PLE: "Palestine",
+  PNG: "Papua New Guinea",
+  POL: "Poland",
+  POR: "Portugal",
+  PRK: "North Korea",
+  PUR: "Puerto Rico",
+  QAT: "Qatar",
+  ROU: "Romania",
+  RSA: "South Africa",
+  RUS: "Russia",
+  RWA: "Rwanda",
+  SAM: "Samoa",
+  SCO: "Scotland",
+  SEN: "Senegal",
+  SEY: "Seychelles",
+  SGP: "Singapore",
+  SHN: "Saint Helena",
+  SLE: "Sierra Leone",
+  SLV: "El Salvador",
+  SMR: "San Marino",
+  SOL: "Solomon Islands",
+  SOM: "Somalia",
+  SRB: "Serbia",
+  SRI: "Sri Lanka",
+  SSD: "South Sudan",
+  STP: "São Tomé & Príncipe",
+  SUI: "Switzerland",
+  SUR: "Suriname",
+  SVK: "Slovakia",
+  SVN: "Slovenia",
+  SWE: "Sweden",
+  SWZ: "Swaziland",
+  SYR: "Syria",
+  TAH: "Tahiti",
+  TAN: "Tanzania",
+  TCA: "Turks & Caicos",
+  TGO: "Togo",
+  THA: "Thailand",
+  TJK: "Tajikistan",
+  TKM: "Turkmenistan",
+  TLS: "East Timor",
+  TOG: "Togo",
+  TGA: "Tonga",
+  TRI: "Trinidad & Tobago",
+  TUN: "Tunisia",
+  TUR: "Turkey",
+  UAE: "United Arab Emirates",
+  UGA: "Uganda",
+  UKR: "Ukraine",
+  URU: "Uruguay",
+  USA: "United States",
+  UZB: "Uzbekistan",
+  VAN: "Vanuatu",
+  VEN: "Venezuela",
+  VIE: "Vietnam",
+  VIN: "St. Vincent & Grenadines",
+  WAL: "Wales",
+  YEM: "Yemen",
+  ZAM: "Zambia",
+  ZIM: "Zimbabwe"
+};
+
 // Static pre-cached URLs for top world clubs to load instantly and save API bandwidth
 const PRE_CACHED_LOGOS: Record<string, string> = {
   "Manchester City": "https://www.thesportsdb.com/images/media/team/badge/xqyyxy1473531117.png",
@@ -330,7 +537,12 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
     const list = clubs
       .map((c) => c.association)
       .filter((a): a is string => Boolean(a) && a.trim() !== "");
-    return Array.from(new Set(list)).sort();
+    const uniqueList = Array.from(new Set(list));
+    return uniqueList.sort((a, b) => {
+      const nameA = FIFA_TO_FULL_NAME[a] || a;
+      const nameB = FIFA_TO_FULL_NAME[b] || b;
+      return nameA.localeCompare(nameB);
+    });
   }, [clubs]);
 
   // Filter and sort clubs
@@ -443,7 +655,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
             <option value="ALL">All Associations</option>
             {uniqueAssociations.map((assoc) => (
               <option key={assoc} value={assoc}>
-                {assoc}
+                {FIFA_TO_FULL_NAME[assoc] || assoc}
               </option>
             ))}
           </select>
@@ -522,7 +734,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                                   className="h-3 w-4.5 rounded-[1px] object-cover shadow-sm border border-slate-200/20 dark:border-white/5"
                                 />
                                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                                  {club.association || "Unknown"}
+                                  {FIFA_TO_FULL_NAME[club.association] || club.association || "Unknown"}
                                 </span>
                               </div>
                             </div>
@@ -655,7 +867,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                         className="h-3.5 w-5 rounded-sm object-cover border border-slate-200/40 dark:border-white/5"
                       />
                       <p className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
-                        {selectedClub.association || "Unknown association"}
+                        {FIFA_TO_FULL_NAME[selectedClub.association] || selectedClub.association || "Unknown association"}
                       </p>
                     </div>
                   </div>

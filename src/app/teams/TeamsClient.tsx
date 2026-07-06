@@ -715,22 +715,22 @@ export default function TeamsClient({
 
       <Tabs defaultValue="list" className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <TabsList className="h-auto flex-wrap justify-start rounded-[1.5rem] border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
+          <TabsList className="h-auto flex w-full md:w-auto overflow-x-auto scrollbar-none whitespace-nowrap justify-start rounded-[1.5rem] border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
             <TabsTrigger
               value="list"
-              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="shrink-0 flex-none rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 whitespace-nowrap data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
             >
               Teams List
             </TabsTrigger>
             <TabsTrigger
               value="rankings"
-              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="shrink-0 flex-none rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 whitespace-nowrap data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
             >
               Team Rankings
             </TabsTrigger>
             <TabsTrigger
               value="players"
-              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="shrink-0 flex-none rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 whitespace-nowrap data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
             >
               Player Rankings
             </TabsTrigger>
