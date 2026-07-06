@@ -34,7 +34,7 @@ export function AdminSidebar() {
         </div>
         <div className="leading-tight">
           <div className="text-sm font-bold tracking-wide text-slate-900">
-            WC26 <span className="bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">ADMIN</span>
+            26WC PREDICTION <span className="bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">ADMIN</span>
           </div>
           <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
             Control Panel
@@ -71,9 +71,9 @@ export function AdminSidebar() {
                     }`}
                 />
                 <span>{item.label}</span>
-                {isActive && (
+                {/* {isActive && (
                   <div className="ml-auto h-1.5 w-1.5 rounded-full bg-violet-500" />
-                )}
+                )} */}
               </Link>
             );
           })}
