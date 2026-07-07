@@ -10,19 +10,11 @@ import { FixturesExplorer } from "@/components/site/FixturesExplorer";
 import { MatchProbabilitiesList } from "@/components/site/MatchProbabilitiesList";
 import { ChevronDown } from "lucide-react";
 
-const DEFAULT_OPEN_SECTIONS = ["markets", "fixtures"];
+const DEFAULT_OPEN_SECTIONS = ["fixtures"];
 export const HOME_SECTION_OPEN_EVENT = "wc26:open-home-section";
 const PROBABILITY_SECTION_VALUE = "probability";
 
 const SECTIONS = [
-  {
-    value: "markets",
-    eyebrow: "Live Match Predictions",
-    title: "Crowd-sourced win probabilities.",
-    sub: "Predict match outcomes and discuss with the community. Percentages shift in real-time based on active votes.",
-    contentClassName: "pt-6",
-    content: <MatchProbabilitiesList />,
-  },
   {
     value: "probability",
     eyebrow: "Team Probability Explorer",
@@ -87,12 +79,16 @@ export function HomeSectionsAccordion() {
   }, []);
 
   return (
-    <Accordion
-      type="multiple"
-      value={openItems}
-      onValueChange={setOpenItems}
-      className="container mx-auto space-y-8 px-4 py-12"
-    >
+    <div className="container mx-auto space-y-12 px-4 py-12">
+      <div id="markets">
+        <MatchProbabilitiesList />
+      </div>
+      <Accordion
+        type="multiple"
+        value={openItems}
+        onValueChange={setOpenItems}
+        className="space-y-8"
+      >
       {SECTIONS.map((section) => {
         const isOpen = openItems.includes(section.value);
 
@@ -143,6 +139,7 @@ export function HomeSectionsAccordion() {
           </div>
         );
       })}
-    </Accordion>
+      </Accordion>
+    </div>
   );
 }

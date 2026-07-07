@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
 
-    const matches = await prisma.marketMatch.findMany({
+    let matches = await prisma.marketMatch.findMany({
       where: search ? {
         OR: [
           { homeTeamName: { contains: search } },
@@ -23,52 +23,51 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Calculate probabilities dynamically based on votes
+    if (matches.length === 0) {
+      // Seed data if empty
+      const SEED_MATCHES = [
+        { homeTeamName: "United States", homeTeamCode: "USA", homeTeamFlag: "us", awayTeamName: "Belgium", awayTeamCode: "BEL", awayTeamFlag: "be", matchDate: new Date("2026-07-11T12:00:00Z"), stage: "QUARTER-FINAL", status: "upcoming" },
+        { homeTeamName: "Portugal", homeTeamCode: "POR", homeTeamFlag: "pt", awayTeamName: "Spain", awayTeamCode: "ESP", awayTeamFlag: "es", matchDate: new Date("2026-07-11T16:00:00Z"), stage: "ROUND OF 16", status: "upcoming" },
+        { homeTeamName: "France", homeTeamCode: "FRA", homeTeamFlag: "fr", awayTeamName: "Germany", awayTeamCode: "GER", awayTeamFlag: "de", matchDate: new Date("2026-07-12T12:00:00Z"), stage: "QUARTER-FINAL", status: "upcoming" },
+        { homeTeamName: "Argentina", homeTeamCode: "ARG", homeTeamFlag: "ar", awayTeamName: "Brazil", awayTeamCode: "BRA", awayTeamFlag: "br", matchDate: new Date("2026-07-12T16:00:00Z"), stage: "QUARTER-FINAL", status: "upcoming" },
+      ];
+      
+      for (const match of SEED_MATCHES) {
+        await prisma.marketMatch.create({ data: match });
+      }
+
+      // Re-fetch after seeding
+      matches = await prisma.marketMatch.findMany({
+        include: { votes: true },
+        orderBy: { matchDate: "asc" }
+      });
+    }
+
+    // Calculate probabilities dynamically based on votes (No Draw)
     const enrichedMatches = matches.map((match) => {
       const totalVotes = match.votes.length;
       let homeProb = 0;
-      let drawProb = 0;
       let awayProb = 0;
 
       if (totalVotes > 0) {
         const homeVotes = match.votes.filter(v => v.vote === "HOME").length;
-        const drawVotes = match.votes.filter(v => v.vote === "DRAW").length;
         const awayVotes = match.votes.filter(v => v.vote === "AWAY").length;
 
         homeProb = Math.round((homeVotes / totalVotes) * 100);
-        drawProb = Math.round((drawVotes / totalVotes) * 100);
-        awayProb = 100 - homeProb - drawProb; // Ensure it sums to 100
+        awayProb = 100 - homeProb;
       } else {
         // Default equal probability if no votes
-        homeProb = 33;
-        drawProb = 34;
-        awayProb = 33;
+        homeProb = 50;
+        awayProb = 50;
       }
 
-      // We omit the full votes array to save payload size, unless needed for the graph later.
       const { votes, ...matchData } = match;
-
-      // Generate dynamic news headlines based on the teams
-      const headlines = [
-        {
-          source: "BBC Sport",
-          time: "2h ago",
-          title: `Will ${match.homeTeamName} hold off ${match.awayTeamName}? Dynamic simulation details internal squad changes.`,
-        },
-        {
-          source: "Reuters",
-          time: "1d ago",
-          title: `${match.homeTeamName} vs ${match.awayTeamName}: Key players key stats and simulated match predictions.`,
-        },
-      ];
 
       return {
         ...matchData,
         homeProb,
-        drawProb,
         awayProb,
         totalVotes,
-        headlines,
       };
     });
 
