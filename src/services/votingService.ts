@@ -19,6 +19,13 @@ export interface TournamentWinnerResponse {
     prob: number;
     color: string;
   }>;
+  allTeams?: Array<{
+    name: string;
+    code: string;
+    flag: string;
+    prob: number;
+    color: string;
+  }>;
   chartData: any[];
   totalVotes: number;
   userSelection?: string | null;
