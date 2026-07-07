@@ -188,7 +188,7 @@ export default function AdminUsersPage() {
             />
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <select
               value={roleFilter}
               onChange={(e) => {
@@ -255,8 +255,8 @@ export default function AdminUsersPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full">
+        <div className="overflow-x-auto overflow-y-hidden rounded-2xl border border-slate-200 bg-white">
+          <table className="w-full whitespace-nowrap min-w-max">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th 

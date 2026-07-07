@@ -91,7 +91,7 @@ export default function AdminMatchesPage() {
 
       <div className="flex-1 overflow-y-auto p-8">
         {/* Filters */}
-        <div className="mb-6 flex items-center gap-4">
+        <div className="mb-6 flex flex-wrap items-center gap-4">
           <select
             value={statusFilter}
             onChange={(e) => {
@@ -112,8 +112,8 @@ export default function AdminMatchesPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full">
+        <div className="overflow-x-auto overflow-y-hidden rounded-2xl border border-slate-200 bg-white">
+          <table className="w-full whitespace-nowrap min-w-max">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th 
