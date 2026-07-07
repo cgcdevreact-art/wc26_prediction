@@ -56,7 +56,7 @@ function TableHeaderCell({ label, tooltip, children }: { label?: string; tooltip
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="cursor-help underline decoration-dotted decoration-muted-foreground/45 hover:decoration-foreground/60 transition-colors">
+          <span className="shrink-0 cursor-help underline decoration-dotted decoration-muted-foreground/45 hover:decoration-foreground/60 transition-colors">
             {children || label}
           </span>
         </TooltipTrigger>
@@ -1014,7 +1014,7 @@ export default function TeamsClient({
               </select>
             </div>
             <div className="overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
-              <table className="w-full text-left text-[11px] table-auto">
+              <table className="w-full text-left text-[11px] table-auto whitespace-nowrap min-w-max">
                 <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[10px] sm:text-xs font-bold uppercase tracking-[0.12em] text-slate-700 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-200">
                   <tr>
                     <th className="w-8 px-1 py-3 font-semibold whitespace-nowrap">#</th>

@@ -422,7 +422,7 @@ export default function SavedPredictionsClient() {
             ) : (
               <div className="space-y-6">
                 <div className="overflow-x-auto overflow-y-auto max-h-[520px] rounded-[1.5rem] border border-slate-200 dark:border-white/10 bg-slate-50/30 dark:bg-black/20 custom-scrollbar">
-                  <table className="w-full text-left border-collapse text-sm">
+                  <table className="w-full text-left border-collapse text-sm min-w-max">
                     <thead className="sticky top-0 z-20 shadow-sm">
                       <tr className="border-b border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-900 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         <th className="py-3 px-4 w-12 text-center">Compare</th>
@@ -938,8 +938,8 @@ export default function SavedPredictionsClient() {
                         <span>Head-to-Head Compare Table</span>
                       </h4>
 
-                      <div className="overflow-x-auto rounded-2xl border border-slate-250 dark:border-white/5">
-                        <table className="w-full text-left border-collapse text-xs whitespace-nowrap min-w-[700px]">
+                      <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-250 dark:border-white/5">
+                        <table className="w-full text-left border-collapse text-xs whitespace-nowrap min-w-max">
                           <thead>
                             <tr className="bg-slate-100 dark:bg-white/[0.02] border-b border-slate-200 dark:border-white/10 font-bold uppercase tracking-wider text-muted-foreground">
                               <th className="py-4 px-5 w-44 sticky left-0 bg-slate-100 dark:bg-[#0c1322] border-r border-slate-200 dark:border-white/10 z-25 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]">Metrics</th>
@@ -1291,6 +1291,255 @@ export default function SavedPredictionsClient() {
                             })()}
                           </tbody>
                         </table>
+                      </div>
+
+                      {/* Mobile Metric-First Comparison Layout */}
+                      <div className="md:hidden">
+                        <div className="flex flex-col gap-6">
+                        {(() => {
+                          const getRawEloVal = (pData: any) => pData.customElo ?? pData.elo ?? 1500;
+                          const getRawAttackVal = (pData: any) => pData.customAttack ?? 75;
+                          const getRawDefenseVal = (pData: any) => pData.customDefense ?? 75;
+                          const getRawSquadVal = (pData: any) => pData.squadValueM ?? appTeams.find((t: any) => t.code === pData.code)?.squadValueM ?? 0;
+                          const getRawChOdds = (pData: any) => pData.stages?.champion ?? (pData.championProb * 10 || 0);
+
+                          const maxEloVal = Math.max(...parsedCompareData.map(c => getRawEloVal(c.data)));
+                          const maxAttackValue = Math.max(...parsedCompareData.map(c => getRawAttackVal(c.data)));
+                          const maxDefenseValue = Math.min(...parsedCompareData.map(c => getRawDefenseVal(c.data))); // Lower defense rating is actually better for conceding less
+                          const maxSquadValue = Math.max(...parsedCompareData.map(c => getRawSquadVal(c.data)));
+                          const maxChampionshipOdds = Math.max(...parsedCompareData.map(c => getRawChOdds(c.data)));
+
+                          const maxReachFinal = Math.max(...parsedCompareData.map(c => c.data.stages?.final ?? 0));
+                          const maxReachSF = Math.max(...parsedCompareData.map(c => c.data.stages?.sf ?? 0));
+                          const maxReachQF = Math.max(...parsedCompareData.map(c => c.data.stages?.qf ?? 0));
+                          const maxReachR16 = Math.max(...parsedCompareData.map(c => c.data.stages?.r16 ?? 0));
+                          const maxReachR32 = Math.max(...parsedCompareData.map(c => c.data.stages?.r32 ?? 0));
+
+                          const metrics = [
+                            { id: 'elo', label: 'Elo Strength', icon: <TrendingUp className="w-4 h-4 text-cyan-500 shrink-0" />, getter: getRawEloVal, max: maxEloVal, format: (v: number) => Math.round(v), bestLabel: 'Strongest', isLowerBetter: false },
+                            { id: 'att', label: 'Attack Rating', icon: <Award className="w-4 h-4 text-emerald-500 shrink-0" />, getter: getRawAttackVal, max: maxAttackValue, format: (v: number) => Math.round(v), bestLabel: 'Best Att', isLowerBetter: false },
+                            { id: 'def', label: 'Defense Rating', icon: <Info className="w-4 h-4 text-rose-500 shrink-0" />, getter: getRawDefenseVal, max: maxDefenseValue, format: (v: number) => Math.round(v), bestLabel: 'Best Def', isLowerBetter: true },
+                            { id: 'sqd', label: 'Squad Value', icon: <Award className="w-4 h-4 text-amber-500 shrink-0" />, getter: getRawSquadVal, max: maxSquadValue, format: (v: number) => v ? `€${v}M` : 'N/A', bestLabel: 'Highest', isLowerBetter: false },
+                          ];
+
+                          const stages = [
+                            { id: 'ch', label: 'Championship Odds', icon: <Award className="w-4 h-4 text-rose-500 shrink-0" />, stageKey: null, max: maxChampionshipOdds },
+                            { id: 'final', label: 'Reach Final', icon: <ChevronRight className="w-4 h-4 text-cyan-500 shrink-0" />, stageKey: 'final', max: maxReachFinal },
+                            { id: 'sf', label: 'Reach Semi-Final', icon: <ChevronRight className="w-4 h-4 text-cyan-500/80 shrink-0" />, stageKey: 'sf', max: maxReachSF },
+                            { id: 'qf', label: 'Reach Quarter-Final', icon: <ChevronRight className="w-4 h-4 text-cyan-500/60 shrink-0" />, stageKey: 'qf', max: maxReachQF },
+                            { id: 'r16', label: 'Reach Round of 16', icon: <ChevronRight className="w-4 h-4 text-cyan-500/40 shrink-0" />, stageKey: 'r16', max: maxReachR16 },
+                            { id: 'r32', label: 'Reach Round of 32', icon: <ChevronRight className="w-4 h-4 text-cyan-500/20 shrink-0" />, stageKey: 'r32', max: maxReachR32 },
+                          ];
+
+                          return (
+                            <>
+                              {/* Attributes Section */}
+                              <div className="space-y-4 mt-2">
+                                <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Attributes</h5>
+                                {metrics.map(m => (
+                                  <div key={m.id} className="bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded-[1.25rem] p-4 shadow-sm">
+                                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-200 dark:border-white/5 text-[13px] font-black text-slate-800 dark:text-slate-200">
+                                      {m.icon}
+                                      {m.label}
+                                    </div>
+                                    <div className="space-y-2">
+                                      {parsedCompareData.map(c => {
+                                        const val = m.getter(c.data);
+                                        const isBest = m.isLowerBetter ? (val === m.max && parsedCompareData.length > 1) : (val === m.max && val > 0 && parsedCompareData.length > 1);
+                                        return (
+                                          <div key={c.id} className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${isBest ? 'bg-emerald-500/[0.08] border-emerald-500/20 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-150 dark:border-white/5'}`}>
+                                            <div className="flex items-center gap-2">
+                                              <CountryFlag code={c.data.code} flag={c.data.flag} name={c.data.name} className="h-4.5 w-6 rounded shrink-0" emojiClassName="text-base leading-none" />
+                                              <span className="text-xs font-bold truncate max-w-[120px]">{c.data.displayName}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <span className={`font-mono text-sm font-black ${isBest ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                {m.format(val)}
+                                              </span>
+                                              {isBest && <span className="text-[9px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide bg-emerald-500/15 px-1.5 py-0.5 rounded">{m.bestLabel}</span>}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                ))}
+
+                                {/* Model Engine Mobile Card */}
+                                <div className="bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded-[1.25rem] p-4 shadow-sm"
+                                     onClick={subTier === "free" ? () => { setUpgradeReason("plus"); setUpgradeOpen(true); } : undefined}>
+                                  <div className={`flex items-center gap-2 mb-3 pb-3 border-b border-slate-200 dark:border-white/5 text-[13px] font-black text-slate-800 dark:text-slate-200 ${subTier === "free" ? "blur-[2px] opacity-70" : ""}`}>
+                                    <Cpu className="w-4 h-4 text-purple-500 shrink-0" />
+                                    Model Engine
+                                  </div>
+                                  <div className={`space-y-2 ${subTier === "free" ? "blur-[4px] select-none pointer-events-none" : ""}`}>
+                                    {parsedCompareData.map(c => {
+                                      const modelLower = (c.data?.modelName || "base").toLowerCase();
+                                      const model = modelLower === "pro" || modelLower === "expert" ? "Pro" : modelLower === "advanced" ? "Advanced" : "Base";
+                                      const badgeClass = model === "Pro"
+                                        ? "bg-purple-500/10 text-purple-700 border-purple-500/20"
+                                        : model === "Advanced"
+                                          ? "bg-cyan-500/10 text-cyan-700 border-cyan-500/20"
+                                          : "bg-slate-500/10 text-slate-700 border-slate-500/20";
+                                      return (
+                                        <div key={c.id} className="flex items-center justify-between p-2.5 rounded-xl border bg-white dark:bg-slate-900 border-slate-150 dark:border-white/5">
+                                          <div className="flex items-center gap-2">
+                                            <CountryFlag code={c.data.code} flag={c.data.flag} name={c.data.name} className="h-4.5 w-6 rounded shrink-0" emojiClassName="text-base leading-none" />
+                                            <span className="text-xs font-bold truncate max-w-[120px]">{c.data.displayName}</span>
+                                          </div>
+                                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${badgeClass}`}>
+                                            {model}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Progression Section */}
+                              <div className="space-y-4">
+                                <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1 mt-6">Tournament Outcomes</h5>
+                                {stages.map(s => (
+                                  <div key={s.id} className="bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded-[1.25rem] p-4 shadow-sm"
+                                       onClick={subTier === "free" ? () => { setUpgradeReason("plus"); setUpgradeOpen(true); } : undefined}>
+                                    <div className={`flex items-center gap-2 mb-3 pb-3 border-b border-slate-200 dark:border-white/5 text-[13px] font-black text-slate-800 dark:text-slate-200 ${subTier === "free" ? "blur-[2px] opacity-70" : ""}`}>
+                                      {s.icon}
+                                      {s.label}
+                                    </div>
+                                    <div className={`space-y-4 ${subTier === "free" ? "blur-[4px] select-none pointer-events-none" : ""}`}>
+                                      {parsedCompareData.map(c => {
+                                        let val = 0;
+                                        let isBest = false;
+                                        if (s.id === 'ch') {
+                                          val = getRawChOdds(c.data);
+                                          isBest = val === s.max && val > 0 && parsedCompareData.length > 1;
+                                        } else {
+                                          val = c.data.stages?.[s.stageKey!] || 0;
+                                          isBest = val === s.max && val > 0 && parsedCompareData.length > 1;
+                                        }
+                                        const prob = parseFloat((val / 10).toFixed(1));
+                                        
+                                        return (
+                                          <div key={c.id} className="flex flex-col gap-2">
+                                            <div className="flex items-center justify-between text-xs font-bold">
+                                              <div className="flex items-center gap-2">
+                                                <CountryFlag code={c.data.code} flag={c.data.flag} name={c.data.name} className="h-4.5 w-6 rounded shrink-0" emojiClassName="hidden" />
+                                                <span className="truncate max-w-[150px]">{c.data.displayName}</span>
+                                              </div>
+                                              <div className="flex items-center gap-1.5 font-mono">
+                                                {isBest && s.id === 'ch' && <span className="text-[9px] font-extrabold text-cyan-600 dark:text-neon uppercase tracking-wide bg-cyan-500/15 dark:bg-neon/20 px-1 py-0.5 rounded flex items-center gap-0.5"><Trophy className="w-2.5 h-2.5" /> Favorite</span>}
+                                                {isBest && s.id !== 'ch' && <span className="text-[9px] font-extrabold text-cyan-600 dark:text-cyan-400 uppercase tracking-wide bg-cyan-500/15 px-1.5 py-0.5 rounded">Best</span>}
+                                                <span className={isBest ? "text-cyan-600 dark:text-neon font-black text-[13px]" : "text-slate-700 dark:text-slate-300"}>
+                                                  {s.id === 'ch' && prob > 0 ? Math.min(100, 100 / prob).toFixed(2) : `${prob}%`}
+                                                </span>
+                                              </div>
+                                            </div>
+                                            <div className="w-full bg-slate-200 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
+                                              <div
+                                                className={`h-full rounded-full transition-all duration-500 ${isBest ? "bg-cyan-500 dark:bg-neon shadow-[0_0_8px_rgba(6,182,212,0.5)]" : "bg-slate-400 dark:bg-slate-500"}`}
+                                                style={{ width: `${prob}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                ))}
+
+                                {/* Expected Path Mobile Card */}
+                                <div className="bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded-[1.25rem] p-4 shadow-sm"
+                                     onClick={subTier === "free" ? () => { setUpgradeReason("plus"); setUpgradeOpen(true); } : undefined}>
+                                  <div className={`flex items-center gap-2 mb-3 pb-3 border-b border-slate-200 dark:border-white/5 text-[13px] font-black text-slate-800 dark:text-slate-200 ${subTier === "free" ? "blur-[2px] opacity-70" : ""}`}>
+                                    <Route className="w-4 h-4 text-pink-500 shrink-0" />
+                                    Expected Path
+                                  </div>
+                                  <div className={`space-y-4 ${subTier === "free" ? "blur-[4px] select-none pointer-events-none" : ""}`}>
+                                    {parsedCompareData.map(c => (
+                                      <div key={c.id} className="bg-white dark:bg-slate-900 border border-slate-150 dark:border-white/5 rounded-xl p-3">
+                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100 dark:border-slate-800">
+                                          <CountryFlag code={c.data.code} flag={c.data.flag} name={c.data.name} className="h-4.5 w-6 rounded shrink-0" emojiClassName="hidden" />
+                                          <span className="text-xs font-extrabold">{c.data.displayName} Path</span>
+                                        </div>
+                                        <div className="relative pl-3 border-l-2 border-slate-100 dark:border-white/5 space-y-3 ml-1.5">
+                                          {c.data.path?.map((step: any, sidx: number) => {
+                                            const stageShort = step.stage
+                                              .replace("Round of 32", "R32")
+                                              .replace("Round of 16", "R16")
+                                              .replace("Quarter Final", "QF")
+                                              .replace("Semi Final", "SF")
+                                              .replace("Final", "Final");
+                                            return (
+                                              <div key={sidx} className="relative text-[11px]">
+                                                <span className="absolute -left-[17px] top-1 h-2 w-2 rounded-full bg-cyan-500 border-2 border-white dark:border-slate-900 shadow-sm" />
+                                                <div className="flex flex-col gap-1">
+                                                  <span className="font-extrabold text-[9px] uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                                    {stageShort}
+                                                  </span>
+                                                  <div className="flex items-center justify-between">
+                                                    <span className="flex items-center gap-1.5 font-bold text-foreground truncate max-w-[140px]">
+                                                      <CountryFlag
+                                                        code={step.opponentCode}
+                                                        flag={step.opponentFlag}
+                                                        name={step.opponentName}
+                                                        className="h-3.5 w-5 shrink-0 rounded-[2px] object-cover"
+                                                        emojiClassName="hidden"
+                                                      />
+                                                      <span className="truncate">{step.opponentName}</span>
+                                                    </span>
+                                                    <span className="font-mono font-bold text-cyan-600 dark:text-neon text-[10px] bg-cyan-500/10 px-1.5 py-0.5 rounded shrink-0">
+                                                      {step.winPct}%
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                
+                                {/* Actions */}
+                                <div className="bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 rounded-[1.25rem] p-4 shadow-sm">
+                                  <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-200 dark:border-white/5 text-[13px] font-black text-slate-800 dark:text-slate-200">
+                                    <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
+                                    Actions
+                                  </div>
+                                  <div className="space-y-2">
+                                    {parsedCompareData.map((c) => (
+                                      <div key={c.id} className="flex items-center justify-between p-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-150 dark:border-white/5">
+                                        <div className="flex items-center gap-2">
+                                          <CountryFlag code={c.data.code} flag={c.data.flag} name={c.data.name} className="h-4 w-5.5 rounded-sm shrink-0" emojiClassName="hidden" />
+                                          <span className="text-xs font-bold truncate max-w-[100px]">{c.data.displayName}</span>
+                                        </div>
+                                        <div className="flex gap-1.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleLoadPrediction(c.raw)}
+                                            className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-700 hover:bg-cyan-500/20 dark:bg-neon/10 dark:text-neon dark:hover:bg-neon/20 transition cursor-pointer"
+                                          >
+                                            Load
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => onToggle(c.id)}
+                                            className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
+                        </div>
                       </div>
                     </div>
                   </div>

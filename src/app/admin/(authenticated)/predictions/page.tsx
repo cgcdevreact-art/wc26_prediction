@@ -143,8 +143,8 @@ export default function AdminPredictionsPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full">
+        <div className="overflow-x-auto overflow-y-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <table className="w-full whitespace-nowrap min-w-max">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 <th 
