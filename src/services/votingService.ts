@@ -21,6 +21,7 @@ export interface TournamentWinnerResponse {
   }>;
   chartData: any[];
   totalVotes: number;
+  userSelection?: string | null;
 }
 
 export const votingService = {

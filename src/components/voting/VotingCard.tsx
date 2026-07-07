@@ -134,156 +134,160 @@ export function VotingCard({ fixture }: VotingCardProps) {
   return (
     <div 
       onClick={handleCardClick}
-      className="min-w-[280px] md:min-w-[320px] bg-white dark:bg-[#16181D] rounded-2xl border border-slate-200 dark:border-white/5 p-5 shadow-lg space-y-4 hover:shadow-xl hover:border-slate-300/80 dark:hover:border-white/10 transition-all duration-300 cursor-pointer select-none"
+      className="min-w-[280px] md:min-w-[320px] h-full bg-white dark:bg-[#16181D] rounded-2xl border border-slate-200 dark:border-white/5 p-5 shadow-lg flex flex-col justify-between hover:shadow-xl hover:border-slate-300/80 dark:hover:border-white/10 transition-all duration-300 cursor-pointer select-none"
     >
-      {/* Top stage info */}
-      <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-        <span>{fixture.stageName}</span>
-        <CountdownTimer kickoffAtIso={fixture.kickoffAtIso} status={fixture.status} />
-      </div>
-
-      {/* Matchup row */}
-      <div className="flex justify-between items-center gap-3">
-        {/* Home Team */}
-        <div className="flex-1 flex flex-col items-center text-center space-y-1.5">
-          <CountryFlag
-            code={fixture.homeTeamObj.code}
-            flag={fixture.homeTeamObj.flag}
-            name={fixture.homeTeamObj.name}
-            className="h-10 w-14 rounded shadow-md border border-slate-100 dark:border-white/10"
-            emojiClassName="text-3xl"
-          />
-          <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1">
-            {fixture.homeTeamObj.name}
-          </span>
+      <div className="space-y-4 flex-grow flex flex-col justify-between">
+        {/* Top stage info */}
+        <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+          <span>{fixture.stageName}</span>
+          <CountdownTimer kickoffAtIso={fixture.kickoffAtIso} status={fixture.status} />
         </div>
 
-        {/* VS Indicator */}
-        <div className="flex flex-col items-center px-2">
-          {isCompleted ? (
-            <span className="font-mono text-sm font-black text-slate-500 dark:text-slate-400">
-              {fixture.homeScore} - {fixture.awayScore}
+        {/* Matchup row */}
+        <div className="flex justify-between items-center gap-3">
+          {/* Home Team */}
+          <div className="flex-1 flex flex-col items-center text-center space-y-1.5">
+            <CountryFlag
+              code={fixture.homeTeamObj.code}
+              flag={fixture.homeTeamObj.flag}
+              name={fixture.homeTeamObj.name}
+              className="h-10 w-14 rounded shadow-md border border-slate-100 dark:border-white/10"
+              emojiClassName="text-3xl"
+            />
+            <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1">
+              {fixture.homeTeamObj.name}
             </span>
-          ) : (
-            <span className="text-xs uppercase font-extrabold text-slate-350 dark:text-slate-650 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 px-2 py-0.5 rounded-lg">
-              VS
+          </div>
+
+          {/* VS Indicator */}
+          <div className="flex flex-col items-center px-2">
+            {isCompleted ? (
+              <span className="font-mono text-sm font-black text-slate-500 dark:text-slate-400">
+                {fixture.homeScore} - {fixture.awayScore}
+              </span>
+            ) : (
+              <span className="text-xs uppercase font-extrabold text-slate-350 dark:text-slate-650 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 px-2 py-0.5 rounded-lg">
+                VS
+              </span>
+            )}
+          </div>
+
+          {/* Away Team */}
+          <div className="flex-1 flex flex-col items-center text-center space-y-1.5">
+            <CountryFlag
+              code={fixture.awayTeamObj.code}
+              flag={fixture.awayTeamObj.flag}
+              name={fixture.awayTeamObj.name}
+              className="h-10 w-14 rounded shadow-md border border-slate-100 dark:border-white/10"
+              emojiClassName="text-3xl"
+            />
+            <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1">
+              {fixture.awayTeamObj.name}
             </span>
-          )}
+          </div>
         </div>
 
-        {/* Away Team */}
-        <div className="flex-1 flex flex-col items-center text-center space-y-1.5">
-          <CountryFlag
-            code={fixture.awayTeamObj.code}
-            flag={fixture.awayTeamObj.flag}
-            name={fixture.awayTeamObj.name}
-            className="h-10 w-14 rounded shadow-md border border-slate-100 dark:border-white/10"
-            emojiClassName="text-3xl"
-          />
-          <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1">
-            {fixture.awayTeamObj.name}
-          </span>
+        {/* Date and Location */}
+        <div className="text-[10px] text-slate-450 dark:text-slate-500 font-medium text-center">
+          {fixture.date ? format(new Date(fixture.date), "MMM d, yyyy") : "Date TBD"} • {fixture.venue}
         </div>
-      </div>
-
-      {/* Date and Location */}
-      <div className="text-[10px] text-slate-450 dark:text-slate-500 font-medium text-center">
-        {fixture.date ? format(new Date(fixture.date), "MMM d, yyyy") : "Date TBD"} • {fixture.venue}
       </div>
 
       {/* Voting Controls */}
-      {loading ? (
-        <div className="h-10 flex justify-center items-center">
-          <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-        </div>
-      ) : !isCompleted ? (
-        <div className="space-y-3">
-          {userVote ? (
-            <div className="flex items-center gap-1.5 text-[10px] font-black text-green-500 uppercase tracking-wider">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>✔ You voted for {userVote === "HOME" ? fixture.homeTeamObj.name : fixture.awayTeamObj.name}</span>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="text-[10px] font-black uppercase text-slate-400 text-center tracking-wider">
-                Will {fixture.homeTeamObj.code} win?
+      <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 w-full">
+        {loading ? (
+          <div className="h-10 flex justify-center items-center">
+            <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+          </div>
+        ) : !isCompleted ? (
+          <div className="space-y-3">
+            {userVote ? (
+              <div className="flex items-center gap-1.5 text-[10px] font-black text-green-500 uppercase tracking-wider">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>✔ You voted for {userVote === "HOME" ? fixture.homeTeamObj.name : fixture.awayTeamObj.name}</span>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!session) {
-                      toast.error("Please sign in to cast your prediction!");
-                      return;
-                    }
-                    setConfirmChoice("HOME");
-                  }}
-                  className="flex-1 py-1.5 rounded-xl border border-slate-200 dark:border-white/5 text-[10px] font-extrabold cursor-pointer transition bg-green-500/10 hover:bg-green-500/20 border-green-500/20 text-green-600 dark:text-green-400 flex items-center justify-center gap-1.5"
-                >
-                  <span>Yes</span>
-                  <CountryFlag
-                    code={fixture.homeTeamObj.code}
-                    flag={fixture.homeTeamObj.flag}
-                    name={fixture.homeTeamObj.name}
-                    className="h-3 w-4 rounded-sm object-cover border border-emerald-500/10"
-                    emojiClassName="text-[10px]"
-                  />
-                  <span>({fixture.homeTeamObj.code})</span>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!session) {
-                      toast.error("Please sign in to cast your prediction!");
-                      return;
-                    }
-                    setConfirmChoice("AWAY");
-                  }}
-                  className="flex-1 py-1.5 rounded-xl border border-slate-200 dark:border-white/5 text-[10px] font-extrabold cursor-pointer transition bg-red-500/10 hover:bg-red-500/20 border-red-500/20 text-red-650 dark:text-red-400 flex items-center justify-center gap-1.5"
-                >
-                  <span>No</span>
-                  <CountryFlag
-                    code={fixture.awayTeamObj.code}
-                    flag={fixture.awayTeamObj.flag}
-                    name={fixture.awayTeamObj.name}
-                    className="h-3 w-4 rounded-sm object-cover border border-rose-500/10"
-                    emojiClassName="text-[10px]"
-                  />
-                  <span>({fixture.awayTeamObj.code})</span>
-                </button>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-[10px] font-black uppercase text-slate-400 text-center tracking-wider">
+                  Will {fixture.homeTeamObj.code} win?
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!session) {
+                        toast.error("Please sign in to cast your prediction!");
+                        return;
+                      }
+                      setConfirmChoice("HOME");
+                    }}
+                    className="flex-1 py-2 px-4 rounded-full border border-emerald-500/25 dark:border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 dark:hover:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-black cursor-pointer transition select-none flex items-center justify-center gap-1.5"
+                  >
+                    <span>Yes</span>
+                    <CountryFlag
+                      code={fixture.homeTeamObj.code}
+                      flag={fixture.homeTeamObj.flag}
+                      name={fixture.homeTeamObj.name}
+                      className="h-3.5 w-5 rounded-sm object-cover"
+                      emojiClassName="text-[11px]"
+                    />
+                    <span>({fixture.homeTeamObj.code})</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!session) {
+                        toast.error("Please sign in to cast your prediction!");
+                        return;
+                      }
+                      setConfirmChoice("AWAY");
+                    }}
+                    className="flex-1 py-2 px-4 rounded-full border border-rose-500/25 dark:border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 dark:hover:bg-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-black cursor-pointer transition select-none flex items-center justify-center gap-1.5"
+                  >
+                    <span>No</span>
+                    <CountryFlag
+                      code={fixture.awayTeamObj.code}
+                      flag={fixture.awayTeamObj.flag}
+                      name={fixture.awayTeamObj.name}
+                      className="h-3.5 w-5 rounded-sm object-cover"
+                      emojiClassName="text-[11px]"
+                    />
+                    <span>({fixture.awayTeamObj.code})</span>
+                  </button>
+                </div>
               </div>
+            )}
+            
+            <VotePercentage
+              homeProb={stats.homeProb}
+              awayProb={stats.awayProb}
+              homeCode={fixture.homeTeamObj.code}
+              awayCode={fixture.awayTeamObj.code}
+              isAuthenticated={!!session}
+            />
+            <div className="text-[9px] font-bold text-slate-400 uppercase text-center">
+              {stats.totalVotes} Votes Cast
             </div>
-          )}
-          
-          <VotePercentage
-            homeProb={stats.homeProb}
-            awayProb={stats.awayProb}
-            homeCode={fixture.homeTeamObj.code}
-            awayCode={fixture.awayTeamObj.code}
-            isAuthenticated={!!session}
-          />
-          <div className="text-[9px] font-bold text-slate-400 uppercase text-center">
-            {stats.totalVotes} Votes Cast
           </div>
-        </div>
-      ) : (
-        <div className="bg-slate-50 dark:bg-white/[0.02] p-2.5 rounded-xl border border-slate-100 dark:border-white/5 space-y-1.5">
-          <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-            <span>Official Result</span>
-            <span className="font-mono text-emerald-500 font-black">Final Score</span>
+        ) : (
+          <div className="bg-slate-50 dark:bg-white/[0.02] p-2.5 rounded-xl border border-slate-100 dark:border-white/5 space-y-1.5">
+            <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+              <span>Official Result</span>
+              <span className="font-mono text-emerald-500 font-black">Final Score</span>
+            </div>
+            <VotePercentage
+              homeProb={stats.homeProb}
+              awayProb={stats.awayProb}
+              homeCode={fixture.homeTeamObj.code}
+              awayCode={fixture.awayTeamObj.code}
+              isAuthenticated={!!session}
+            />
+            <div className="text-[9px] font-bold text-slate-400 uppercase text-center">
+              {stats.totalVotes} Votes Cast
+            </div>
           </div>
-          <VotePercentage
-            homeProb={stats.homeProb}
-            awayProb={stats.awayProb}
-            homeCode={fixture.homeTeamObj.code}
-            awayCode={fixture.awayTeamObj.code}
-            isAuthenticated={!!session}
-          />
-          <div className="text-[9px] font-bold text-slate-400 uppercase text-center">
-            {stats.totalVotes} Votes Cast
-          </div>
-        </div>
-      )}
+        )}
+      </div>
       {confirmChoice && (
         <div 
           onClick={(e) => {

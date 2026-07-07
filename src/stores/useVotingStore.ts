@@ -155,6 +155,7 @@ export const useVotingStore = create<VotingState>((set, get) => ({
           [key]: previousUserVote
         }
       }));
+      throw err;
     }
   },
 
@@ -162,6 +163,20 @@ export const useVotingStore = create<VotingState>((set, get) => ({
     try {
       const data = await votingService.fetchTournamentWinnerVotes();
       set({ tournamentWinnerPolls: data });
+      if (data.userSelection) {
+        set((state) => ({
+          userVotes: {
+            ...state.userVotes,
+            "tournament-winner": data.userSelection
+          }
+        }));
+      } else {
+        set((state) => {
+          const nextVotes = { ...state.userVotes };
+          delete nextVotes["tournament-winner"];
+          return { userVotes: nextVotes };
+        });
+      }
     } catch (err) {
       console.error("Failed to load winner polls:", err);
     }
