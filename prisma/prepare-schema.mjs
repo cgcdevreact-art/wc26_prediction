@@ -35,6 +35,7 @@ const databaseUrl = process.env.DATABASE_URL || readDatabaseUrlFromEnvFile();
 const isMySql = databaseUrl.startsWith("mysql://") || databaseUrl.startsWith("mysqls://");
 const provider = isMySql ? "mysql" : "sqlite";
 
+const template = fs.readFileSync(templatePath, "utf8");
 let rendered = template.replace("__DATABASE_PROVIDER__", provider);
 if (provider === "sqlite") {
   rendered = rendered.replace(/\s+@db\.\w+/g, "");
