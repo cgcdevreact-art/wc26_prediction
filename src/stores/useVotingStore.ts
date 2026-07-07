@@ -163,11 +163,12 @@ export const useVotingStore = create<VotingState>((set, get) => ({
     try {
       const data = await votingService.fetchTournamentWinnerVotes();
       set({ tournamentWinnerPolls: data });
-      if (data.userSelection) {
+      const selection = data.userSelection;
+      if (selection) {
         set((state) => ({
           userVotes: {
             ...state.userVotes,
-            "tournament-winner": data.userSelection
+            "tournament-winner": selection
           }
         }));
       } else {
