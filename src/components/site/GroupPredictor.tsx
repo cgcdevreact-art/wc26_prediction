@@ -341,24 +341,25 @@ function computeProbs(homeLambda: number, awayLambda: number, isKnockout: boolea
 }
 
 // Venue & Date details for all knockout matches matching reference diagram
+// Venue & Date details for all knockout matches matching reference diagram
 const KO_DETAILS: Record<string, { venue: string; date: string }[]> = {
   r32: [
+    { venue: "Los Angeles", date: "6/28" },
+    { venue: "Monterrey", date: "6/29" },
     { venue: "Boston", date: "6/29" },
     { venue: "New York/NJ", date: "6/30" },
-    { venue: "Los Angeles", date: "6/29" },
-    { venue: "Monterrey", date: "6/29" },
+    { venue: "Houston", date: "6/29" },
+    { venue: "Dallas", date: "6/30" },
+    { venue: "Mexico City", date: "6/30" },
+    { venue: "Atlanta", date: "7/1" },
     { venue: "Toronto", date: "7/2" },
-    { venue: "Los Angeles", date: "7/3" },
-    { venue: "San Francisco", date: "7/2" },
-    { venue: "Seattle", date: "7/2" },
-    { venue: "Houston", date: "6/30" },
-    { venue: "Dallas", date: "7/1" },
-    { venue: "Mexico City", date: "7/1" },
-    { venue: "Atlanta", date: "7/2" },
-    { venue: "Miami", date: "7/4" },
-    { venue: "Dallas", date: "7/4" },
-    { venue: "Vancouver", date: "7/3" },
-    { venue: "Kansas City", date: "7/4" },
+    { venue: "Los Angeles", date: "7/2" },
+    { venue: "San Francisco", date: "7/1" },
+    { venue: "Seattle", date: "7/1" },
+    { venue: "Miami", date: "7/3" },
+    { venue: "Dallas", date: "7/3" },
+    { venue: "Vancouver", date: "7/2" },
+    { venue: "Kansas City", date: "7/3" },
   ],
   r16: [
     { venue: "Philadelphia", date: "7/5" },
@@ -371,21 +372,43 @@ const KO_DETAILS: Record<string, { venue: string; date: string }[]> = {
     { venue: "Vancouver", date: "7/7" },
   ],
   qf: [
-    { venue: "Boston", date: "7/10" },
-    { venue: "Los Angeles", date: "7/11" },
-    { venue: "Miami", date: "7/12" },
-    { venue: "Kansas City", date: "7/12" },
+    { venue: "Boston", date: "7/9" },
+    { venue: "Miami", date: "7/11" },
+    { venue: "Los Angeles", date: "7/10" },
+    { venue: "Kansas City", date: "7/11" },
   ],
   sf: [
-    { venue: "Dallas", date: "7/15" },
-    { venue: "Atlanta", date: "7/16" },
+    { venue: "Dallas", date: "7/14" },
+    { venue: "Atlanta", date: "7/15" },
   ],
   final: [
-    { venue: "New York/NJ", date: "7/20" }
+    { venue: "New York/NJ", date: "7/19" }
   ],
   third: [
-    { venue: "Miami", date: "7/19" }
+    { venue: "Miami", date: "7/18" }
   ]
+};
+
+const ROUND_INDEX_TO_MATCH_ID: Record<string, Record<number, number>> = {
+  r32: {
+    0: 73, 1: 75, 2: 74, 3: 77, 4: 76, 5: 78, 6: 79, 7: 80,
+    8: 83, 9: 84, 10: 81, 11: 82, 12: 86, 13: 88, 14: 85, 15: 87
+  },
+  r16: {
+    0: 90, 1: 89, 2: 91, 3: 92, 4: 93, 5: 94, 6: 95, 7: 96
+  },
+  qf: {
+    0: 97, 1: 99, 2: 98, 3: 100
+  },
+  sf: {
+    0: 101, 1: 102
+  },
+  final: {
+    0: 104
+  },
+  third: {
+    0: 103
+  }
 };
 
 // Maps API match_no (number) in liveR32 to the corresponding visual slot index (0-15) in the bracket
@@ -640,6 +663,42 @@ export function GroupPredictor({
   const [liveStadiums, setLiveStadiums] = useState<any[]>([]);
   const [apiFixtures, setApiFixtures] = useState<any[]>([]);
   const [isLoadingLiveData, setIsLoadingLiveData] = useState(true);
+
+  const getKoMatchDetailsDynamic = useCallback((round: string, index: number) => {
+    const matchId = ROUND_INDEX_TO_MATCH_ID[round]?.[index];
+    const fallback = KO_DETAILS[round]?.[index] || { venue: "TBD", date: "TBD" };
+    if (!matchId || liveGames.length === 0) return fallback;
+
+    const game = liveGames.find((g: any) => String(g.id) === String(matchId));
+    if (!game) return fallback;
+
+    let dateStr = fallback.date;
+    try {
+      if (game.local_date) {
+        const parts = game.local_date.split(" ")[0].split("/");
+        if (parts.length >= 2) {
+          dateStr = `${parseInt(parts[0])}/${parseInt(parts[1])}`;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    let venueStr = fallback.venue;
+    if (liveStadiums.length > 0) {
+      const stadiumObj = liveStadiums.find((s: any) => String(s.id) === String(game.stadium_id));
+      if (stadiumObj) {
+        venueStr = stadiumObj.city_en.split("(")[0].trim();
+        if (venueStr.toLowerCase().includes("new york")) {
+          venueStr = "New York/NJ";
+        } else if (venueStr.toLowerCase().includes("san francisco")) {
+          venueStr = "San Francisco";
+        }
+      }
+    }
+
+    return { venue: venueStr, date: dateStr };
+  }, [liveGames, liveStadiums]);
 
   const openAuthModal = (mode: "signin" | "signup" = "signin") => {
     router.push(buildAuthModalHref({
@@ -3950,10 +4009,10 @@ export function GroupPredictor({
           {/* Tab Selectors */}
           {!onlyKnockout && (
             <div className="mb-8 flex flex-col gap-4 border-b border-border dark:border-white/10 md:flex-row md:items-end md:justify-between">
-              <div className="flex -mb-[1px]">
+              <div className="flex -mb-[1px] overflow-x-auto scrollbar-none">
                 <button
                   onClick={() => setActiveTab("group")}
-                  className={`px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "group"
+                  className={`px-4 sm:px-6 py-3 font-display text-sm sm:text-base md:text-lg font-semibold border-b-2 transition whitespace-nowrap ${activeTab === "group"
                     ? "border-neon text-neon"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                     }`}
@@ -3963,7 +4022,7 @@ export function GroupPredictor({
                 {isGroupStageComplete && (
                   <button
                     onClick={() => setActiveTab("knockout")}
-                    className={`flex items-center gap-2 px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "knockout"
+                    className={`flex items-center gap-2 px-4 sm:px-6 py-3 font-display text-sm sm:text-base md:text-lg font-semibold border-b-2 transition whitespace-nowrap ${activeTab === "knockout"
                       ? "border-neon text-neon"
                       : "border-transparent text-muted-foreground hover:text-foreground"
                       }`}
@@ -4455,18 +4514,18 @@ export function GroupPredictor({
 
                     return (
                       <>
-                        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                          <div className="flex items-center gap-3">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 w-full">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
                             <button
                               onClick={() => handleAiPredictKnockoutsWithCredits()}
-                              className="flex items-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-6 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-neon shadow-neon"
+                              className="flex items-center justify-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-6 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-neon shadow-neon w-full sm:w-auto"
                             >
                               <Sparkles className="h-4 w-4" />
                               Simulate Remaining Bracket
                             </button>
                             <button
                               onClick={() => setResetTarget("knockouts")}
-                              className="flex items-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-muted-foreground hover:text-foreground"
+                              className="flex items-center justify-center gap-2 rounded-lg bg-muted dark:bg-white/5 border border-border dark:border-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-muted/80 dark:hover:bg-white/10 transition text-muted-foreground hover:text-foreground w-full sm:w-auto"
                               title="Reset Knockout Bracket"
                             >
                               <RefreshCw className="h-4 w-4" />
@@ -4496,12 +4555,12 @@ export function GroupPredictor({
                           </div>
 
                           {/* Share & Zoom controls wrapper */}
-                          <div className="flex items-center gap-3 shrink-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto shrink-0">
                             {!isReadOnly && (
                               <button
                                 onClick={handleCreateShareLink}
                                 disabled={isSharingLoading}
-                                className="flex items-center gap-2 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold px-4 py-2.5 text-xs transition duration-200"
+                                className="flex items-center justify-center gap-2 rounded-xl bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/15 text-purple-600 dark:text-purple-400 font-bold px-4 py-2.5 text-xs transition duration-200 w-full sm:w-auto"
                               >
                                 <Share2 className="h-4 w-4" />
                                 <span>{isSharingLoading ? "Sharing..." : "Share Bracket"}</span>
@@ -4509,7 +4568,7 @@ export function GroupPredictor({
                             )}
 
                             {/* Zoom Controls */}
-                            <div className="flex items-center gap-2 bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 rounded-xl p-1">
+                            <div className="flex items-center justify-center gap-2 bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 rounded-xl p-1 w-full sm:w-auto">
                               <button
                                 onClick={() => setZoomScale(prev => Math.max(50, prev - 10))}
                                 className="p-1.5 rounded-lg hover:bg-card dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
@@ -4590,10 +4649,11 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.r32[idx]
+                                        details: getKoMatchDetailsDynamic("r32", idx)
                                       })}
                                       onEditScoreClick={() => handleOpenScoreEditModal("r32", idx, m.home, m.away, "Match " + (idx + 1))}
                                       label={`Match ${idx + 1}`}
+                                      details={getKoMatchDetailsDynamic("r32", idx)}
                                     />
                                   );
                                 })}
@@ -4636,7 +4696,7 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.r16[idx]
+                                        details: getKoMatchDetailsDynamic("r16", idx)
                                       })}
                                       on1v1Click={() => setSelected1v1Match({
                                         round: "r16",
@@ -4645,11 +4705,12 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.r16[idx]
+                                        details: getKoMatchDetailsDynamic("r16", idx)
                                       })}
                                       onEditScoreClick={() => handleOpenScoreEditModal("r16", idx, m.home, m.away, "Match " + (idx + 1))}
                                       label={`Match ${idx + 1}`}
                                       lockedMessage="TBD (R32)"
+                                      details={getKoMatchDetailsDynamic("r16", idx)}
                                     />
                                   );
                                 })}
@@ -4692,7 +4753,7 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.qf[idx]
+                                        details: getKoMatchDetailsDynamic("qf", idx)
                                       })}
                                       on1v1Click={() => setSelected1v1Match({
                                         round: "qf",
@@ -4701,11 +4762,12 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.qf[idx]
+                                        details: getKoMatchDetailsDynamic("qf", idx)
                                       })}
                                       onEditScoreClick={() => handleOpenScoreEditModal("qf", idx, m.home, m.away, "QF Match " + (idx + 1))}
                                       label={`QF Match ${idx + 1}`}
                                       lockedMessage="TBD (R16)"
+                                      details={getKoMatchDetailsDynamic("qf", idx)}
                                     />
                                   );
                                 })}
@@ -4748,7 +4810,7 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.sf[idx]
+                                        details: getKoMatchDetailsDynamic("sf", idx)
                                       })}
                                       on1v1Click={() => setSelected1v1Match({
                                         round: "sf",
@@ -4757,11 +4819,12 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.sf[idx]
+                                        details: getKoMatchDetailsDynamic("sf", idx)
                                       })}
                                       onEditScoreClick={() => handleOpenScoreEditModal("sf", idx, m.home, m.away, "SF Match " + (idx + 1))}
                                       label={`SF Match ${idx + 1}`}
                                       lockedMessage="TBD (QF)"
+                                      details={getKoMatchDetailsDynamic("sf", idx)}
                                     />
                                   );
                                 })}
@@ -4841,7 +4904,7 @@ export function GroupPredictor({
                                         awayCode: finalMatch.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.final[0]
+                                        details: getKoMatchDetailsDynamic("final", 0)
                                       })}
                                       on1v1Click={() => setSelected1v1Match({
                                         round: "final",
@@ -4850,11 +4913,12 @@ export function GroupPredictor({
                                         awayCode: finalMatch.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.final[0]
+                                        details: getKoMatchDetailsDynamic("final", 0)
                                       })}
                                       onEditScoreClick={() => handleOpenScoreEditModal("final", 0, finalMatch.home, finalMatch.away, "Final")}
                                       label="Final"
                                       lockedMessage="TBD (SF Winners)"
+                                      details={getKoMatchDetailsDynamic("final", 0)}
                                     />
                                   );
                                 })()}
@@ -4885,7 +4949,7 @@ export function GroupPredictor({
                                         awayCode: sfLosers.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.third[0]
+                                        details: getKoMatchDetailsDynamic("third", 0)
                                       })}
                                       on1v1Click={() => setSelected1v1Match({
                                         round: "third",
@@ -4894,11 +4958,12 @@ export function GroupPredictor({
                                         awayCode: sfLosers.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.third[0]
+                                        details: getKoMatchDetailsDynamic("third", 0)
                                       })}
                                       onEditScoreClick={() => handleOpenScoreEditModal("third", 0, sfLosers.home, sfLosers.away, "3rd Place")}
                                       label="3rd Place"
                                       lockedMessage="TBD (SF Losers)"
+                                      details={getKoMatchDetailsDynamic("third", 0)}
                                     />
                                   );
                                 })()}
@@ -4942,7 +5007,7 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.sf[realIdx]
+                                        details: getKoMatchDetailsDynamic("sf", realIdx)
                                       })}
                                       on1v1Click={() => setSelected1v1Match({
                                         round: "sf",
@@ -4951,11 +5016,12 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.sf[realIdx]
+                                        details: getKoMatchDetailsDynamic("sf", realIdx)
                                       })}
                                       onEditScoreClick={() => handleOpenScoreEditModal("sf", realIdx, m.home, m.away, "SF Match " + (realIdx + 1))}
                                       label={`SF Match ${realIdx + 1}`}
                                       lockedMessage="TBD (QF)"
+                                      details={getKoMatchDetailsDynamic("sf", realIdx)}
                                     />
                                   );
                                 })}
@@ -4999,7 +5065,7 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.qf[realIdx]
+                                        details: getKoMatchDetailsDynamic("qf", realIdx)
                                       })}
                                       on1v1Click={() => setSelected1v1Match({
                                         round: "qf",
@@ -5008,11 +5074,12 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.qf[realIdx]
+                                        details: getKoMatchDetailsDynamic("qf", realIdx)
                                       })}
                                       onEditScoreClick={() => handleOpenScoreEditModal("qf", realIdx, m.home, m.away, "QF Match " + (realIdx + 1))}
                                       label={`QF Match ${realIdx + 1}`}
                                       lockedMessage="TBD (R16)"
+                                      details={getKoMatchDetailsDynamic("qf", realIdx)}
                                     />
                                   );
                                 })}
@@ -5056,7 +5123,7 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.r16[realIdx]
+                                        details: getKoMatchDetailsDynamic("r16", realIdx)
                                       })}
                                       on1v1Click={() => setSelected1v1Match({
                                         round: "r16",
@@ -5065,11 +5132,12 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.r16[realIdx]
+                                        details: getKoMatchDetailsDynamic("r16", realIdx)
                                       })}
                                       onEditScoreClick={() => handleOpenScoreEditModal("r16", realIdx, m.home, m.away, "Match " + (realIdx + 1))}
                                       label={`Match ${realIdx + 1}`}
                                       lockedMessage="TBD (R32)"
+                                      details={getKoMatchDetailsDynamic("r16", realIdx)}
                                     />
                                   );
                                 })}
@@ -5113,10 +5181,11 @@ export function GroupPredictor({
                                         awayCode: m.away!,
                                         homeScore: matchState.homeScore,
                                         awayScore: matchState.awayScore,
-                                        details: KO_DETAILS.r32[realIdx]
+                                        details: getKoMatchDetailsDynamic("r32", realIdx)
                                       })}
                                       onEditScoreClick={() => handleOpenScoreEditModal("r32", realIdx, m.home, m.away, "Match " + (realIdx + 1))}
                                       label={`Match ${realIdx + 1}`}
+                                      details={getKoMatchDetailsDynamic("r32", realIdx)}
                                     />
                                   );
                                 })}
@@ -6299,6 +6368,7 @@ interface KnockoutMatchCardProps {
   onEditScoreClick?: () => void;
   isReal?: boolean;
   isReadOnly?: boolean;
+  details?: { venue: string; date: string };
 }
 
 function KnockoutMatchCard({
@@ -6318,6 +6388,7 @@ function KnockoutMatchCard({
   onEditScoreClick,
   isReal = false,
   isReadOnly = false,
+  details: propDetails,
 }: KnockoutMatchCardProps) {
   const teams = useTeams();
   const getTeam = (code: string) => teams.find(t => t.code === code) || teams[0];
@@ -6325,7 +6396,7 @@ function KnockoutMatchCard({
   const tAway = awayCode ? getTeam(awayCode) : null;
   const isLocked = !homeCode || !awayCode;
 
-  const details = KO_DETAILS[round]?.[matchIndex];
+  const details = propDetails || KO_DETAILS[round]?.[matchIndex];
 
   if (isLocked) {
     return (

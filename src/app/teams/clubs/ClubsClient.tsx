@@ -4,6 +4,213 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Search, Trophy, Globe, Award, Users, ChevronLeft, ChevronRight, X, Sparkles, Shield } from "lucide-react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 
+const FIFA_TO_FULL_NAME: Record<string, string> = {
+  AFG: "Afghanistan",
+  ALB: "Albania",
+  ALG: "Algeria",
+  AND: "Andorra",
+  ANG: "Angola",
+  ANT: "Antigua & Barbuda",
+  ARG: "Argentina",
+  ARM: "Armenia",
+  ARU: "Aruba",
+  ASA: "American Samoa",
+  AUS: "Australia",
+  AUT: "Austria",
+  AZE: "Azerbaijan",
+  BAH: "Bahamas",
+  BAN: "Bangladesh",
+  BDI: "Burundi",
+  BEL: "Belgium",
+  BEN: "Benin",
+  BER: "Bermuda",
+  BFA: "Burkina Faso",
+  BHR: "Bahrain",
+  BIH: "Bosnia & Herzegovina",
+  BLR: "Belarus",
+  BLZ: "Belize",
+  BOL: "Bolivia",
+  BOT: "Botswana",
+  BRA: "Brazil",
+  BRU: "Brunei",
+  BUL: "Bulgaria",
+  CAM: "Cambodia",
+  CAN: "Canada",
+  CAY: "Cayman Islands",
+  CGO: "Congo",
+  CHA: "Chad",
+  CHI: "Chile",
+  CHN: "China",
+  CIV: "Ivory Coast",
+  CMR: "Cameroon",
+  COD: "DR Congo",
+  COK: "Cook Islands",
+  COL: "Colombia",
+  COM: "Comoros",
+  CPV: "Cape Verde",
+  CRC: "Costa Rica",
+  CRO: "Croatia",
+  CTA: "Central African Republic",
+  CUB: "Cuba",
+  CUR: "Curaçao",
+  CUW: "Curaçao",
+  CYP: "Cyprus",
+  CZE: "Czech Republic",
+  DEN: "Denmark",
+  DJI: "Djibouti",
+  DMA: "Dominica",
+  DOM: "Dominican Republic",
+  ECU: "Ecuador",
+  EGY: "Egypt",
+  ENG: "England",
+  EQG: "Equatorial Guinea",
+  ERI: "Eritrea",
+  ESP: "Spain",
+  EST: "Estonia",
+  ETH: "Ethiopia",
+  FIJ: "Fiji",
+  FIN: "Finland",
+  FRA: "France",
+  FRG: "Germany",
+  FRO: "Faroe Islands",
+  GAB: "Gabon",
+  GAM: "Gambia",
+  GEO: "Georgia",
+  GER: "Germany",
+  GHA: "Ghana",
+  GIB: "Gibraltar",
+  GPE: "Guadeloupe",
+  GRN: "Grenada",
+  GUA: "Guatemala",
+  GUI: "Guinea",
+  GUM: "Guam",
+  GUY: "Guyana",
+  HAI: "Haiti",
+  HKG: "Hong Kong",
+  HON: "Honduras",
+  HUN: "Hungary",
+  INA: "Indonesia",
+  IND: "India",
+  IRL: "Ireland",
+  IRN: "Iran",
+  IRQ: "Iraq",
+  ISL: "Iceland",
+  ISR: "Israel",
+  ITA: "Italy",
+  JAM: "Jamaica",
+  JOR: "Jordan",
+  JPN: "Japan",
+  KAZ: "Kazakhstan",
+  KEN: "Kenya",
+  KGZ: "Kyrgyzstan",
+  KOR: "South Korea",
+  KSA: "Saudi Arabia",
+  KUW: "Kuwait",
+  LAO: "Laos",
+  LVA: "Latvia",
+  LBN: "Lebanon",
+  LBR: "Liberia",
+  LBY: "Libya",
+  LCA: "Saint Lucia",
+  LES: "Lesotho",
+  LIE: "Liechtenstein",
+  LTU: "Lithuania",
+  LUX: "Luxembourg",
+  MAC: "Macau",
+  MAD: "Madagascar",
+  MAR: "Morocco",
+  MAS: "Malaysia",
+  MDA: "Moldova",
+  MDV: "Maldives",
+  MEX: "Mexico",
+  MGL: "Mongolia",
+  MKD: "North Macedonia",
+  MLI: "Mali",
+  MLT: "Malta",
+  MNE: "Montenegro",
+  MOZ: "Mozambique",
+  MRI: "Mauritius",
+  MSH: "Montserrat",
+  MTN: "Mauritania",
+  MWI: "Malawi",
+  MYA: "Myanmar",
+  NAM: "Namibia",
+  NCA: "Nicaragua",
+  NED: "Netherlands",
+  NEP: "Nepal",
+  NGA: "Nigeria",
+  NIG: "Niger",
+  NIR: "Northern Ireland",
+  NOR: "Norway",
+  NZL: "New Zealand",
+  OMA: "Oman",
+  PAK: "Pakistan",
+  PAN: "Panama",
+  PAR: "Paraguay",
+  PER: "Peru",
+  PHI: "Philippines",
+  PLE: "Palestine",
+  PNG: "Papua New Guinea",
+  POL: "Poland",
+  POR: "Portugal",
+  PRK: "North Korea",
+  PUR: "Puerto Rico",
+  QAT: "Qatar",
+  ROU: "Romania",
+  RSA: "South Africa",
+  RUS: "Russia",
+  RWA: "Rwanda",
+  SAM: "Samoa",
+  SCO: "Scotland",
+  SEN: "Senegal",
+  SEY: "Seychelles",
+  SGP: "Singapore",
+  SHN: "Saint Helena",
+  SLE: "Sierra Leone",
+  SLV: "El Salvador",
+  SMR: "San Marino",
+  SOL: "Solomon Islands",
+  SOM: "Somalia",
+  SRB: "Serbia",
+  SRI: "Sri Lanka",
+  SSD: "South Sudan",
+  STP: "São Tomé & Príncipe",
+  SUI: "Switzerland",
+  SUR: "Suriname",
+  SVK: "Slovakia",
+  SVN: "Slovenia",
+  SWE: "Sweden",
+  SWZ: "Swaziland",
+  SYR: "Syria",
+  TAH: "Tahiti",
+  TAN: "Tanzania",
+  TCA: "Turks & Caicos",
+  TGO: "Togo",
+  THA: "Thailand",
+  TJK: "Tajikistan",
+  TKM: "Turkmenistan",
+  TLS: "East Timor",
+  TOG: "Togo",
+  TGA: "Tonga",
+  TRI: "Trinidad & Tobago",
+  TUN: "Tunisia",
+  TUR: "Turkey",
+  UAE: "United Arab Emirates",
+  UGA: "Uganda",
+  UKR: "Ukraine",
+  URU: "Uruguay",
+  USA: "United States",
+  UZB: "Uzbekistan",
+  VAN: "Vanuatu",
+  VEN: "Venezuela",
+  VIE: "Vietnam",
+  VIN: "St. Vincent & Grenadines",
+  WAL: "Wales",
+  YEM: "Yemen",
+  ZAM: "Zambia",
+  ZIM: "Zimbabwe"
+};
+
 // Static pre-cached URLs for top world clubs to load instantly and save API bandwidth
 const PRE_CACHED_LOGOS: Record<string, string> = {
   "Manchester City": "https://www.thesportsdb.com/images/media/team/badge/xqyyxy1473531117.png",
@@ -108,7 +315,7 @@ const processQueue = async () => {
           .replace(/^(FC|CF|AC|SC|AS|FK|SV|RC|UD|SSC|Cd|Club|1\.\s*FC|1\.\s*FSV|FSV)\s+/i, "")
           .replace(/\s+(FC|CF|AC|SC|AS|FK|SV|RC|UD|SSC|Club)$/i, "")
           .trim();
-        
+
         if (simplified && simplified !== cleanName) {
           badge = await fetchLogo(simplified);
         }
@@ -235,7 +442,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
   const [sortBy, setSortBy] = useState<"count" | "rating" | "name">("count");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedClubName, setSelectedClubName] = useState<string | null>(null);
-  
+
   const itemsPerPage = 15;
 
   // Process players data to group by club
@@ -275,7 +482,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
       }
 
       clubMap[clubName].players.push(player);
-      
+
       // Parse rating
       const ratingVal = parseInt((player["Overall Rating"] || "60").replace("%", ""), 10) || 60;
       clubMap[clubName].ratingSum += ratingVal;
@@ -290,7 +497,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
 
     return Object.values(clubMap).map((c) => {
       const avgRating = Math.round(c.ratingSum / c.players.length);
-      
+
       // Clean name: e.g. "Real Madrid (ESP)" -> "Real Madrid"
       const displayName = c.name.replace(/\s*\([^)]*\)\s*$/, "");
 
@@ -330,18 +537,23 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
     const list = clubs
       .map((c) => c.association)
       .filter((a): a is string => Boolean(a) && a.trim() !== "");
-    return Array.from(new Set(list)).sort();
+    const uniqueList = Array.from(new Set(list));
+    return uniqueList.sort((a, b) => {
+      const nameA = FIFA_TO_FULL_NAME[a] || a;
+      const nameB = FIFA_TO_FULL_NAME[b] || b;
+      return nameA.localeCompare(nameB);
+    });
   }, [clubs]);
 
   // Filter and sort clubs
   const filteredAndSortedClubs = useMemo(() => {
     let result = clubs.filter((club) => {
-      const matchesSearch = 
+      const matchesSearch =
         club.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         club.fullName.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesAssoc = 
-        selectedAssociation === "ALL" || 
+
+      const matchesAssoc =
+        selectedAssociation === "ALL" ||
         club.association === selectedAssociation;
 
       return matchesSearch && matchesAssoc;
@@ -370,10 +582,10 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
   // Calculate current page items
   const totalClubs = filteredAndSortedClubs.length;
   const totalPages = Math.max(1, Math.ceil(totalClubs / itemsPerPage));
-  
+
   // Adjust page if it exceeds total pages
   const activePage = currentPage > totalPages ? totalPages : currentPage;
-  
+
   const paginatedClubs = useMemo(() => {
     const startIndex = (activePage - 1) * itemsPerPage;
     return filteredAndSortedClubs.slice(startIndex, startIndex + itemsPerPage);
@@ -443,7 +655,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
             <option value="ALL">All Associations</option>
             {uniqueAssociations.map((assoc) => (
               <option key={assoc} value={assoc}>
-                {assoc}
+                {FIFA_TO_FULL_NAME[assoc] || assoc}
               </option>
             ))}
           </select>
@@ -487,20 +699,18 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                       <tr
                         key={club.fullName}
                         onClick={() => setSelectedClubName(isSelected ? null : club.fullName)}
-                        className={`group cursor-pointer transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/[0.02] ${
-                          isSelected ? "bg-cyan-50/30 dark:bg-cyan-950/20" : ""
-                        }`}
+                        className={`group cursor-pointer transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/[0.02] ${isSelected ? "bg-cyan-50/30 dark:bg-cyan-950/20" : ""
+                          }`}
                       >
                         <td className="px-4 py-4 text-center">
-                          <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ring-1 ${
-                            globalIdx === 1 
-                              ? "bg-amber-100 text-amber-800 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-900/30"
-                              : globalIdx === 2
+                          <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ring-1 ${globalIdx === 1
+                            ? "bg-amber-100 text-amber-800 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-900/30"
+                            : globalIdx === 2
                               ? "bg-slate-200 text-slate-800 ring-slate-350 dark:bg-slate-800/80 dark:text-slate-200 dark:ring-slate-700/50"
                               : globalIdx === 3
-                              ? "bg-amber-700/10 text-amber-900 ring-amber-700/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900/10"
-                              : "text-slate-500 ring-slate-200/50 dark:text-slate-400 dark:ring-white/5"
-                          }`}>
+                                ? "bg-amber-700/10 text-amber-900 ring-amber-700/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900/10"
+                                : "text-slate-500 ring-slate-200/50 dark:text-slate-400 dark:ring-white/5"
+                            }`}>
                             {globalIdx}
                           </span>
                         </td>
@@ -522,7 +732,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                                   className="h-3 w-4.5 rounded-[1px] object-cover shadow-sm border border-slate-200/20 dark:border-white/5"
                                 />
                                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                                  {club.association || "Unknown"}
+                                  {FIFA_TO_FULL_NAME[club.association] || club.association || "Unknown"}
                                 </span>
                               </div>
                             </div>
@@ -541,13 +751,12 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                             {/* Rating Progress pill */}
                             <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100 dark:bg-white/[0.08]">
                               <div
-                                className={`h-full rounded-full bg-gradient-to-r ${
-                                  club.avgRating >= 80 
-                                    ? "from-violet-500 to-indigo-500" 
-                                    : club.avgRating >= 75
+                                className={`h-full rounded-full bg-gradient-to-r ${club.avgRating >= 80
+                                  ? "from-violet-500 to-indigo-500"
+                                  : club.avgRating >= 75
                                     ? "from-emerald-500 to-teal-500"
                                     : "from-cyan-500 to-blue-500"
-                                }`}
+                                  }`}
                                 style={{ width: `${club.avgRating}%` }}
                               />
                             </div>
@@ -607,7 +816,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
-                  
+
                   <div className="flex h-9 items-center px-3 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-white/[0.04] rounded-lg">
                     {activePage} / {totalPages}
                   </div>
@@ -655,7 +864,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                         className="h-3.5 w-5 rounded-sm object-cover border border-slate-200/40 dark:border-white/5"
                       />
                       <p className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
-                        {selectedClub.association || "Unknown association"}
+                        {FIFA_TO_FULL_NAME[selectedClub.association] || selectedClub.association || "Unknown association"}
                       </p>
                     </div>
                   </div>
@@ -708,11 +917,11 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
 
                 <div className="space-y-3">
                   {selectedClub.players.map((player, idx) => {
-                    const posCode = player["Position Code"] || player.PositionCode || player.Position?.slice(0,2);
+                    const posCode = player["Position Code"] || player.PositionCode || player.Position?.slice(0, 2);
                     const ratingStr = parseInt((player["Overall Rating"] || "0").replace("%", ""), 10) || 60;
-                    
+
                     return (
-                      <div 
+                      <div
                         key={idx}
                         className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-slate-50/30 hover:border-slate-200/60 dark:border-white/5 dark:bg-white/[0.01] dark:hover:border-white/10 transition-all duration-200 shadow-sm"
                       >

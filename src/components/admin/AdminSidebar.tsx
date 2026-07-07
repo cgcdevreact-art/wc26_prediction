@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
@@ -12,6 +13,8 @@ import {
   LogOut,
   ArrowLeft,
   Shield,
+  Menu,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -24,30 +27,47 @@ const NAV_ITEMS = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <aside className="sticky top-0 z-30 border-b border-slate-200 bg-white lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
+    <aside className="w-full sticky top-0 z-30 border-b border-slate-200 bg-white lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r">
       {/* Logo area */}
-      <div className="flex items-center gap-3 px-4 py-4 lg:h-16 lg:border-b lg:border-slate-200 lg:px-5 lg:py-0">
-        <div className="grid h-9 w-9 place-items-center rounded-xl shadow-lg">
-          <Image src="/26wc-logo.png" alt="Admin Logo" width={36} height={36} className="w-9 h-9 object-contain" />
+      <div className="flex items-center justify-between px-4 py-4 lg:h-16 lg:border-b lg:border-slate-200 lg:px-5 lg:py-0">
+        <div className="flex items-center gap-3">
+          <div className="grid h-9 w-9 place-items-center rounded-xl shadow-lg">
+            <Image src="/26wc-logo.png" alt="Admin Logo" width={36} height={36} className="w-9 h-9 object-contain" />
+          </div>
+          <div className="leading-tight">
+            <div className="text-sm font-bold tracking-wide text-slate-900">
+              26WC PREDICTION <span className="bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">ADMIN</span>
+            </div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
+              Control Panel
+            </div>
+          </div>
         </div>
-        <div className="leading-tight">
-          <div className="text-sm font-bold tracking-wide text-slate-900">
-            26WC PREDICTION <span className="bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">ADMIN</span>
-          </div>
-          <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
-            Control Panel
-          </div>
+
+        {/* Mobile Quick Actions */}
+        <div className="flex items-center gap-2 lg:hidden">
+          <Link href="/" className="p-2 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition" title="Back to Site">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <button onClick={() => signOut({ callbackUrl: "/admin/login" })} className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition cursor-pointer" title="Sign Out">
+            <LogOut className="h-5 w-5" />
+          </button>
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 ml-1 rounded-lg text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="overflow-x-auto px-3 py-3 lg:flex-1 lg:overflow-y-auto lg:px-3 lg:py-4">
-        <div className="mb-2 hidden px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400 lg:block">
-          Management
-        </div>
-        <div className="flex gap-2 lg:flex-col lg:gap-0.5">
+      <div className={`${isMobileMenuOpen ? "block" : "hidden"} lg:block lg:flex-1 lg:overflow-y-auto border-t border-slate-100 lg:border-t-0`}>
+        <nav className="px-3 py-3 lg:px-3 lg:py-4">
+          <div className="mb-2 hidden px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400 lg:block">
+            Management
+          </div>
+          <div className="flex flex-col gap-1 lg:gap-0.5">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -78,10 +98,11 @@ export function AdminSidebar() {
             );
           })}
         </div>
-      </nav>
+        </nav>
+      </div>
 
       {/* Bottom */}
-      <div className="flex flex-wrap gap-2 border-t border-slate-200 p-3 lg:block lg:space-y-1">
+      <div className="hidden border-t border-slate-200 p-3 lg:block lg:space-y-1">
         <Link
           href="/"
           className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600"
