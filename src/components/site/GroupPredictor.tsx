@@ -362,13 +362,13 @@ const KO_DETAILS: Record<string, { venue: string; date: string }[]> = {
     { venue: "Kansas City", date: "7/3" },
   ],
   r16: [
-    { venue: "Houston", date: "7/4" },
-    { venue: "Philadelphia", date: "7/4" },
-    { venue: "New York/NJ", date: "7/5" },
-    { venue: "Mexico City", date: "7/5" },
-    { venue: "Dallas", date: "7/6" },
-    { venue: "Seattle", date: "7/6" },
-    { venue: "Atlanta", date: "7/7" },
+    { venue: "Philadelphia", date: "7/5" },
+    { venue: "Houston", date: "7/5" },
+    { venue: "Dallas", date: "7/7" },
+    { venue: "Seattle", date: "7/7" },
+    { venue: "New York/NJ", date: "7/6" },
+    { venue: "Miami", date: "7/12" },
+    { venue: "Atlanta", date: "7/6" },
     { venue: "Vancouver", date: "7/7" },
   ],
   qf: [
@@ -1333,7 +1333,7 @@ export function GroupPredictor({
               away: parsed.awayCode
             };
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     });
 
@@ -2385,12 +2385,12 @@ export function GroupPredictor({
     const evaluateMatch = (round: string, matchIndex: number, home: string | null, away: string | null) => {
       const manualWinner = round === "third" ? activeThirdWinner : (activeWinners[round as keyof typeof activeWinners]?.[matchIndex] ?? null);
       const manualScores = round === "third" ? activeThirdScores : (activeScores[`${round}-${matchIndex}`] || { home: "", away: "" });
-      
+
       const realMatch = useRealScores ? getLiveFixtureForTeams(home, away) : null;
       if (realMatch && realMatch.status === "finished") {
         return { winnerCode: realMatch.winnerCode, homeScore: realMatch.homeScore, awayScore: realMatch.awayScore };
       }
-      
+
       const hasHome = manualScores.home !== "";
       const hasAway = manualScores.away !== "";
       if (hasHome || hasAway || manualWinner) {
@@ -4533,9 +4533,9 @@ export function GroupPredictor({
                             </button>
                             {!isReadOnly && (
                               <label
-                                className={`flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-semibold cursor-pointer select-none transition w-full sm:w-auto ${useRealScores
-                                    ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)] animate-pulse"
-                                    : "bg-muted dark:bg-white/5 border border-border dark:border-white/10 text-muted-foreground hover:text-foreground"
+                                className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-semibold cursor-pointer select-none transition ${useRealScores
+                                  ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)] animate-pulse"
+                                  : "bg-muted dark:bg-white/5 border border-border dark:border-white/10 text-muted-foreground hover:text-foreground"
                                   }`}
                               >
                                 <input

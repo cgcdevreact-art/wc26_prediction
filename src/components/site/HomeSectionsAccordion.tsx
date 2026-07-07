@@ -7,6 +7,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ProbabilityExplorer } from "@/components/site/ProbabilityExplorer";
 import { WildcardCountrySection } from "@/components/site/WildcardCountrySection";
 import { FixturesExplorer } from "@/components/site/FixturesExplorer";
+import { MatchProbabilitiesList } from "@/components/site/MatchProbabilitiesList";
 import { ChevronDown } from "lucide-react";
 
 const DEFAULT_OPEN_SECTIONS = ["fixtures"];
@@ -78,12 +79,16 @@ export function HomeSectionsAccordion() {
   }, []);
 
   return (
-    <Accordion
-      type="multiple"
-      value={openItems}
-      onValueChange={setOpenItems}
-      className="container mx-auto space-y-8 px-4 py-12"
-    >
+    <div className="container mx-auto space-y-12 px-4 py-12">
+      <div id="markets">
+        <MatchProbabilitiesList />
+      </div>
+      <Accordion
+        type="multiple"
+        value={openItems}
+        onValueChange={setOpenItems}
+        className="space-y-8"
+      >
       {SECTIONS.map((section) => {
         const isOpen = openItems.includes(section.value);
 
@@ -134,6 +139,7 @@ export function HomeSectionsAccordion() {
           </div>
         );
       })}
-    </Accordion>
+      </Accordion>
+    </div>
   );
 }
