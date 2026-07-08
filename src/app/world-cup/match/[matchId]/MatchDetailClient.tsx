@@ -869,9 +869,9 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
 
           {/* STANDALONE DISCUSSION SECTION BELOW TABS */}
           <div className="bg-white dark:bg-[#16181D] rounded-3xl border border-slate-200 dark:border-white/5 p-6 shadow-sm space-y-6">
-            <h3 className="font-display font-bold text-lg text-slate-800 dark:text-white">
+            {/* <h3 className="font-display font-bold text-lg text-slate-800 dark:text-white">
               Discussion
-            </h3>
+            </h3> */}
 
             {/* COMMENT COMPOSER */}
             <div className="space-y-3">
@@ -994,96 +994,96 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
 
               return (userPrediction || fixture.status === "COMPLETED") ? (
                 <div className="bg-slate-50 dark:bg-white/[0.02] p-4.5 rounded-2xl border border-slate-200 dark:border-white/5 space-y-5">
-                {fixture.status === "COMPLETED" ? (
-                  <div className="flex items-center gap-2 text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
-                    <CheckCircle2 className="w-5 h-5" />
-                    <span>Determined</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-xs font-black text-cyan-600 dark:text-neon uppercase tracking-widest">
-                    <CheckCircle2 className="w-5 h-5" />
-                    <span>✔ Predicted {userPrediction === "HOME" ? fixture.homeTeamObj.name : fixture.awayTeamObj.name}</span>
-                  </div>
-                )}
+                  {fixture.status === "COMPLETED" ? (
+                    <div className="flex items-center gap-2 text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span>Determined</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-xs font-black text-cyan-600 dark:text-neon uppercase tracking-widest">
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span>✔ Predicted {userPrediction === "HOME" ? fixture.homeTeamObj.name : fixture.awayTeamObj.name}</span>
+                    </div>
+                  )}
 
-                <div className="space-y-3.5 text-xs font-bold">
-                  <div className="space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-slate-800 dark:text-slate-300">{fixture.homeTeamObj.name}</span>
-                      <span className="font-mono">{predictionsSummary.homePercent}%</span>
+                  <div className="space-y-3.5 text-xs font-bold">
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-slate-800 dark:text-slate-300">{fixture.homeTeamObj.name}</span>
+                        <span className="font-mono">{predictionsSummary.homePercent}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${predictionsSummary.homePercent}%` }} />
+                      </div>
                     </div>
-                    <div className="h-2 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${predictionsSummary.homePercent}%` }} />
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-slate-800 dark:text-slate-300">{fixture.awayTeamObj.name}</span>
+                        <span className="font-mono">{predictionsSummary.awayPercent}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-rose-500 transition-all duration-500" style={{ width: `${predictionsSummary.awayPercent}%` }} />
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-slate-800 dark:text-slate-300">{fixture.awayTeamObj.name}</span>
-                      <span className="font-mono">{predictionsSummary.awayPercent}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                      <div className="h-full bg-rose-500 transition-all duration-500" style={{ width: `${predictionsSummary.awayPercent}%` }} />
-                    </div>
-                  </div>
-                </div>
 
-                <div className="pt-2 flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                  <span>Confidence: {sentimentStats.confidenceIndex}%</span>
-                  <span>Total Votes: {predictionsSummary.totalVotes}</span>
+                  <div className="pt-2 flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    <span>Confidence: {sentimentStats.confidenceIndex}%</span>
+                    <span>Total Votes: {predictionsSummary.totalVotes}</span>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="text-xs font-black uppercase text-slate-400 tracking-wider">
-                  Will {fixture.homeTeamObj.name} win?
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-xs font-black uppercase text-slate-400 tracking-wider">
+                    Will {fixture.homeTeamObj.name} win?
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        if (!currentUserId) {
+                          toast.error("Please sign in to cast your prediction!");
+                          return;
+                        }
+                        setConfirmChoice("HOME");
+                      }}
+                      disabled={submittingPrediction || fixture.status === "COMPLETED"}
+                      className="flex-1 py-3.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 font-black text-xs cursor-pointer select-none transition flex items-center justify-center gap-2"
+                    >
+                      <span>Yes</span>
+                      <CountryFlag
+                        code={fixture.homeTeamObj.code}
+                        flag={fixture.homeTeamObj.flag}
+                        name={fixture.homeTeamObj.name}
+                        className="h-3.5 w-5 rounded object-cover shadow-sm border border-emerald-500/10"
+                        emojiClassName="text-xs"
+                      />
+                      <span>({fixture.homeTeamObj.name})</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!currentUserId) {
+                          toast.error("Please sign in to cast your prediction!");
+                          return;
+                        }
+                        setConfirmChoice("AWAY");
+                      }}
+                      disabled={submittingPrediction || fixture.status === "COMPLETED"}
+                      className="flex-1 py-3.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-650 dark:text-rose-400 font-black text-xs cursor-pointer select-none transition flex items-center justify-center gap-2"
+                    >
+                      <span>No</span>
+                      <CountryFlag
+                        code={fixture.awayTeamObj.code}
+                        flag={fixture.awayTeamObj.flag}
+                        name={fixture.awayTeamObj.name}
+                        className="h-3.5 w-5 rounded object-cover shadow-sm border border-rose-500/10"
+                        emojiClassName="text-xs"
+                      />
+                      <span>({fixture.awayTeamObj.name})</span>
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      if (!currentUserId) {
-                        toast.error("Please sign in to cast your prediction!");
-                        return;
-                      }
-                      setConfirmChoice("HOME");
-                    }}
-                    disabled={submittingPrediction || fixture.status === "COMPLETED"}
-                    className="flex-1 py-3.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 font-black text-xs cursor-pointer select-none transition flex items-center justify-center gap-2"
-                  >
-                    <span>Yes</span>
-                    <CountryFlag
-                      code={fixture.homeTeamObj.code}
-                      flag={fixture.homeTeamObj.flag}
-                      name={fixture.homeTeamObj.name}
-                      className="h-3.5 w-5 rounded object-cover shadow-sm border border-emerald-500/10"
-                      emojiClassName="text-xs"
-                    />
-                    <span>({fixture.homeTeamObj.name})</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (!currentUserId) {
-                        toast.error("Please sign in to cast your prediction!");
-                        return;
-                      }
-                      setConfirmChoice("AWAY");
-                    }}
-                    disabled={submittingPrediction || fixture.status === "COMPLETED"}
-                    className="flex-1 py-3.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-650 dark:text-rose-400 font-black text-xs cursor-pointer select-none transition flex items-center justify-center gap-2"
-                  >
-                    <span>No</span>
-                    <CountryFlag
-                      code={fixture.awayTeamObj.code}
-                      flag={fixture.awayTeamObj.flag}
-                      name={fixture.awayTeamObj.name}
-                      className="h-3.5 w-5 rounded object-cover shadow-sm border border-rose-500/10"
-                      emojiClassName="text-xs"
-                    />
-                    <span>({fixture.awayTeamObj.name})</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
 
             {/* Secondary actions */}
             <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex gap-2">
