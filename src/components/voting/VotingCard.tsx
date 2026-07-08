@@ -6,7 +6,7 @@ import { CountryFlag } from "@/components/ui/CountryFlag";
 import { CountdownTimer } from "./CountdownTimer";
 import { VotePercentage } from "./VotePercentage";
 import { format } from "date-fns";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { Check, CheckCircle2, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState, useMemo } from "react";
@@ -130,31 +130,55 @@ export function VotingCard({ fixture }: VotingCardProps) {
   };
 
   const isCompleted = fixture.status === "COMPLETED";
+  const homeWon = isCompleted && (fixture.homeScore ?? 0) > (fixture.awayScore ?? 0);
+  const awayWon = isCompleted && (fixture.awayScore ?? 0) > (fixture.homeScore ?? 0);
+  const isDraw = isCompleted && (fixture.homeScore ?? 0) === (fixture.awayScore ?? 0);
+
+  const isPlaceholderHome = !fixture.homeTeamObj.code || fixture.homeTeamObj.code === "TBD" || fixture.homeTeamObj.name.toLowerCase().includes("winner") || fixture.homeTeamObj.name.toLowerCase().includes("runner");
+  const isPlaceholderAway = !fixture.awayTeamObj.code || fixture.awayTeamObj.code === "TBD" || fixture.awayTeamObj.name.toLowerCase().includes("winner") || fixture.awayTeamObj.name.toLowerCase().includes("runner");
+  const teamsNotAssigned = isPlaceholderHome || isPlaceholderAway;
 
   return (
     <div 
       onClick={handleCardClick}
-      className="min-w-[280px] md:min-w-[320px] h-full bg-white dark:bg-[#16181D] rounded-2xl border border-slate-200 dark:border-white/5 p-5 shadow-lg flex flex-col justify-between hover:shadow-xl hover:border-slate-300/80 dark:hover:border-white/10 transition-all duration-300 cursor-pointer select-none"
+      className="min-w-[280px] md:min-w-[320px] h-[360px] bg-white dark:bg-[#16181D] rounded-2xl border border-slate-200 dark:border-white/5 p-5 shadow-lg flex flex-col justify-between hover:shadow-xl hover:border-slate-300/80 dark:hover:border-white/10 transition-all duration-300 cursor-pointer select-none"
     >
       <div className="space-y-4 flex-grow flex flex-col justify-between">
         {/* Top stage info */}
         <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
           <span>{fixture.stageName}</span>
-          <CountdownTimer kickoffAtIso={fixture.kickoffAtIso} status={fixture.status} />
+          {isCompleted ? (
+            <span className="bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">
+              Determined
+            </span>
+          ) : (
+            <CountdownTimer kickoffAtIso={fixture.kickoffAtIso} status={fixture.status} />
+          )}
         </div>
 
         {/* Matchup row */}
         <div className="flex justify-between items-center gap-3">
           {/* Home Team */}
-          <div className="flex-1 flex flex-col items-center text-center space-y-1.5">
-            <CountryFlag
-              code={fixture.homeTeamObj.code}
-              flag={fixture.homeTeamObj.flag}
-              name={fixture.homeTeamObj.name}
-              className="h-10 w-14 rounded shadow-md border border-slate-100 dark:border-white/10"
-              emojiClassName="text-3xl"
-            />
-            <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1">
+          <div className={`flex-1 flex flex-col items-center text-center space-y-1.5 transition-opacity ${
+            isCompleted && !homeWon && !isDraw ? "opacity-40" : ""
+          }`}>
+            <div className="relative">
+              <CountryFlag
+                code={fixture.homeTeamObj.code}
+                flag={fixture.homeTeamObj.flag}
+                name={fixture.homeTeamObj.name}
+                className="h-10 w-14 rounded shadow-md border border-slate-100 dark:border-white/10"
+                emojiClassName="text-3xl"
+              />
+              {homeWon && (
+                <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white rounded-full p-0.5 border border-white dark:border-[#16181D]">
+                  <Check className="w-2.5 h-2.5 stroke-[4]" />
+                </span>
+              )}
+            </div>
+            <span className={`text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1 ${
+              homeWon ? "text-emerald-500 dark:text-emerald-400" : ""
+            }`}>
               {fixture.homeTeamObj.name}
             </span>
           </div>
@@ -173,15 +197,26 @@ export function VotingCard({ fixture }: VotingCardProps) {
           </div>
 
           {/* Away Team */}
-          <div className="flex-1 flex flex-col items-center text-center space-y-1.5">
-            <CountryFlag
-              code={fixture.awayTeamObj.code}
-              flag={fixture.awayTeamObj.flag}
-              name={fixture.awayTeamObj.name}
-              className="h-10 w-14 rounded shadow-md border border-slate-100 dark:border-white/10"
-              emojiClassName="text-3xl"
-            />
-            <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1">
+          <div className={`flex-1 flex flex-col items-center text-center space-y-1.5 transition-opacity ${
+            isCompleted && !awayWon && !isDraw ? "opacity-40" : ""
+          }`}>
+            <div className="relative">
+              <CountryFlag
+                code={fixture.awayTeamObj.code}
+                flag={fixture.awayTeamObj.flag}
+                name={fixture.awayTeamObj.name}
+                className="h-10 w-14 rounded shadow-md border border-slate-100 dark:border-white/10"
+                emojiClassName="text-3xl"
+              />
+              {awayWon && (
+                <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white rounded-full p-0.5 border border-white dark:border-[#16181D]">
+                  <Check className="w-2.5 h-2.5 stroke-[4]" />
+                </span>
+              )}
+            </div>
+            <span className={`text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1 ${
+              awayWon ? "text-emerald-500 dark:text-emerald-400" : ""
+            }`}>
               {fixture.awayTeamObj.name}
             </span>
           </div>
@@ -198,6 +233,15 @@ export function VotingCard({ fixture }: VotingCardProps) {
         {loading ? (
           <div className="h-10 flex justify-center items-center">
             <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+          </div>
+        ) : teamsNotAssigned ? (
+          <div className="bg-slate-50 dark:bg-white/[0.02] p-3 rounded-xl border border-slate-100 dark:border-white/5 text-center flex flex-col justify-center items-center h-[142px] space-y-1">
+            <div className="text-[10px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-widest">
+              Voting Not Yet Started
+            </div>
+            <div className="text-[9px] text-slate-400 dark:text-slate-500 font-medium leading-relaxed max-w-[200px]">
+              Competing teams are not yet determined. Voting opens once participants are locked.
+            </div>
           </div>
         ) : !isCompleted ? (
           <div className="space-y-3">
@@ -264,9 +308,10 @@ export function VotingCard({ fixture }: VotingCardProps) {
               homeCode={fixture.homeTeamObj.code}
               awayCode={fixture.awayTeamObj.code}
               isAuthenticated={!!session}
+              hasVoted={!!userVote}
             />
-            <div className="text-[9px] font-bold text-slate-400 uppercase text-center">
-              {stats.totalVotes} Votes Cast
+             <div className="text-[9px] font-bold text-slate-400 uppercase text-center">
+              {userVote ? `${stats.totalVotes} Votes Cast` : "? Votes Cast"}
             </div>
           </div>
         ) : (
