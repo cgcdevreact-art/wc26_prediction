@@ -68,13 +68,11 @@ async function main() {
       }
 
       await prisma.user.createMany({
-        data: userBatch,
-        skipDuplicates: true
+        data: userBatch
       });
 
       await prisma.prediction.createMany({
-        data: predictionBatch,
-        skipDuplicates: true
+        data: predictionBatch
       });
 
       remaining -= currentBatchSize;
