@@ -95,7 +95,7 @@ export function MatchProbabilitiesList() {
     try {
       await voteTournamentWinner(id, code);
     } catch (err) {
-      alert("Failed to register your vote. The database tables might not be migrated on this server. Please contact the administrator.");
+      toast.error("Failed to register your vote. The database tables might not be migrated on this server. Please contact the administrator.");
     }
   };
 
