@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useFixturesStore } from "@/stores/useFixturesStore";
 import { useVotingStore } from "@/stores/useVotingStore";
 import { VotingCard } from "@/components/voting/VotingCard";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { useSession } from "next-auth/react";
-import { Trophy, Vote, X } from "lucide-react";
+import { Trophy, Vote, X, Code, Link2, Bookmark, Gift } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 export function MatchProbabilitiesList() {
@@ -22,6 +23,18 @@ export function MatchProbabilitiesList() {
 
   const [isMobile, setIsMobile] = useState(false);
   const [confirmWinnerTeam, setConfirmWinnerTeam] = useState<{ id: number; code: string; name: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "LIVE" | "UPCOMING" | "COMPLETED">("ALL");
+
+  // Detect dark mode change to update chart colors dynamically
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  useEffect(() => {
+    setIsDarkMode(document.documentElement.classList.contains("dark"));
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     setIsMobile(window.innerWidth < 640);
@@ -63,7 +76,7 @@ export function MatchProbabilitiesList() {
 
   const handleWinnerVoteClick = (teamId: number, teamCode: string) => {
     if (!session) {
-      alert("Please sign in to cast your vote!");
+      toast.error("Please sign in to cast your vote!");
       return;
     }
 
@@ -108,7 +121,30 @@ export function MatchProbabilitiesList() {
   }
 
   // Load all upcoming matches dynamically (no limit)
-  const upcomingFixtures = fixtures.filter((f) => f.status === "UPCOMING");
+  const carouselFixtures = [...fixtures].sort((a, b) => {
+    const aActive = a.status === "UPCOMING" || a.status === "LIVE" || a.status === "IN_PROGRESS";
+    const bActive = b.status === "UPCOMING" || b.status === "LIVE" || b.status === "IN_PROGRESS";
+
+    // Sort active matches before completed matches
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+
+    // If both are active, sort chronologically (earlier match first)
+    if (aActive && bActive) {
+      return a.match_no - b.match_no;
+    }
+
+    // If both are completed, sort reverse chronologically (latest match first)
+    return b.match_no - a.match_no;
+  });
+
+  const filteredFixtures = carouselFixtures.filter((f) => {
+    if (statusFilter === "ALL") return true;
+    if (statusFilter === "LIVE") return f.status === "LIVE" || f.status === "IN_PROGRESS";
+    if (statusFilter === "UPCOMING") return f.status === "UPCOMING";
+    if (statusFilter === "COMPLETED") return f.status === "COMPLETED";
+    return true;
+  });
   const userHasVotedWinner = !!userVotes["tournament-winner"];
 
   // Skeleton Loader for premium visual look on initial load
@@ -131,156 +167,201 @@ export function MatchProbabilitiesList() {
     );
   }
 
+
+
+  const gridStroke = isDarkMode ? "#1f2937" : "#e2e8f0";
+  const axisStroke = isDarkMode ? "#6c7a89" : "#94a3b8";
+  const tooltipBg = isDarkMode ? "#16181d" : "#ffffff";
+  const tooltipBorder = isDarkMode ? "rgba(255,255,255,0.08)" : "#e2e8f0";
+
   return (
     <div className="text-slate-900 dark:text-white w-full space-y-8">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-        {/* Left Column: Overall World Cup Winner Market (55% width - span 7) */}
+        {/* Left Column: Overall World Cup Winner Market (span 7) */}
         <div className="lg:col-span-7 bg-white dark:bg-[#16181D] rounded-3xl border border-slate-200 dark:border-white/5 p-6 shadow-md flex flex-col justify-between space-y-6">
-          {/* Header */}
+
+          {/* Header Row */}
           <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                Sports • Soccer • Community Verdict
-              </span>
-              <h3 className="text-xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2 font-display">
+            {/* Avatar & Title */}
+            <div className="flex items-center">
+              <div className="w-10 h-10 overflow-hidden rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-500/10 border border-amber-500/20 flex items-center justify-center mr-3 shrink-0 shadow-xs">
                 <Trophy className="w-5 h-5 text-amber-500" />
-                World Cup Winner Aggregated Prediction
-              </h3>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1.5">
+                  Sports • Soccer • Community Verdict
+                </span>
+                <h3 className="text-xl font-black tracking-tight text-slate-900 dark:text-white font-display">
+                  World Cup Winner Aggregated Prediction
+                </h3>
+              </div>
             </div>
-            {/* <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-white/5 px-2.5 py-1 rounded-lg">
-              Dynamic Chart
-            </span> */}
+
+            {/* Actions (Link & Bookmark) */}
+            <div className="flex items-center gap-3 text-slate-400 dark:text-[#6c7a89]">
+              {/* <button title="Copy Link" className="hover:text-slate-650 dark:hover:text-white transition">
+                <Link2 className="w-4 h-4 cursor-pointer" />
+              </button>
+              <button title="Watch Bookmark" className="hover:text-slate-650 dark:hover:text-white transition">
+                <Bookmark className="w-4 h-4 cursor-pointer" />
+              </button> */}
+            </div>
           </div>
 
-          {/* Grid: Winner listing + Historical Odds Chart */}
+          {/* Grid Layout: Standings (left) & Chart (right) */}
           {tournamentWinnerPolls && (
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-              {/* Probability listing (span 4) */}
-              <div className="md:col-span-4 space-y-3.5 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-white/10">
-                {(tournamentWinnerPolls.allTeams || tournamentWinnerPolls.teams).map((t) => {
-                  const isPlotted = tournamentWinnerPolls.teams.some((ct) => ct.code === t.code);
-                  return (
-                    <div key={t.code} className="flex items-center justify-between border-b border-slate-100 dark:border-white/5 pb-2.5 last:border-0 last:pb-0">
-                      <div className="flex items-center gap-2.5">
-                        {isPlotted ? (
-                          <span className="w-2 h-2 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: t.color }} title="Plotted on trend chart" />
-                        ) : (
-                          <span className="w-2 h-2 rounded-full shrink-0 border border-slate-300 dark:border-white/10 bg-transparent" title="Not on chart (low probability)" />
-                        )}
-                        <CountryFlag code={t.code} flag={t.flag} name={t.name} className="h-5 w-7 rounded-sm shadow-sm" />
-                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{t.name}</span>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+
+              {/* Left Column (span 4): Standings List & Comments */}
+              <div className="md:col-span-4 flex flex-col justify-between h-full space-y-6">
+
+                {/* Standings List (Top 4 teams only) */}
+                <div className="space-y-4">
+                  {tournamentWinnerPolls.allTeams?.map((t) => (
+                    <div key={t.code} className="flex items-center justify-between group">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-5 overflow-hidden rounded-md border border-slate-200 dark:border-[#1f2937] bg-slate-100 dark:bg-slate-900 flex items-center justify-center shrink-0">
+                          <CountryFlag code={t.code} flag={t.flag} name={t.name} className="h-full w-full object-cover scale-110" />
+                        </div>
+                        <span className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-amber-500 transition">
+                          {t.name}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-sm font-black text-slate-900 dark:text-white">
+                      <div className="flex items-center gap-2.5">
+                        <span className="font-mono text-base font-black text-slate-900 dark:text-white">
                           {t.prob}%
                         </span>
                         <button
                           onClick={() => handleWinnerVoteClick((t as any).id || 0, t.code)}
                           disabled={userHasVotedWinner}
                           className={`p-1.5 rounded-lg border cursor-pointer transition ${userVotes["tournament-winner"] === t.code
-                            ? "bg-amber-500/10 border-amber-500/20 text-amber-500 font-extrabold"
-                            : "bg-slate-50 hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 border-slate-200 dark:border-white/10 text-slate-400 hover:text-slate-650"
+                            ? "bg-amber-500/20 border-amber-500/40 text-amber-500"
+                            : "bg-slate-50 hover:bg-slate-100 dark:bg-[#1f2937]/30 hover:dark:bg-[#1f2937] border-slate-200 dark:border-[#1f2937] text-slate-400 dark:text-[#6c7a89] hover:text-slate-650 dark:hover:text-white"
                             }`}
                           title="Vote as tournament champion"
                         >
-                          <Vote className="w-3.5 h-3.5" />
+                          <Vote className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+
               </div>
 
-              {/* Historical probability chart (span 8) */}
-              <div className="md:col-span-8 h-[280px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={tournamentWinnerPolls.chartData} margin={{ top: 10, right: isMobile ? 10 : 25, left: 0, bottom: 0 }}>
-                    <CartesianGrid vertical={false} stroke="#334155" strokeDasharray="3 3" opacity={0.4} />
-                    <XAxis dataKey="date" stroke="#64748b" fontSize={9} tickLine={false} axisLine={false} tickMargin={10} />
-                    <YAxis
-                      orientation="right"
-                      stroke="#64748b"
-                      fontSize={9}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(val) => `${val}%`}
-                      tickMargin={10}
-                    />
-                    <Tooltip
-                      formatter={(value: number) => [`${Number(value).toFixed(1)}%`]}
-                      contentStyle={{ backgroundColor: 'var(--tooltip-bg, #16181d)', borderColor: 'rgba(255,255,255,0.08)', borderRadius: '8px' }}
-                      labelStyle={{ fontSize: '10px', color: '#94a3b8' }}
-                    />
+              {/* Right Column (span 8): Legend & Stepped Chart */}
+              <div className="md:col-span-8 flex flex-col space-y-4">
+
+                {/* Horizontal Inline Legend */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-white/5 pb-2">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] font-bold text-slate-500 dark:text-[#6c7a89]">
                     {tournamentWinnerPolls.teams.map((t) => (
-                      <Line
-                        key={t.code}
-                        type="monotone"
-                        dataKey={t.name}
-                        stroke={t.color}
-                        strokeWidth={2}
-                        name={t.name}
-                        isAnimationActive={false}
-                        dot={(props: any) => {
-                          if (props.index !== tournamentWinnerPolls.chartData.length - 1) return <g key={`dot-${t.name}-${props.index}`}></g>;
-                          const val = props.payload[t.name];
-                          if (val === undefined) return <g key={`dot-${t.name}-${props.index}`}></g>;
-                          const shift = yOffsets[t.code] || 0;
-                          return (
-                            <g key={`dot-${t.name}-${props.index}`}>
-                              <circle cx={props.cx} cy={props.cy} r={4} fill={t.color} />
-                              {!isMobile && (
-                                <text
-                                  x={props.cx + 8}
-                                  y={props.cy + shift}
-                                  fill={t.color}
-                                  fontSize={9}
-                                  fontWeight="750"
-                                  dominantBaseline="middle"
-                                >
-                                  {t.flag} {t.name} ({Math.round(Number(val))}%)
-                                </text>
-                              )}
-                            </g>
-                          );
-                        }}
-                      />
+                      <div key={t.code} className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: t.color }} />
+                        <span className="text-slate-700 dark:text-slate-300">{t.name}</span>
+                        <span className="text-slate-900 dark:text-white font-mono">{t.exactProbability}%</span>
+                      </div>
                     ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
+                  </div>
+                </div>
 
-          {/* Footer stats */}
-          {tournamentWinnerPolls && (
-            <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase border-t border-slate-100 dark:border-white/5 pt-4">
-              {/* <span>{tournamentWinnerPolls.totalVotes.toLocaleString()} Votes Cast</span> */}
-              <span>Ends Jul 20, 2026</span>
+                {/* Stepped Line Chart */}
+                <div className="h-[240px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={tournamentWinnerPolls.chartData} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
+                      <CartesianGrid vertical={false} stroke={gridStroke} strokeDasharray="3 3" opacity={0.6} />
+                      <XAxis dataKey="date" stroke={axisStroke} fontSize={10} tickLine={false} axisLine={false} tickMargin={10} />
+                      <YAxis
+                        orientation="right"
+                        stroke={axisStroke}
+                        fontSize={10}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(val) => `${val}%`}
+                        tickMargin={8}
+                        ticks={[0, 10, 20, 30, 40]}
+                        domain={[0, 45]}
+                      />
+                      <Tooltip
+                        formatter={(value: number, name: string) => [
+                          `${Number(value).toFixed(1)}%`,
+                          name
+                        ]}
+                        contentStyle={{ backgroundColor: tooltipBg, borderColor: tooltipBorder, borderRadius: '12px' }}
+                        labelStyle={{ fontSize: '10px', color: axisStroke, fontWeight: 'bold' }}
+                        itemStyle={{ fontSize: '11px', fontWeight: 'bold' }}
+                      />
+                      {tournamentWinnerPolls.teams.map((t) => (
+                        <Line
+                          key={t.code}
+                          type="stepAfter"
+                          dataKey={t.name}
+                          stroke={t.color}
+                          strokeWidth={2.2}
+                          name={t.name}
+                          isAnimationActive={false}
+                          dot={(props: any) => {
+                            if (props.index !== tournamentWinnerPolls.chartData.length - 1) return <g key={`dot-${t.name}-${props.index}`}></g>;
+                            return (
+                              <circle
+                                key={`dot-${t.name}-${props.index}`}
+                                cx={props.cx}
+                                cy={props.cy}
+                                r={4}
+                                fill={t.color}
+                                stroke={tooltipBg}
+                                strokeWidth={1.5}
+                              />
+                            );
+                          }}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           )}
         </div>
 
         {/* Right Column: Dynamic Horizontal Scroll carousel (45% width - span 5) */}
-        <div className="lg:col-span-5 flex flex-col justify-start space-y-4 min-w-0 h-full">
-          <div className="px-1">
-            <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
-              Active Match Prediction Pools
-            </h4>
-            <p className="text-[10px] text-muted-foreground">
-              Vote on upcoming match winners.
-            </p>
+        <div className="lg:col-span-5 flex flex-col justify-start space-y-4 min-w-0">
+          <div className="px-1 flex flex-wrap justify-between items-start gap-3">
+            <div>
+              <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
+                Active Match Prediction Pools
+              </h4>
+              <p className="text-[10px] text-muted-foreground">
+                Vote on upcoming match winners.
+              </p>
+            </div>
+            {/* Pill Tabs Filter in Top-Right Corner */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-white/5 p-1 rounded-xl text-[9px] font-extrabold uppercase shrink-0">
+              {(["ALL", "LIVE", "UPCOMING", "COMPLETED"] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setStatusFilter(filter)}
+                  className={`px-2 py-0.5 rounded-lg transition cursor-pointer select-none ${statusFilter === filter
+                    ? "bg-white dark:bg-[#16181D] text-slate-900 dark:text-white shadow-xs"
+                    : "text-slate-450 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+                    }`}
+                >
+                  {filter === "ALL" ? "All" : filter.charAt(0) + filter.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex gap-4 overflow-x-auto pb-4 pt-1 px-1 scrollbar-custom select-none flex-grow">
-            {upcomingFixtures.length > 0 ? (
-              upcomingFixtures.map((f) => (
+          <div className="flex gap-4 overflow-x-auto pb-4 pt-1 px-1 scrollbar-custom select-none">
+            {filteredFixtures.length > 0 ? (
+              filteredFixtures.map((f) => (
                 <VotingCard key={f.match_no} fixture={f} />
               ))
             ) : (
               <div className="w-full py-12 text-center text-xs text-muted-foreground border border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-white/[0.01]">
-                No upcoming matches left to vote on!
+                No matches left to show!
               </div>
             )}
           </div>

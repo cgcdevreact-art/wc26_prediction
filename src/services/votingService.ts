@@ -18,6 +18,7 @@ export interface TournamentWinnerResponse {
     flag: string;
     prob: number;
     color: string;
+    exactProbability: number;
   }>;
   allTeams?: Array<{
     name: string;
@@ -25,6 +26,7 @@ export interface TournamentWinnerResponse {
     flag: string;
     prob: number;
     color: string;
+    exactProbability: number;
   }>;
   chartData: any[];
   totalVotes: number;

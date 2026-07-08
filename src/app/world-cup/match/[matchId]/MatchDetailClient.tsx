@@ -974,12 +974,37 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
               <div className="h-28 flex justify-center items-center">
                 <Loader2 className="w-5 h-5 animate-spin text-cyan-500" />
               </div>
-            ) : userPrediction ? (
-              <div className="bg-slate-50 dark:bg-white/[0.02] p-4.5 rounded-2xl border border-slate-200 dark:border-white/5 space-y-5">
-                <div className="flex items-center gap-2 text-xs font-black text-cyan-600 dark:text-neon uppercase tracking-widest">
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>✔ Predicted {userPrediction === "HOME" ? fixture.homeTeamObj.name : fixture.awayTeamObj.name}</span>
-                </div>
+            ) : (() => {
+              const isPlaceholderHome = !fixture.homeTeamObj.code || fixture.homeTeamObj.code === "TBD" || fixture.homeTeamObj.name.toLowerCase().includes("winner") || fixture.homeTeamObj.name.toLowerCase().includes("runner");
+              const isPlaceholderAway = !fixture.awayTeamObj.code || fixture.awayTeamObj.code === "TBD" || fixture.awayTeamObj.name.toLowerCase().includes("winner") || fixture.awayTeamObj.name.toLowerCase().includes("runner");
+              const teamsNotAssigned = isPlaceholderHome || isPlaceholderAway;
+
+              if (teamsNotAssigned) {
+                return (
+                  <div className="bg-slate-50 dark:bg-white/[0.02] p-6 rounded-2xl border border-slate-200 dark:border-white/5 text-center space-y-2 py-8">
+                    <div className="text-sm font-black text-slate-500 dark:text-slate-450 uppercase tracking-widest">
+                      Voting Not Yet Started
+                    </div>
+                    <p className="text-xs text-slate-450 dark:text-slate-500 font-medium leading-relaxed max-w-[240px] mx-auto">
+                      Competing teams are not yet determined. Predictions will open once participants are locked.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (userPrediction || fixture.status === "COMPLETED") ? (
+                <div className="bg-slate-50 dark:bg-white/[0.02] p-4.5 rounded-2xl border border-slate-200 dark:border-white/5 space-y-5">
+                {fixture.status === "COMPLETED" ? (
+                  <div className="flex items-center gap-2 text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>Determined</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs font-black text-cyan-600 dark:text-neon uppercase tracking-widest">
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>✔ Predicted {userPrediction === "HOME" ? fixture.homeTeamObj.name : fixture.awayTeamObj.name}</span>
+                  </div>
+                )}
 
                 <div className="space-y-3.5 text-xs font-bold">
                   <div className="space-y-1">
@@ -1057,7 +1082,8 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
                   </button>
                 </div>
               </div>
-            )}
+            );
+          })()}
 
             {/* Secondary actions */}
             <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex gap-2">

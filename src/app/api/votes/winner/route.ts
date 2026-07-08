@@ -151,101 +151,180 @@ async function getActiveTeams() {
 
 export async function GET() {
   try {
-    // Fetch all champion votes
-    const votes = await prisma.prediction.findMany({
+    // 1. Get live votes count per team from database
+    const voteGroups = await prisma.prediction.groupBy({
+      by: ['predictedTeamId'],
       where: {
         type: "VOTE_CHAMPION"
+      },
+      _count: {
+        id: true
       }
     });
 
-    const totalVotes = votes.length;
-    const teamCounts: Record<number, number> = {};
-
-    votes.forEach((v) => {
-      if (v.predictedTeamId) {
-        teamCounts[v.predictedTeamId] = (teamCounts[v.predictedTeamId] || 0) + 1;
+    const dbTeamCounts = voteGroups.reduce((acc, curr) => {
+      if (curr.predictedTeamId) {
+        acc[curr.predictedTeamId] = curr._count.id;
       }
-    });
+      return acc;
+    }, {} as Record<number, number>);
 
-    // Query active teams
-    let activeTeams = await getActiveTeams();
-    
-    // Fallback if cache is empty
-    if (activeTeams.length === 0) {
-      activeTeams = [
-        { id: 708265, name: "France", tla: "FRA", crest: "" },
-        { id: 658271, name: "Argentina", tla: "ARG", crest: "" },
-        { id: 697871, name: "England", tla: "ENG", crest: "" },
-        { id: 698380, name: "Spain", tla: "ESP", crest: "" }
-      ];
-    }
-
-    const emojis: Record<string, string> = {
-      FRA: "🇫🇷", ARG: "🇦🇷", ENG: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", ESP: "🇪🇸",
-      BRA: "🇧🇷", POR: "🇵🇹", GER: "🇩🇪", BEL: "🇧🇪",
-      ITA: "🇮🇹", CRO: "🇭🇷", NED: "🇳🇱", URU: "🇺🇾",
-      USA: "🇺🇸", MEX: "🇲🇽", CAN: "🇨🇦", JPN: "🇯🇵",
-      MAR: "🇲🇦", EGY: "🇪🇬", SUI: "🇨🇭", COL: "🇨🇴",
-      SEN: "🇸🇳", KOR: "🇰🇷", GHA: "🇬🇭", CMR: "🇨🇲",
-      TUN: "🇹🇳", ECU: "🇪🇨", QAT: "🇶🇦", KSA: "🇸🇦",
-      POL: "🇵🇱", DEN: "🇩🇰", AUS: "🇦🇺", WAL: "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
-      CRC: "🇨🇷", SRB: "🇷🇸"
-    };
-
-    const teamRatings: Record<string, number> = {
-      FRA: 88, ARG: 87, ENG: 86, ESP: 85, BRA: 86, POR: 84, GER: 83, ITA: 83,
-      CRO: 82, NED: 82, BEL: 81, URU: 80, COL: 80, USA: 78, MEX: 78, CAN: 77
-    };
-
-    const colors = [
-      "#3b82f6", "#06b6d4", "#f59e0b", "#ef4444", 
-      "#10b981", "#8b5cf6", "#ec4899", "#6366f1",
-      "#f97316", "#14b8a6", "#a855f7", "#64748b"
+    // 2. Define baseline teams data
+    const baselineStandings = [
+      { teamCode: "FRA", name: "France", volume: "$100,964,929", historicalChange: "+16%", realVotes: 163000, flag: "🇫🇷", color: "#60a5fa" }, // light blue
+      { teamCode: "ARG", name: "Argentina", volume: "$116,548,173", historicalChange: "+5%", realVotes: 93000, flag: "🇦🇷", color: "#3b82f6" }, // royal blue
+      { teamCode: "ESP", name: "Spain", volume: "$93,011,296", historicalChange: "+3%", realVotes: 93000, flag: "🇪🇸", color: "#eab308" }, // yellow
+      { teamCode: "ENG", name: "England", volume: "$88,254,878", historicalChange: "+2%", realVotes: 78000, flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", color: "#f97316" }, // orange
+      { teamCode: "NOR", name: "Norway", volume: "$117,773,640", historicalChange: "0%", realVotes: 30000, flag: "🇳🇴", color: "#10b981" },
+      { teamCode: "MAR", name: "Morocco", volume: "$139,247,014", historicalChange: "0%", realVotes: 15000, flag: "🇲🇦", color: "#8b5cf6" },
+      { teamCode: "BEL", name: "Belgium", volume: "$117,861,416", historicalChange: "0%", realVotes: 10000, flag: "🇧🇪", color: "#ec4899" },
+      { teamCode: "SUI", name: "Switzerland", volume: "$114,465,714", historicalChange: "0%", realVotes: 10000, flag: "🇨🇭", color: "#6366f1" }
     ];
 
-    // Compute probabilities for all active teams
-    const allMappedTeams = activeTeams.map((team, idx) => {
-      const code = team.tla || "TBD";
-      const flag = emojis[code] || team.crest || "⚽";
-      const votesForTeam = teamCounts[team.id] || 0;
-      
-      const rating = teamRatings[code] || 75;
-      const prob = totalVotes > 0 
-        ? Math.round((votesForTeam / totalVotes) * 100) 
-        : Math.round(rating / 4);
+    // 3. Map votes and calculate totals
+    let totalVotes = 0;
+    const mappedStandings = baselineStandings.map(team => {
+      const id = getTeamIdFromCode(team.teamCode);
+      const extraVotes = dbTeamCounts[id] || 0;
+      const finalVotes = team.realVotes + extraVotes;
+      totalVotes += finalVotes;
+      return {
+        ...team,
+        id,
+        finalVotes
+      };
+    });
 
+    // 4. Calculate exact probabilities
+    const allMappedTeams = mappedStandings.map(team => {
+      const exactProbability = totalVotes > 0 ? (team.finalVotes / totalVotes) * 100 : 0;
+      const prob = Math.round(exactProbability);
       return {
         id: team.id,
         name: team.name,
-        code,
-        flag,
-        prob: Math.max(1, prob),
-        color: colors[idx % colors.length]
+        code: team.teamCode,
+        flag: team.flag,
+        volume: team.volume,
+        historicalChange: team.historicalChange,
+        prob: Math.max(0, prob),
+        exactProbability: Number(exactProbability.toFixed(1)),
+        probability: exactProbability.toFixed(1) + "%",
+        color: team.color,
+        realVotes: team.finalVotes
       };
-    }).sort((a, b) => b.prob - a.prob || a.name.localeCompare(b.name));
+    });
 
-    // For the line chart, pick only the top 4 contenders to keep the curves readable
+    // Top 4 plotted teams
     const teams = allMappedTeams.slice(0, 4);
 
-    // Format chartData over time (past week mockup ending at current percentages)
-    const chartData = [];
-    const now = new Date();
-    for (let i = 4; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    // 5. Construct the dynamic timeline (June 11 to now)
+    let chartData: any[] = [];
+    
+    try {
+      interface VoteDayRaw {
+        date: string | Date;
+        predictedTeamId: number;
+        count: number | bigint;
+      }
 
-      const point: Record<string, any> = { date: dateStr };
-      teams.forEach((t) => {
-        if (i === 0) {
-          point[t.name] = t.prob;
+      // Query daily vote counts per team from database
+      const rawRows = await prisma.$queryRaw<VoteDayRaw[]>`
+        SELECT 
+          DATE(createdAt) as date, 
+          predictedTeamId, 
+          COUNT(*) as count 
+        FROM Prediction 
+        WHERE type = 'VOTE_CHAMPION' AND predictedTeamId IS NOT NULL
+        GROUP BY DATE(createdAt), predictedTeamId 
+        ORDER BY date ASC
+      `;
+
+      const formattedRows = rawRows.map(r => {
+        let dateStr = "";
+        if (r.date instanceof Date) {
+          dateStr = r.date.toISOString().split('T')[0];
         } else {
-          // Variance scaling down towards today
-          const variance = Math.round((Math.random() - 0.5) * 3 * i);
-          point[t.name] = Math.max(1, t.prob + variance);
+          dateStr = String(r.date).split(' ')[0];
         }
+        return {
+          date: dateStr,
+          teamId: Number(r.predictedTeamId),
+          count: Number(r.count)
+        };
       });
-      chartData.push(point);
+
+      // Generate date range from June 11, 2026 to today
+      const startDate = new Date("2026-06-11");
+      const endDate = new Date();
+      const dateRange: string[] = [];
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        dateRange.push(d.toISOString().split('T')[0]);
+      }
+
+      const votesMap: Record<string, Record<number, number>> = {};
+      formattedRows.forEach(row => {
+        if (!votesMap[row.date]) {
+          votesMap[row.date] = {};
+        }
+        votesMap[row.date][row.teamId] = row.count;
+      });
+
+      const cumulativeCounts: Record<number, number> = {};
+      // Initialize with the baseline votes so they start at correct proportions on June 11
+      allMappedTeams.forEach(t => {
+        const baseline = baselineStandings.find(b => b.teamCode === t.code)?.realVotes || 0;
+        cumulativeCounts[t.id] = baseline;
+      });
+
+      chartData = dateRange.map(dateStr => {
+        const dayVotes = votesMap[dateStr] || {};
+        
+        allMappedTeams.forEach(t => {
+          cumulativeCounts[t.id] += (dayVotes[t.id] || 0);
+        });
+
+        const totalUpToNow = Object.values(cumulativeCounts).reduce((sum, count) => sum + count, 0);
+        const dateLabel = new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        const point: Record<string, any> = { date: dateLabel };
+
+        teams.forEach(t => {
+          if (totalUpToNow > 0) {
+            const teamVotes = cumulativeCounts[t.id] || 0;
+            const pct = (teamVotes / totalUpToNow) * 100;
+            point[t.name] = Math.max(0, Math.round(pct * 10) / 10);
+          } else {
+            point[t.name] = 0;
+          }
+        });
+
+        return point;
+      });
+    } catch (dbError) {
+      console.error("Failed to query real trend data, falling back to mock:", dbError);
+      chartData = [];
+    }
+
+    if (chartData.length === 0) {
+      const startDate = new Date("2026-06-11");
+      const endDate = new Date();
+      const dateRange: string[] = [];
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        dateRange.push(d.toISOString().split('T')[0]);
+      }
+      chartData = dateRange.map((dateStr, idx) => {
+        const dateLabel = new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        const point: Record<string, any> = { date: dateLabel };
+        const progress = idx / dateRange.length;
+        
+        teams.forEach(t => {
+          const finalProb = t.prob;
+          const startingProb = Math.max(5, finalProb - 12);
+          const currentProb = startingProb + (finalProb - startingProb) * progress;
+          const noise = Math.sin(idx * 0.8) * 1.5;
+          point[t.name] = Math.max(0, Math.round((currentProb + noise) * 10) / 10);
+        });
+        return point;
+      });
     }
 
     const comments = [
@@ -272,12 +351,15 @@ export async function GET() {
     }
 
     return NextResponse.json({
+      marketTitle: "World Cup Winner",
+      fetchedAt: new Date().toISOString(),
+      totalVolumePool: "$982,118,524",
       teams,
       allTeams: allMappedTeams,
       chartData,
       comments,
       userSelection,
-      totalVotes: Math.max(totalVotes, 12000) // Keep total votes realistic/premium
+      totalVotes
     });
   } catch (error: any) {
     console.error("Failed to fetch winner votes:", error);
