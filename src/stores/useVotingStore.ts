@@ -12,6 +12,7 @@ interface VotingState {
   userVotes: Record<string, string>; // Keyed by matchId -> selection (e.g. "HOME", "AWAY", "teamId")
   tournamentWinnerPolls: TournamentWinnerResponse | null;
   loading: boolean;
+  isLoadingTournamentWinnerPolls: boolean;
   
   // Actions
   voteMatch: (matchId: string, selection: "HOME" | "AWAY") => Promise<void>;
@@ -26,6 +27,7 @@ export const useVotingStore = create<VotingState>((set, get) => ({
   userVotes: {},
   tournamentWinnerPolls: null,
   loading: false,
+  isLoadingTournamentWinnerPolls: false,
 
   initializeMatchVotes: (matches) => {
     const matchStats: Record<string, VoteStats> = {};
@@ -160,9 +162,12 @@ export const useVotingStore = create<VotingState>((set, get) => ({
   },
 
   loadTournamentWinnerPolls: async () => {
+    if (!get().tournamentWinnerPolls) {
+      set({ isLoadingTournamentWinnerPolls: true });
+    }
     try {
       const data = await votingService.fetchTournamentWinnerVotes();
-      set({ tournamentWinnerPolls: data });
+      set({ tournamentWinnerPolls: data, isLoadingTournamentWinnerPolls: false });
       const selection = data.userSelection;
       if (selection) {
         set((state) => ({
@@ -179,7 +184,8 @@ export const useVotingStore = create<VotingState>((set, get) => ({
         });
       }
     } catch (err) {
-      console.error("Failed to load winner polls:", err);
+      console.error("Failed to load tournament winner polls:", err);
+      set({ isLoadingTournamentWinnerPolls: false });
     }
   }
 }));

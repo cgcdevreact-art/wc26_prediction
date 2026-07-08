@@ -18,7 +18,8 @@ export function MatchProbabilitiesList() {
     userVotes,
     voteTournamentWinner,
     loadTournamentWinnerPolls,
-    initializeMatchVotes
+    initializeMatchVotes,
+    isLoadingTournamentWinnerPolls
   } = useVotingStore();
 
   const [isMobile, setIsMobile] = useState(false);
@@ -210,7 +211,11 @@ export function MatchProbabilitiesList() {
           </div>
 
           {/* Grid Layout: Standings (left) & Chart (right) */}
-          {tournamentWinnerPolls && (
+          {isLoadingTournamentWinnerPolls && !tournamentWinnerPolls ? (
+            <div className="flex justify-center items-center h-[320px]">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+            </div>
+          ) : tournamentWinnerPolls && (
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
 
               {/* Left Column (span 4): Standings List & Comments */}

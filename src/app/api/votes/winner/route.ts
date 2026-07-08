@@ -212,29 +212,54 @@ export async function GET() {
     let chartData: any[] = [];
     
     try {
-      interface VoteDayRaw {
-        date: string | Date;
-        predictedTeamId: number;
-        count: number | bigint;
-      }
+      let rawRows: any[] = [];
+      const dbUrl = process.env.DATABASE_URL || "";
+      const isMysql = dbUrl.startsWith("mysql");
 
-      // Query daily vote counts per team from database
-      const rawRows = await prisma.$queryRaw<VoteDayRaw[]>`
-        SELECT 
-          DATE(createdAt) as date, 
-          predictedTeamId, 
-          COUNT(*) as count 
-        FROM Prediction 
-        WHERE type = 'VOTE_CHAMPION' AND predictedTeamId IS NOT NULL
-        GROUP BY DATE(createdAt), predictedTeamId 
-        ORDER BY date ASC
-      `;
+      try {
+        if (isMysql) {
+          rawRows = await prisma.$queryRaw`
+            SELECT 
+              DATE(createdAt) as date, 
+              predictedTeamId, 
+              COUNT(*) as count 
+            FROM Prediction 
+            WHERE type = 'VOTE_CHAMPION' AND predictedTeamId IS NOT NULL
+            GROUP BY DATE(createdAt), predictedTeamId 
+            ORDER BY date ASC
+          `;
+        } else {
+          rawRows = await prisma.$queryRaw`
+            SELECT 
+              DATE(createdAt/1000, 'unixepoch') as date, 
+              predictedTeamId, 
+              COUNT(*) as count 
+            FROM Prediction 
+            WHERE type = 'VOTE_CHAMPION' AND predictedTeamId IS NOT NULL
+            GROUP BY DATE(createdAt/1000, 'unixepoch'), predictedTeamId 
+            ORDER BY date ASC
+          `;
+        }
+      } catch (err) {
+        console.error("Standard query failed, trying fallback...", err);
+        // Fallback for cases where Prisma schema name differs
+        rawRows = await prisma.$queryRaw`
+          SELECT 
+            DATE(createdAt) as date, 
+            predictedTeamId, 
+            COUNT(*) as count 
+          FROM prediction 
+          WHERE type = 'VOTE_CHAMPION' AND predictedTeamId IS NOT NULL
+          GROUP BY DATE(createdAt), predictedTeamId 
+          ORDER BY date ASC
+        `;
+      }
 
       const formattedRows = rawRows.map(r => {
         let dateStr = "";
         if (r.date instanceof Date) {
           dateStr = r.date.toISOString().split('T')[0];
-        } else {
+        } else if (r.date) {
           dateStr = String(r.date).split(' ')[0];
         }
         return {
@@ -242,7 +267,7 @@ export async function GET() {
           teamId: Number(r.predictedTeamId),
           count: Number(r.count)
         };
-      });
+      }).filter(r => r.date !== "null" && r.date !== "");
 
       // Generate date range from June 11, 2026 to today
       const startDate = new Date("2026-06-11");
