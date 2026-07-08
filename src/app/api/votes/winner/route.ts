@@ -169,47 +169,38 @@ export async function GET() {
       return acc;
     }, {} as Record<number, number>);
 
-    // 2. Define baseline teams data
-    const baselineStandings = [
-      { teamCode: "FRA", name: "France", volume: "$100,964,929", historicalChange: "+16%", realVotes: 163000, flag: "🇫🇷", color: "#60a5fa" }, // light blue
-      { teamCode: "ARG", name: "Argentina", volume: "$116,548,173", historicalChange: "+5%", realVotes: 93000, flag: "🇦🇷", color: "#3b82f6" }, // royal blue
-      { teamCode: "ESP", name: "Spain", volume: "$93,011,296", historicalChange: "+3%", realVotes: 93000, flag: "🇪🇸", color: "#eab308" }, // yellow
-      { teamCode: "ENG", name: "England", volume: "$88,254,878", historicalChange: "+2%", realVotes: 78000, flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", color: "#f97316" }, // orange
-      { teamCode: "NOR", name: "Norway", volume: "$117,773,640", historicalChange: "0%", realVotes: 30000, flag: "🇳🇴", color: "#10b981" },
-      { teamCode: "MAR", name: "Morocco", volume: "$139,247,014", historicalChange: "0%", realVotes: 15000, flag: "🇲🇦", color: "#8b5cf6" },
-      { teamCode: "BEL", name: "Belgium", volume: "$117,861,416", historicalChange: "0%", realVotes: 10000, flag: "🇧🇪", color: "#ec4899" },
-      { teamCode: "SUI", name: "Switzerland", volume: "$114,465,714", historicalChange: "0%", realVotes: 10000, flag: "🇨🇭", color: "#6366f1" }
-    ];
+    // 2. Fetch active teams dynamically from DB fixtures
+    const activeTeams = await getActiveTeams();
 
-    // 3. Map votes and calculate totals
+    // 3. Map votes and calculate totals purely from database
     let totalVotes = 0;
-    const mappedStandings = baselineStandings.map(team => {
-      const id = getTeamIdFromCode(team.teamCode);
-      const extraVotes = dbTeamCounts[id] || 0;
-      const finalVotes = team.realVotes + extraVotes;
+    const colorPalette = ["#60a5fa", "#3b82f6", "#eab308", "#f97316", "#10b981", "#8b5cf6", "#ec4899", "#6366f1"];
+
+    const rawStandings = activeTeams.map((team, idx) => {
+      const finalVotes = dbTeamCounts[team.id] || 0;
       totalVotes += finalVotes;
       return {
-        ...team,
-        id,
+        id: team.id,
+        name: team.name,
+        code: team.tla,
+        flag: team.crest,
+        color: colorPalette[idx % colorPalette.length],
         finalVotes
       };
     });
 
+    // Sort standings by finalVotes descending
+    rawStandings.sort((a, b) => b.finalVotes - a.finalVotes);
+
     // 4. Calculate exact probabilities
-    const allMappedTeams = mappedStandings.map(team => {
+    const allMappedTeams = rawStandings.map(team => {
       const exactProbability = totalVotes > 0 ? (team.finalVotes / totalVotes) * 100 : 0;
       const prob = Math.round(exactProbability);
       return {
-        id: team.id,
-        name: team.name,
-        code: team.teamCode,
-        flag: team.flag,
-        volume: team.volume,
-        historicalChange: team.historicalChange,
+        ...team,
         prob: Math.max(0, prob),
         exactProbability: Number(exactProbability.toFixed(1)),
         probability: exactProbability.toFixed(1) + "%",
-        color: team.color,
         realVotes: team.finalVotes
       };
     });
@@ -270,10 +261,9 @@ export async function GET() {
       });
 
       const cumulativeCounts: Record<number, number> = {};
-      // Initialize with the baseline votes so they start at correct proportions on June 11
+      // Initialize cumulative counts to 0 for all teams
       allMappedTeams.forEach(t => {
-        const baseline = baselineStandings.find(b => b.teamCode === t.code)?.realVotes || 0;
-        cumulativeCounts[t.id] = baseline;
+        cumulativeCounts[t.id] = 0;
       });
 
       chartData = dateRange.map(dateStr => {
@@ -299,6 +289,26 @@ export async function GET() {
 
         return point;
       });
+
+      // Backfill any initial zero days (like June 11) with the first day's valid ratio
+      let firstValidPoint: Record<string, number> | null = null;
+      for (const pt of chartData) {
+        const hasVotes = Object.keys(pt).some(k => k !== "date" && pt[k] > 0);
+        if (hasVotes) {
+          firstValidPoint = pt;
+          break;
+        }
+      }
+      if (firstValidPoint) {
+        chartData.forEach(pt => {
+          const hasVotes = Object.keys(pt).some(k => k !== "date" && pt[k] > 0);
+          if (!hasVotes) {
+            teams.forEach(t => {
+              pt[t.name] = firstValidPoint![t.name];
+            });
+          }
+        });
+      }
     } catch (dbError) {
       console.error("Failed to query real trend data, falling back to mock:", dbError);
       chartData = [];
