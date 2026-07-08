@@ -1,12 +1,13 @@
 "use client";
 
 import { useVotingStore } from "@/stores/useVotingStore";
+import { useFixturesStore } from "@/stores/useFixturesStore";
 import { FixtureView } from "@/services/fixturesService";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { CountdownTimer } from "./CountdownTimer";
 import { VotePercentage } from "./VotePercentage";
 import { format } from "date-fns";
-import { Check, CheckCircle2, Loader2 } from "lucide-react";
+import { Check, CheckCircle2, Loader2, Trophy } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState, useMemo } from "react";
@@ -129,10 +130,43 @@ export function VotingCard({ fixture }: VotingCardProps) {
     router.push(`/world-cup/match/${matchId}`);
   };
 
+  const allFixtures = useFixturesStore((state) => state.fixtures);
   const isCompleted = fixture.status === "COMPLETED";
-  const homeWon = isCompleted && (fixture.homeScore ?? 0) > (fixture.awayScore ?? 0);
-  const awayWon = isCompleted && (fixture.awayScore ?? 0) > (fixture.homeScore ?? 0);
-  const isDraw = isCompleted && (fixture.homeScore ?? 0) === (fixture.awayScore ?? 0);
+  const homeScoreVal = parseInt(fixture.homeScore, 10);
+  const awayScoreVal = parseInt(fixture.awayScore, 10);
+
+  const homeWonReal = isCompleted && !isNaN(homeScoreVal) && !isNaN(awayScoreVal) && homeScoreVal > awayScoreVal;
+  const awayWonReal = isCompleted && !isNaN(homeScoreVal) && !isNaN(awayScoreVal) && awayScoreVal > homeScoreVal;
+  const isDrawScore = isCompleted && !isNaN(homeScoreVal) && !isNaN(awayScoreVal) && homeScoreVal === awayScoreVal;
+
+  let homeWon = homeWonReal;
+  let awayWon = awayWonReal;
+  let isDraw = isDrawScore;
+
+  if (isDrawScore && fixture.isKnockout && allFixtures.length > 0) {
+    const homeCode = fixture.homeTeamObj.code;
+    const awayCode = fixture.awayTeamObj.code;
+    const homeQualified = allFixtures.some(f => 
+      f.match_no > fixture.match_no && 
+      (f.homeTeamObj.code === homeCode || f.awayTeamObj.code === homeCode)
+    );
+    const awayQualified = allFixtures.some(f => 
+      f.match_no > fixture.match_no && 
+      (f.homeTeamObj.code === awayCode || f.awayTeamObj.code === awayCode)
+    );
+
+    if (homeQualified && !awayQualified) {
+      homeWon = true;
+      isDraw = false;
+    } else if (awayQualified && !homeQualified) {
+      awayWon = true;
+      isDraw = false;
+    }
+  }
+
+  const winnerName = homeWon ? fixture.homeTeamObj.name : awayWon ? fixture.awayTeamObj.name : "Draw";
+  const winnerFlag = homeWon ? fixture.homeTeamObj.flag : awayWon ? fixture.awayTeamObj.flag : null;
+  const winnerCode = homeWon ? fixture.homeTeamObj.code : awayWon ? fixture.awayTeamObj.code : null;
 
   const isPlaceholderHome = !fixture.homeTeamObj.code || fixture.homeTeamObj.code === "TBD" || fixture.homeTeamObj.name.toLowerCase().includes("winner") || fixture.homeTeamObj.name.toLowerCase().includes("runner");
   const isPlaceholderAway = !fixture.awayTeamObj.code || fixture.awayTeamObj.code === "TBD" || fixture.awayTeamObj.name.toLowerCase().includes("winner") || fixture.awayTeamObj.name.toLowerCase().includes("runner");
@@ -311,21 +345,26 @@ export function VotingCard({ fixture }: VotingCardProps) {
             </div>
           </div>
         ) : (
-          <div className="bg-slate-50 dark:bg-white/[0.02] p-2.5 rounded-xl border border-slate-100 dark:border-white/5 space-y-1.5">
-            <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              <span>Official Result</span>
-              <span className="font-mono text-emerald-500 font-black">Final Score</span>
+          <div className="bg-emerald-500/5 dark:bg-emerald-500/10 p-3 rounded-2xl border border-emerald-500/20 text-center flex flex-col justify-center items-center h-[90px] space-y-1">
+            <div className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1 justify-center">
+              <Trophy className="w-3 h-3 text-amber-500" /> Winner
             </div>
-            <VotePercentage
-              homeProb={stats.homeProb}
-              awayProb={stats.awayProb}
-              homeCode={fixture.homeTeamObj.code}
-              awayCode={fixture.awayTeamObj.code}
-              isAuthenticated={!!session}
-            />
-            <div className="text-[9px] font-bold text-slate-400 uppercase text-center">
-              {stats.totalVotes} Votes Cast
-            </div>
+            {isDraw ? (
+              <span className="text-xs font-black text-slate-800 dark:text-white">Draw</span>
+            ) : (
+              <div className="flex items-center gap-2 justify-center">
+                <CountryFlag
+                  code={winnerCode || ""}
+                  flag={winnerFlag || ""}
+                  name={winnerName || ""}
+                  className="h-4 w-6 rounded shadow-xs"
+                  emojiClassName="text-sm"
+                />
+                <span className="text-xs font-black text-slate-800 dark:text-white">
+                  {winnerName}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
