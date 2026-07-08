@@ -124,6 +124,15 @@ export function MatchProbabilitiesList() {
       return;
     }
 
+    const votedWinnerCode = userVotes["tournament-winner"];
+    if (votedWinnerCode) {
+      const list = tournamentWinnerPolls?.allTeams || tournamentWinnerPolls?.teams || [];
+      const votedTeam = list.find((t) => t.code === votedWinnerCode);
+      const votedTeamName = votedTeam ? votedTeam.name : votedWinnerCode;
+      toast.error(`You already voted for ${votedTeamName}!`);
+      return;
+    }
+
     const list = tournamentWinnerPolls?.allTeams || tournamentWinnerPolls?.teams || [];
     const team = list.find((t) => t.code === teamCode);
     const teamName = team ? team.name : teamCode;
@@ -283,14 +292,24 @@ export function MatchProbabilitiesList() {
                         </span>
                         <button
                           onClick={() => handleWinnerVoteClick((t as any).id || 0, t.code)}
-                          disabled={userHasVotedWinner}
-                          className={`p-1.5 rounded-lg border cursor-pointer transition ${userVotes["tournament-winner"] === t.code
-                            ? "bg-amber-500/20 border-amber-500/40 text-amber-500"
-                            : "bg-slate-50 hover:bg-slate-100 dark:bg-[#1f2937]/30 hover:dark:bg-[#1f2937] border-slate-200 dark:border-[#1f2937] text-slate-400 dark:text-[#6c7a89] hover:text-slate-650 dark:hover:text-white"
-                            }`}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                            userVotes["tournament-winner"] === t.code
+                              ? "bg-[#fffbeb] dark:bg-[#f59e0b]/10 border-2 border-[#f59e0b] text-[#d97706] dark:text-[#f59e0b]"
+                              : "bg-[#f8fafc] dark:bg-[#1e2025]/50 border border-[#e2e8f0] dark:border-white/5 text-[#64748b] dark:text-slate-400 hover:bg-[#f1f5f9] hover:border-[#cbd5e1] hover:text-[#475569] dark:hover:bg-white/10 dark:hover:text-white"
+                          }`}
                           title="Vote as tournament champion"
                         >
-                          <Vote className="w-3 h-3" />
+                          {userVotes["tournament-winner"] === t.code ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="4" y="4" width="16" height="16" rx="3" />
+                              <path d="M9 12l2 2 4-4" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="4" y="4" width="16" height="16" rx="3" />
+                              <path d="M9 12l2 2 4-4" />
+                            </svg>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -328,8 +347,8 @@ export function MatchProbabilitiesList() {
                         </button>
                       ))}
                     </div>
-                    
-                    <button 
+
+                    <button
                       onClick={() => setSortAsc(!sortAsc)}
                       title={sortAsc ? "Sort Descending" : "Sort Ascending"}
                       className={`hover:text-slate-900 dark:hover:text-white transition cursor-pointer p-1 rounded-md ${sortAsc ? "text-cyan-500" : ""}`}
@@ -338,7 +357,7 @@ export function MatchProbabilitiesList() {
                     </button>
 
                     <div className="relative">
-                      <button 
+                      <button
                         onClick={() => setShowSettings(!showSettings)}
                         title="Show on chart"
                         className={`hover:text-slate-900 dark:hover:text-white transition cursor-pointer p-1 rounded-md ${showSettings ? "bg-slate-100 dark:bg-white/10 text-cyan-500 dark:text-neon" : ""}`}
@@ -373,14 +392,12 @@ export function MatchProbabilitiesList() {
                                         [t.name]: !prev[t.name]
                                       }));
                                     }}
-                                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                      isVisible ? "bg-cyan-500" : "bg-slate-200 dark:bg-slate-800"
-                                    }`}
+                                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isVisible ? "bg-cyan-500" : "bg-slate-200 dark:bg-slate-800"
+                                      }`}
                                   >
                                     <span
-                                      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
-                                        isVisible ? "translate-x-3" : "translate-x-0"
-                                      }`}
+                                      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${isVisible ? "translate-x-3" : "translate-x-0"
+                                        }`}
                                     />
                                   </button>
                                 </div>
@@ -460,7 +477,7 @@ export function MatchProbabilitiesList() {
                 Active Match Prediction Pools
               </h4>
               <p className="text-[10px] text-muted-foreground transition-all duration-300">
-                {statusFilter === "ALL" && "Vote on match prediction pools and view results."}
+                {statusFilter === "ALL" && "Vote in match prediction pools and view the results."}
                 {statusFilter === "LIVE" && "Predict outcomes for active live matches in real-time."}
                 {statusFilter === "UPCOMING" && "Vote on upcoming match winners."}
                 {statusFilter === "COMPLETED" && "View completed match prediction results."}
@@ -489,8 +506,21 @@ export function MatchProbabilitiesList() {
                 <VotingCard key={f.match_no} fixture={f} />
               ))
             ) : (
-              <div className="w-full py-12 text-center text-xs text-muted-foreground border border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-white/[0.01]">
-                No matches left to show!
+              <div className="w-full py-10 text-center text-xs text-muted-foreground border border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-white/[0.01] flex flex-col items-center justify-center gap-3">
+                {statusFilter === "LIVE" ? (
+                  <>
+                    <img 
+                      src="/lottie/Soccer_empty_state.svg" 
+                      className="w-20 h-20 opacity-75 dark:opacity-60" 
+                      alt="No live matches"
+                    />
+                    <span className="font-bold text-slate-500 dark:text-slate-450">
+                      No live matches at the moment.
+                    </span>
+                  </>
+                ) : (
+                  <span>No matches left to show!</span>
+                )}
               </div>
             )}
           </div>

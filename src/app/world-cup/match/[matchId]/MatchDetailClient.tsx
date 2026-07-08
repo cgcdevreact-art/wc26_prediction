@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-
+import { useFixturesStore } from "@/stores/useFixturesStore";
 interface MatchDetailClientProps {
   fixture: FixtureView & {
     lineups?: {
@@ -29,6 +29,7 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
   const { data: session } = useSession();
   const matchId = String(fixture.match_no);
   const currentUserId = session?.user?.id || null;
+  const allFixtures = useFixturesStore((state) => state.fixtures);
 
   // Tabs & Filters
   const [activeTab, setActiveTab] = useState<string>("overview");
@@ -59,6 +60,7 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
   const [loadingComments, setLoadingComments] = useState<boolean>(true);
   const [comments, setComments] = useState<any[]>([]);
   const [commentSort, setCommentSort] = useState<string>("Newest");
+  const [visibleCommentsLimit, setVisibleCommentsLimit] = useState<number>(10);
   const [newCommentText, setNewCommentText] = useState<string>("");
   const [submittingComment, setSubmittingComment] = useState<boolean>(false);
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
@@ -932,7 +934,7 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
               </div>
             ) : (
               <div className="space-y-6">
-                {comments.map((comment) => (
+                {comments.slice(0, visibleCommentsLimit).map((comment) => (
                   <CommentNode
                     key={comment.id}
                     comment={comment}
@@ -949,6 +951,17 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
                     toggleCollapse={toggleCollapse}
                   />
                 ))}
+
+                {comments.length > visibleCommentsLimit && (
+                  <div className="flex justify-center pt-2">
+                    <button
+                      onClick={() => setVisibleCommentsLimit((prev) => prev + 10)}
+                      className="px-4 py-2 text-xs font-bold text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 hover:dark:text-cyan-300 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl transition cursor-pointer select-none"
+                    >
+                      Show More
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -965,9 +978,9 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
                 <Trophy className="w-5 h-5 text-yellow-500" />
                 Prediction Pool
               </h3>
-              <p className="text-xs text-slate-400">
+              {/* <p className="text-xs text-slate-400">
                 Percentages update live. Correct predictions score platform ELO.
-              </p>
+              </p> */}
             </div>
 
             {loadingPreds ? (
@@ -992,19 +1005,78 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
                 );
               }
 
-              return (userPrediction || fixture.status === "COMPLETED") ? (
-                <div className="bg-slate-50 dark:bg-white/[0.02] p-4.5 rounded-2xl border border-slate-200 dark:border-white/5 space-y-5">
-                  {fixture.status === "COMPLETED" ? (
+              if (fixture.status === "COMPLETED") {
+                const homeScoreVal = parseInt(fixture.homeScore, 10);
+                const awayScoreVal = parseInt(fixture.awayScore, 10);
+
+                const homeWonReal = !isNaN(homeScoreVal) && !isNaN(awayScoreVal) && homeScoreVal > awayScoreVal;
+                const awayWonReal = !isNaN(homeScoreVal) && !isNaN(awayScoreVal) && awayScoreVal > homeScoreVal;
+                const isDrawScore = !isNaN(homeScoreVal) && !isNaN(awayScoreVal) && homeScoreVal === awayScoreVal;
+
+                let homeWon = homeWonReal;
+                let awayWon = awayWonReal;
+                let isDraw = isDrawScore;
+
+                if (isDrawScore && fixture.isKnockout && allFixtures.length > 0) {
+                  const homeCode = fixture.homeTeamObj.code;
+                  const awayCode = fixture.awayTeamObj.code;
+                  const homeQualified = allFixtures.some(f => 
+                    f.match_no > fixture.match_no && 
+                    (f.homeTeamObj.code === homeCode || f.awayTeamObj.code === homeCode)
+                  );
+                  const awayQualified = allFixtures.some(f => 
+                    f.match_no > fixture.match_no && 
+                    (f.homeTeamObj.code === awayCode || f.awayTeamObj.code === awayCode)
+                  );
+
+                  if (homeQualified && !awayQualified) {
+                    homeWon = true;
+                    isDraw = false;
+                  } else if (awayQualified && !homeQualified) {
+                    awayWon = true;
+                    isDraw = false;
+                  }
+                }
+
+                const winnerName = homeWon ? fixture.homeTeamObj.name : awayWon ? fixture.awayTeamObj.name : "Draw";
+                const winnerFlag = homeWon ? fixture.homeTeamObj.flag : awayWon ? fixture.awayTeamObj.flag : null;
+                const winnerCode = homeWon ? fixture.homeTeamObj.code : awayWon ? fixture.awayTeamObj.code : null;
+
+                return (
+                  <div className="bg-emerald-500/5 dark:bg-emerald-500/10 p-5 rounded-2xl border border-emerald-500/20 space-y-4">
                     <div className="flex items-center gap-2 text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
                       <CheckCircle2 className="w-5 h-5" />
                       <span>Determined</span>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-xs font-black text-cyan-600 dark:text-neon uppercase tracking-widest">
-                      <CheckCircle2 className="w-5 h-5" />
-                      <span>✔ Predicted {userPrediction === "HOME" ? fixture.homeTeamObj.name : fixture.awayTeamObj.name}</span>
+                    <div className="bg-white dark:bg-[#16181D]/30 border border-slate-100 dark:border-white/5 p-4 rounded-xl flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Winner</span>
+                      {isDraw ? (
+                        <span className="text-sm font-black text-slate-800 dark:text-white">Draw</span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <CountryFlag
+                            code={winnerCode || ""}
+                            flag={winnerFlag || ""}
+                            name={winnerName || ""}
+                            className="h-4 w-6 rounded shadow-xs"
+                            emojiClassName="text-sm"
+                          />
+                          <span className="text-sm font-black text-slate-855 dark:text-white">
+                            {winnerName}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+                );
+              }
+
+              return userPrediction ? (
+                <div className="bg-slate-50 dark:bg-white/[0.02] p-4.5 rounded-2xl border border-slate-200 dark:border-white/5 space-y-5">
+                  <div className="flex items-center gap-2 text-xs font-black text-cyan-600 dark:text-neon uppercase tracking-widest">
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>✔ Predicted {userPrediction === "HOME" ? fixture.homeTeamObj.name : fixture.awayTeamObj.name}</span>
+                  </div>
 
                   <div className="space-y-3.5 text-xs font-bold">
                     <div className="space-y-1">
@@ -1139,7 +1211,7 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
                           {m.predictions.hasVoted ? `${m.predictions.homePercent}%` : "-%"}
                         </span>
                       </div>
- 
+
                       <div className="flex justify-between items-center min-w-0">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <CountryFlag
