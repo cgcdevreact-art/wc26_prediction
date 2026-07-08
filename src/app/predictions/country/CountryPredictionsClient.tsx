@@ -161,6 +161,8 @@ export default function CountryPredictionsClient({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [zoomScale, setZoomScale] = useState(85);
+  const [sharedAuthor, setSharedAuthor] = useState<string | null>(null);
+  const [isLoadingShared, setIsLoadingShared] = useState(false);
 
   const [bypassOverrides, setBypassOverrides] = useState(false);
   const [useRealScores, setUseRealScores] = useState(true);
@@ -350,8 +352,32 @@ export default function CountryPredictionsClient({
     if (!mounted || !isInitialized || hasProcessedLoadUrl || isLoadingCustomCountries) return;
 
     const loadId = searchParams.get("load");
+    const shareId = searchParams.get("shareId");
     const autorun = searchParams.get("autorun") === "true";
     const forcedModel = searchParams.get("model");
+
+    if (shareId && !hasProcessedLoadUrl) {
+      setIsLoadingShared(true);
+      fetch(`/api/share/${shareId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.snapshot && data.snapshot[0]) {
+            handleLoadPrediction(data.snapshot[0], true);
+            setSharedAuthor(data.userName || "Guest User");
+          }
+          const params = new URLSearchParams(searchParams.toString());
+          params.delete("shareId");
+          window.history.replaceState(null, "", `${pathname}?${params.toString()}`);
+          setHasProcessedLoadUrl(true);
+          setIsLoadingShared(false);
+        })
+        .catch(err => {
+          console.error(err);
+          setHasProcessedLoadUrl(true);
+          setIsLoadingShared(false);
+        });
+      return;
+    }
 
     if (!loadId) {
       if (forcedModel === "base" && selectedModel !== "base") {
@@ -417,7 +443,7 @@ export default function CountryPredictionsClient({
     }
   }, [pendingAutorun, mounted, isInitialized, isLoadingCustomCountries]);
 
-  const handleLoadPrediction = (prediction: any) => {
+  const handleLoadPrediction = (prediction: any, isShared: boolean = false) => {
     try {
       ignoreResetRef.current = true;
       const data = readPredictionPayload<any>(prediction.predictedPayload, prediction.predictedWinner);
@@ -441,6 +467,21 @@ export default function CountryPredictionsClient({
       setPlayersOut(data.playersOut ?? []);
       setUseRealScores(!!data.useRealScores);
       setBypassOverrides(!!data.bypassOverrides);
+
+      if (data.isWildcard || data.code.startsWith("CC_")) {
+        setSharedCustomCountry({
+          code: data.code,
+          name: data.name,
+          flag: data.flag,
+          elo: data.customElo ?? data.elo ?? 1500,
+          attack: data.customAttack ?? 75,
+          defense: data.customDefense ?? 75,
+          baselineCode: data.baselineCode,
+          replacedCode: data.replacedCode,
+        });
+      } else {
+        setSharedCustomCountry(null);
+      }
 
       if (data.simResults) {
         setSimResults(data.simResults);
@@ -488,9 +529,10 @@ export default function CountryPredictionsClient({
         });
       }
 
-      loadedPredictionRef.current = true;
-      setSaveSuccess(true);
-      toast.success(`Loaded saved simulation for ${data.name}!`);
+      if (!isShared) {
+        setSaveSuccess(true);
+      }
+      toast.success(`Loaded ${isShared ? 'shared' : 'saved'} simulation for ${data.name}!`);
 
       // Delay resetting the ref to allow React to flush state updates
       setTimeout(() => {
@@ -641,7 +683,6 @@ export default function CountryPredictionsClient({
   const hasInitializedCustomizer = useRef(false);
   const hasRestoredSimulationSnapshot = useRef(false);
   const ignoreResetRef = useRef(false);
-  const loadedPredictionRef = useRef(false);
   const deletedCustomCodesRef = useRef<Set<string>>(new Set());
   const formattedModelName = selectedModel ? selectedModel.charAt(0).toUpperCase() + selectedModel.slice(1) : "";
   const activePlan = (subscriptionTier || session?.user?.subscriptionTier || "free").toLowerCase();
@@ -689,6 +730,7 @@ export default function CountryPredictionsClient({
 
   // Simulation results state
   const [simResults, setSimResults] = useState<CountrySimulationResults | null>(null);
+  const [sharedCustomCountry, setSharedCustomCountry] = useState<any>(null);
 
   const [customCountries, setCustomCountries] = useState<CustomCountry[]>([]);
 
@@ -827,8 +869,8 @@ export default function CountryPredictionsClient({
   }, [selectedCode, customCountries]);
 
   const isWildcardScenario = useMemo(() => {
-    return searchParams.get("wildcard") === "true" || !!activeCustomCountry;
-  }, [searchParams, activeCustomCountry]);
+    return searchParams.get("wildcard") === "true" || !!activeCustomCountry || !!(sharedCustomCountry && sharedCustomCountry.code === selectedCode);
+  }, [searchParams, activeCustomCountry, sharedCustomCountry, selectedCode]);
 
   const effectiveCode = selectedCode;
 
@@ -847,8 +889,22 @@ export default function CountryPredictionsClient({
         squadValueM: origTeam?.squadValueM || 100,
       };
     }
+    if (sharedCustomCountry && sharedCustomCountry.code === selectedCode) {
+      const origTeam = appTeams.find((t) => t.code === sharedCustomCountry.replacedCode) || appTeams[0];
+      return {
+        code: sharedCustomCountry.code,
+        name: sharedCustomCountry.name,
+        flag: sharedCustomCountry.flag,
+        rank: origTeam?.rank || 99,
+        elo: sharedCustomCountry.elo,
+        attack: sharedCustomCountry.attack,
+        defense: sharedCustomCountry.defense,
+        power: origTeam?.power || 75,
+        squadValueM: origTeam?.squadValueM || 100,
+      };
+    }
     return appTeams.find((t) => t.code === selectedCode) || appTeams[0];
-  }, [selectedCode, activeCustomCountry, appTeams]);
+  }, [selectedCode, activeCustomCountry, sharedCustomCountry, appTeams]);
 
   const isKnownTeamCode = (code: string | null | undefined) => {
     if (!code) return false;
@@ -859,9 +915,12 @@ export default function CountryPredictionsClient({
   };
 
   const getTeam = (code: string): SimTeam => {
-    const custom = activeCustomCountry &&
-      (activeCustomCountry.replacedCode === code || activeCustomCountry.code === code)
+    const custom = (activeCustomCountry &&
+      (activeCustomCountry.replacedCode === code || activeCustomCountry.code === code))
       ? activeCustomCountry
+      : (sharedCustomCountry &&
+        (sharedCustomCountry.replacedCode === code || sharedCustomCountry.code === code))
+      ? sharedCustomCountry
       : null;
     if (custom) {
       const isSelected = (custom.replacedCode === effectiveCode) || (custom.code === effectiveCode);
@@ -943,12 +1002,6 @@ export default function CountryPredictionsClient({
     const isCustom = storeTeam?.isCustom ?? false;
 
     if (ignoreResetRef.current) {
-      lastOverrideStateRef.current = { isOverrideDisabled, isCustom, selectedCode };
-      return;
-    }
-
-    if (loadedPredictionRef.current) {
-      loadedPredictionRef.current = false;
       lastOverrideStateRef.current = { isOverrideDisabled, isCustom, selectedCode };
       return;
     }
@@ -1859,12 +1912,14 @@ export default function CountryPredictionsClient({
 
     setShowConfirmPopup(true);
     setSaveSuccess(false);
+    setSharedAuthor(null);
   };
 
   // Reset saved state whenever the selected country or prediction model changes
   useEffect(() => {
-    if (mounted) {
+    if (mounted && !ignoreResetRef.current) {
       setSaveSuccess(false);
+      setSharedAuthor(null);
     }
   }, [selectedCode, selectedModel, mounted]);
 
@@ -2063,8 +2118,24 @@ export default function CountryPredictionsClient({
 
   if (!mounted) return null;
 
+  if (isLoadingShared) {
+    return (
+      <div className="mx-auto container mx-auto px-4 w-full py-24 flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in duration-700">
+        <div className="w-12 h-12 border-4 border-slate-200 dark:border-slate-800 border-t-cyan-500 rounded-full animate-spin mb-6" />
+        <h2 className="text-xl font-bold font-display text-slate-800 dark:text-white tracking-tight mb-2">Loading Shared Simulation</h2>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">Please wait while we reconstruct the path to glory...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto container mx-auto px-4 w-full  py-8   animate-in fade-in duration-700">
+      {sharedAuthor && (
+        <div className="bg-gradient-to-r from-blue-500/10 via-cyan-500/10 to-blue-500/10 border-b border-cyan-500/20 text-slate-800 dark:text-cyan-50 px-4 py-3 text-center text-sm font-semibold mb-6 rounded-2xl mx-4 flex items-center justify-center gap-2">
+          <Info className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+          <span>You are viewing a shared country simulation created by <span className="font-bold text-cyan-700 dark:text-cyan-300">{sharedAuthor}</span>.</span>
+        </div>
+      )}
       {/* Premium Dashboard Header */}
       <div className="relative mb-10 overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900">
         <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-emerald-100/70 blur-3xl pointer-events-none dark:bg-neon/10" />
@@ -2073,7 +2144,12 @@ export default function CountryPredictionsClient({
           <div>
             <div className="text-xs uppercase tracking-[0.25em] text-cyan-600 dark:text-neon flex items-center gap-2 font-bold mb-2">
               <Sparkles className="w-4 h-4 text-cyan-600 dark:text-neon animate-pulse" />
-              Predictive Intelligence Platform
+              <span>Predictive Intelligence Platform</span>
+              {sharedAuthor && (
+                <span className="ml-2 inline-flex items-center rounded-full bg-cyan-100 px-2.5 py-0.5 text-[10px] font-bold text-cyan-800 dark:bg-cyan-900/80 dark:text-cyan-300">
+                  Shared by {sharedAuthor}
+                </span>
+              )}
             </div>
             <h1 className="font-display text-3xl font-black sm:text-4xl text-slate-950 dark:text-gradient tracking-tight mt-4">
               Path to Glory Explorer
@@ -2152,14 +2228,16 @@ export default function CountryPredictionsClient({
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Simulation Engine</span>
               <span className="text-base font-bold font-display text-cyan-700 dark:text-neon mt-0.5">{formattedModelName}</span>
             </div>
-            <button
-              onClick={handleRunSimulationClick}
-              disabled={isSimulating || !isInitialized}
-              className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 via-emerald-500 to-fuchsia-500 px-5 py-3 text-sm font-black text-white shadow-[0_16px_40px_rgba(14,165,233,0.2)] transition-all hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(14,165,233,0.28)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Sparkles className="h-4 w-4" />
-              <span>{isSimulating ? "Running..." : "Run Simulation"}</span>
-            </button>
+            {!sharedAuthor && (
+              <button
+                onClick={handleRunSimulationClick}
+                disabled={isSimulating || !isInitialized}
+                className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 via-emerald-500 to-fuchsia-500 px-5 py-3 text-sm font-black text-white shadow-[0_16px_40px_rgba(14,165,233,0.2)] transition-all hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(14,165,233,0.28)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>{isSimulating ? "Running..." : "Run Simulation"}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -2552,7 +2630,7 @@ export default function CountryPredictionsClient({
                     <div className="text-xs text-muted-foreground mt-0.5 mb-2">Profile, champion odds, and stage progression</div>
                   </div>
                   {/* Save Projections Action Button */}
-                  {simResults && (
+                  {simResults && !sharedAuthor && (
                     <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                       {session ? (
                         <div
@@ -2966,16 +3044,19 @@ export default function CountryPredictionsClient({
                 <div className="font-display font-extrabold text-xl text-foreground dark:text-white tracking-tight">Path to Glory</div>
                 <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">Most likely path to lifting the trophy for {selectedTeam.name}</div>
               </div>
-              {simResults && (
+              {simResults && !sharedAuthor && (
                 <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                   {session ? (
-                    <button
-                      onClick={handleSavePrediction}
-                      disabled={isSaving || isSimulating || saveSuccess}
+                    <div
+                      role="button"
+                      onClick={(e) => {
+                        if (isSaving || isSimulating || saveSuccess) return;
+                        handleSavePrediction();
+                      }}
                       className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all ${saveSuccess
                         ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 cursor-not-allowed opacity-80"
                         : "border border-transparent bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] text-white shadow-[0_10px_25px_rgba(44,124,135,0.2)] hover:opacity-95 active:scale-95 disabled:opacity-50"
-                        }`}
+                        } ${isSaving || isSimulating || saveSuccess ? 'opacity-50 pointer-events-none' : ''}`}
                     >
                       {isSaving ? (
                         <>
@@ -2993,15 +3074,16 @@ export default function CountryPredictionsClient({
                           <span>Save to Predictions</span>
                         </>
                       )}
-                    </button>
+                    </div>
                   ) : (
-                    <button
+                    <div
+                      role="button"
                       onClick={() => openAuthModal("signin")}
                       className="flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-all dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/[0.08]"
                     >
                       <Lock className="h-4 w-4" />
                       <span>Sign In to Save</span>
-                    </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -3031,7 +3113,6 @@ export default function CountryPredictionsClient({
                         type="button"
                         onClick={() => setZoomScale(prev => Math.min(150, prev + 10))}
                         className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition cursor-pointer"
-                        title="Zoom In"
                       >
                         <Plus className="h-4 w-4" />
                       </button>
@@ -3439,6 +3520,8 @@ export default function CountryPredictionsClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+
       <AlertDialog open={!!customCountryDeleteTarget} onOpenChange={(open) => !open && setCustomCountryDeleteTarget(null)}>
         <AlertDialogContent className="rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-xl dark:border-white/10 dark:bg-slate-950 dark:text-white">
           <AlertDialogHeader>

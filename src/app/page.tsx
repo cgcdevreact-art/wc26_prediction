@@ -19,6 +19,7 @@ export default function Page() {
       <main>
         <Hero />
         <LiveStats />
+        
         <HomeSectionsAccordion />
       </main>
       <Footer />

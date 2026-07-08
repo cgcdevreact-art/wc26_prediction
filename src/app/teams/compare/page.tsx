@@ -19,19 +19,24 @@ export default function Page() {
           </p>
         </div>
         
-        {/* Sub-category selector navigation */}
-        <div className="inline-flex w-full flex-wrap items-center rounded-full border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)] sm:w-auto">
+        <div className="flex w-full md:w-auto overflow-x-auto scrollbar-none whitespace-nowrap items-center rounded-full border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)] sm:w-auto">
           <Link
             href="/teams"
-            className="flex-1 rounded-full px-5 py-2.5 text-center text-sm font-semibold text-slate-600 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white sm:flex-none"
+            className="shrink-0 flex-none rounded-full px-5 py-2.5 text-center text-sm font-semibold text-slate-600 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white whitespace-nowrap"
           >
             Teams List
           </Link>
           <Link
             href="/teams/compare"
-            className="flex-1 rounded-full bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] px-5 py-2.5 text-center text-sm font-semibold text-white shadow-[0_12px_30px_rgba(44,124,135,0.24)] sm:flex-none"
+            className="shrink-0 flex-none rounded-full bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] px-5 py-2.5 text-center text-sm font-semibold text-white shadow-[0_12px_30px_rgba(44,124,135,0.24)] whitespace-nowrap"
           >
             Compare Teams
+          </Link>
+          <Link
+            href="/teams/clubs"
+            className="shrink-0 flex-none rounded-full px-5 py-2.5 text-center text-sm font-semibold text-slate-600 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white whitespace-nowrap"
+          >
+            Club Rankings
           </Link>
         </div>
       </div>

@@ -36,7 +36,10 @@ const isMySql = databaseUrl.startsWith("mysql://") || databaseUrl.startsWith("my
 const provider = isMySql ? "mysql" : "sqlite";
 
 const template = fs.readFileSync(templatePath, "utf8");
-const rendered = template.replace("__DATABASE_PROVIDER__", provider);
+let rendered = template.replace("__DATABASE_PROVIDER__", provider);
+if (provider === "sqlite") {
+  rendered = rendered.replace(/\s+@db\.\w+/g, "");
+}
 
 fs.writeFileSync(outputPath, rendered);
 

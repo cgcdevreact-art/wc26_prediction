@@ -30,6 +30,7 @@ interface Match1v1ModalProps {
   };
   onSimulate: () => void;
   isRealData: boolean;
+  isReadOnly?: boolean;
 }
 
 export function Match1v1Modal({
@@ -44,7 +45,8 @@ export function Match1v1Modal({
   awayLambda,
   matchDetails,
   onSimulate,
-  isRealData
+  isRealData,
+  isReadOnly = false
 }: Match1v1ModalProps) {
   const probs = useMemo(() => {
     if (!homeTeam || !awayTeam) return { homeWin: 0, awayWin: 0 };
@@ -224,7 +226,7 @@ export function Match1v1Modal({
           >
             Close
           </button>
-          {!(match.homeScore !== "" && match.awayScore !== "") && (
+          {!isReadOnly && !(match.homeScore !== "" && match.awayScore !== "") && (
             <button
               type="button"
               onClick={() => {

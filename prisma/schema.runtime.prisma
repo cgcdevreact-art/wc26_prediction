@@ -28,6 +28,14 @@ model User {
   teamOverrides     UserTeamOverride[]
   playerOverrides   UserPlayerOverride[]
   customCountries   UserCustomCountry[]
+  shareLinks        ShareLink[]
+  marketVotes       MarketVote[]
+  marketComments    MarketComment[]
+  matchPredictions  MatchPrediction[]
+  comments          Comment[]
+  commentReplies    CommentReply[]
+  commentLikes      CommentLike[]
+  commentReports    CommentReport[]
 
   stripeCustomerId       String?   @unique
   stripeSubscriptionId  String?   @unique
@@ -469,3 +477,189 @@ model UserCustomCountry {
   @@unique([userId, code])
   @@index([userId])
 }
+
+model ShareLink {
+  id            String   @id @default(cuid())
+  userId        String?  // Nullable to support anonymous/guest shares
+  title         String?  @default("My World Cup 2026 Bracket")
+  description   String?
+  
+  // The complete serialized predictions array (group matches + knockouts)
+  snapshot      Json
+  
+  // Cached metadata fields for high-speed queries & OG rendering
+  championCode  String?  // E.g. "BRA"
+  finalist1Code String?  // E.g. "BRA"
+  finalist2Code String?  // E.g. "FRA"
+  modelUsed     String   @default("base") // base, advanced, pro
+  
+  // Stats
+  views         Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model MarketMatch {
+  id             String   @id @default(cuid())
+  homeTeamName   String
+  homeTeamCode   String
+  homeTeamFlag   String
+  awayTeamName   String
+  awayTeamCode   String
+  awayTeamFlag   String
+  matchDate      DateTime
+  stage          String   @default("Group Stage")
+  status         String   @default("upcoming") // upcoming, live, finished
+  
+  votes          MarketVote[]
+  comments       MarketComment[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model MarketVote {
+  id             String   @id @default(cuid())
+  userId         String
+  marketMatchId  String
+  vote           String   // "HOME", "DRAW", "AWAY"
+  
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketMatch    MarketMatch @relation(fields: [marketMatchId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, marketMatchId])
+  @@index([marketMatchId])
+  @@index([userId])
+}
+
+model MarketComment {
+  id             String   @id @default(cuid())
+  userId         String
+  marketMatchId  String
+  content        String
+  
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketMatch    MarketMatch @relation(fields: [marketMatchId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([marketMatchId])
+  @@index([userId])
+}
+
+
+
+model MatchPrediction {
+  id         String   @id @default(cuid())
+  matchId    String   @map("match_id")
+  userId     String?  @map("user_id")
+  deviceId   String?  @map("device_id")
+  prediction String   @map("prediction") // "HOME" or "AWAY"
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matchId])
+  @@unique([deviceId, matchId])
+  @@index([matchId])
+  @@map("match_predictions")
+}
+
+model PredictionHistory {
+  id          String   @id @default(cuid())
+  matchId     String   @map("match_id")
+  homePercent Float    @map("home_percent")
+  awayPercent Float    @map("away_percent")
+  totalVotes  Int      @map("total_votes")
+  timestamp   DateTime @default(now()) @map("timestamp")
+
+  @@index([matchId])
+  @@index([timestamp])
+  @@map("prediction_history")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  matchId   String   @map("match_id")
+  userId    String   @map("user_id")
+  content   String
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies   CommentReply[]
+  likes     CommentLike[]
+  reports   CommentReport[]
+
+  @@index([matchId])
+  @@index([userId])
+  @@map("comments")
+}
+
+model CommentReply {
+  id        String   @id @default(cuid())
+  commentId String   @map("comment_id")
+  parentId  String?  @map("parent_id")
+  userId    String   @map("user_id")
+  content   String
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  parent    CommentReply?   @relation("ReplyToReply", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   CommentReply[]  @relation("ReplyToReply")
+
+  likes     CommentLike[]
+  reports   CommentReport[]
+
+  @@index([commentId])
+  @@index([parentId])
+  @@index([userId])
+  @@map("comment_replies")
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  commentId String?  @map("comment_id")
+  replyId   String?  @map("reply_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reply     CommentReply? @relation(fields: [replyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@unique([userId, replyId])
+  @@map("comment_likes")
+}
+
+model CommentReport {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  commentId String?  @map("comment_id")
+  replyId   String?  @map("reply_id")
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reply     CommentReply? @relation(fields: [replyId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
+  @@index([replyId])
+  @@map("comment_reports")
+}
+

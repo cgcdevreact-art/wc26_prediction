@@ -241,11 +241,11 @@ export default function PrivacyPolicyPage() {
           <div className="mt-4 space-y-1 text-sm text-muted-foreground">
             <p>
               <span className="font-semibold text-slate-700 dark:text-slate-200">Effective Date:</span>{" "}
-              June 25, 2026
+              June 10, 2026
             </p>
             <p>
               <span className="font-semibold text-slate-700 dark:text-slate-200">Last Updated:</span>{" "}
-              June 25, 2026
+              June 10, 2026
             </p>
           </div>
         </div>
