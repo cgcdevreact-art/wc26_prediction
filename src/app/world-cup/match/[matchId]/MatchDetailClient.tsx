@@ -1136,10 +1136,10 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
                           <span className="text-xs font-bold truncate text-slate-800 dark:text-white">{m.homeTeamObj.name}</span>
                         </div>
                         <span className="text-xs font-black font-mono text-emerald-500">
-                          {currentUserId ? `${m.predictions.homePercent}%` : "-%"}
+                          {m.predictions.hasVoted ? `${m.predictions.homePercent}%` : "-%"}
                         </span>
                       </div>
-
+ 
                       <div className="flex justify-between items-center min-w-0">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <CountryFlag
@@ -1152,7 +1152,7 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
                           <span className="text-xs font-bold truncate text-slate-800 dark:text-white">{m.awayTeamObj.name}</span>
                         </div>
                         <span className="text-xs font-black font-mono text-rose-500">
-                          {currentUserId ? `${m.predictions.awayPercent}%` : "-%"}
+                          {m.predictions.hasVoted ? `${m.predictions.awayPercent}%` : "-%"}
                         </span>
                       </div>
                     </div>
@@ -1276,8 +1276,8 @@ function CommentNode({
       </div>
 
       {!isCollapsed && (
-        <div className="space-y-2">
-          <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+        <div className="space-y-2 w-full overflow-hidden">
+          <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium break-words">
             {comment.content}
           </p>
 

@@ -20,7 +20,7 @@ export function VotingCard({ fixture }: VotingCardProps) {
   const router = useRouter();
   const matchId = String(fixture.match_no);
   const { data: session } = useSession();
-  
+
   // Real stats from the unified predictions system
   const [stats, setStats] = useState({
     homeProb: fixture.predictions?.homePercent || 50,
@@ -102,7 +102,7 @@ export function VotingCard({ fixture }: VotingCardProps) {
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Failed");
       }
-      
+
       // Update with exact server values if provided
       if (data.predictionsSummary) {
         setStats({
@@ -112,7 +112,7 @@ export function VotingCard({ fixture }: VotingCardProps) {
           totalVotes: data.predictionsSummary.totalVotes
         });
       }
-      
+
       // Redirect to the detail page immediately after successful vote!
       router.push(`/world-cup/match/${matchId}`);
     } catch (err) {
@@ -139,7 +139,7 @@ export function VotingCard({ fixture }: VotingCardProps) {
   const teamsNotAssigned = isPlaceholderHome || isPlaceholderAway;
 
   return (
-    <div 
+    <div
       onClick={handleCardClick}
       className="min-w-[280px] md:min-w-[320px] h-[360px] bg-white dark:bg-[#16181D] rounded-2xl border border-slate-200 dark:border-white/5 p-5 shadow-lg flex flex-col justify-between hover:shadow-xl hover:border-slate-300/80 dark:hover:border-white/10 transition-all duration-300 cursor-pointer select-none"
     >
@@ -159,9 +159,8 @@ export function VotingCard({ fixture }: VotingCardProps) {
         {/* Matchup row */}
         <div className="flex justify-between items-center gap-3">
           {/* Home Team */}
-          <div className={`flex-1 flex flex-col items-center text-center space-y-1.5 transition-opacity ${
-            isCompleted && !homeWon && !isDraw ? "opacity-40" : ""
-          }`}>
+          <div className={`flex-1 flex flex-col items-center text-center space-y-1.5 transition-opacity ${isCompleted && !homeWon && !isDraw ? "opacity-40" : ""
+            }`}>
             <div className="relative">
               <CountryFlag
                 code={fixture.homeTeamObj.code}
@@ -176,9 +175,8 @@ export function VotingCard({ fixture }: VotingCardProps) {
                 </span>
               )}
             </div>
-            <span className={`text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1 ${
-              homeWon ? "text-emerald-500 dark:text-emerald-400" : ""
-            }`}>
+            <span className={`text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1 ${homeWon ? "text-emerald-500 dark:text-emerald-400" : ""
+              }`}>
               {fixture.homeTeamObj.name}
             </span>
           </div>
@@ -197,9 +195,8 @@ export function VotingCard({ fixture }: VotingCardProps) {
           </div>
 
           {/* Away Team */}
-          <div className={`flex-1 flex flex-col items-center text-center space-y-1.5 transition-opacity ${
-            isCompleted && !awayWon && !isDraw ? "opacity-40" : ""
-          }`}>
+          <div className={`flex-1 flex flex-col items-center text-center space-y-1.5 transition-opacity ${isCompleted && !awayWon && !isDraw ? "opacity-40" : ""
+            }`}>
             <div className="relative">
               <CountryFlag
                 code={fixture.awayTeamObj.code}
@@ -214,9 +211,8 @@ export function VotingCard({ fixture }: VotingCardProps) {
                 </span>
               )}
             </div>
-            <span className={`text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1 ${
-              awayWon ? "text-emerald-500 dark:text-emerald-400" : ""
-            }`}>
+            <span className={`text-xs font-extrabold text-slate-800 dark:text-slate-200 line-clamp-1 ${awayWon ? "text-emerald-500 dark:text-emerald-400" : ""
+              }`}>
               {fixture.awayTeamObj.name}
             </span>
           </div>
@@ -301,7 +297,7 @@ export function VotingCard({ fixture }: VotingCardProps) {
                 </div>
               </div>
             )}
-            
+
             <VotePercentage
               homeProb={stats.homeProb}
               awayProb={stats.awayProb}
@@ -310,8 +306,8 @@ export function VotingCard({ fixture }: VotingCardProps) {
               isAuthenticated={!!session}
               hasVoted={!!userVote}
             />
-             <div className="text-[9px] font-bold text-slate-400 uppercase text-center">
-              {userVote ? `${stats.totalVotes} Votes Cast` : "? Votes Cast"}
+            <div className={`text-[9px] font-bold text-slate-400 uppercase text-center transition-opacity duration-300 ${!userVote ? "opacity-45" : ""}`}>
+              {userVote ? `${stats.totalVotes} Votes Cast` : "- Votes Cast"}
             </div>
           </div>
         ) : (
@@ -334,14 +330,14 @@ export function VotingCard({ fixture }: VotingCardProps) {
         )}
       </div>
       {confirmChoice && (
-        <div 
+        <div
           onClick={(e) => {
             e.stopPropagation();
             setConfirmChoice(null);
           }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200 cursor-default"
         >
-          <div 
+          <div
             onClick={(e) => e.stopPropagation()}
             className="bg-white dark:bg-[#16181D] rounded-3xl border border-slate-200 dark:border-white/5 p-6 max-w-sm w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 cursor-default"
           >
