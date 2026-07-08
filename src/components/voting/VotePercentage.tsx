@@ -11,11 +11,11 @@ interface VotePercentageProps {
   hasVoted?: boolean;
 }
 
-export function VotePercentage({ 
-  homeProb, 
-  awayProb, 
-  homeCode, 
-  awayCode, 
+export function VotePercentage({
+  homeProb,
+  awayProb,
+  homeCode,
+  awayCode,
   isAuthenticated = true,
   hasVoted = true
 }: VotePercentageProps) {
@@ -33,14 +33,14 @@ export function VotePercentage({
   const animatedAway = 100 - animatedHome;
 
   return (
-    <div className="w-full space-y-1.5">
+    <div className={`w-full space-y-1.5 transition-opacity duration-300 ${!hasVoted ? "opacity-45 select-none" : ""}`}>
       {/* Percentage Numbers */}
       <div className="flex justify-between text-[11px] font-black tracking-wider text-slate-450 dark:text-slate-500">
         <span className={showResults ? "text-green-500 font-mono" : "font-mono opacity-80"}>
-          {homeCode} {showResults ? `${Math.round(animatedHome)}%` : "?%"}
+          {homeCode} {showResults ? `${Math.round(animatedHome)}%` : "-%"}
         </span>
         <span className={showResults ? "text-red-500 font-mono" : "font-mono opacity-80"}>
-          {showResults ? `${Math.round(animatedAway)}%` : "?%"} {awayCode}
+          {showResults ? `${Math.round(animatedAway)}%` : "-%"} {awayCode}
         </span>
       </div>
 

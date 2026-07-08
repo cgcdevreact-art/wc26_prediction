@@ -173,18 +173,31 @@ export async function GET() {
     const activeTeams = await getActiveTeams();
 
     // 3. Map votes and calculate totals purely from database
-    let totalVotes = 0;
-    const colorPalette = ["#60a5fa", "#3b82f6", "#eab308", "#f97316", "#10b981", "#8b5cf6", "#ec4899", "#6366f1"];
+    const totalVotes = await prisma.prediction.count({
+      where: {
+        type: "VOTE_CHAMPION"
+      }
+    });
 
-    const rawStandings = activeTeams.map((team, idx) => {
+    const teamColors: Record<string, string> = {
+      FRA: "#5da4e6",
+      ESP: "#ecc94b",
+      ARG: "#2b6cb0",
+      ENG: "#dd6b20",
+      NOR: "#a7f3d0",
+      MAR: "#f43f5e",
+      BEL: "#f59e0b",
+      SUI: "#94a3b8"
+    };
+
+    const rawStandings = activeTeams.map((team) => {
       const finalVotes = dbTeamCounts[team.id] || 0;
-      totalVotes += finalVotes;
       return {
         id: team.id,
         name: team.name,
         code: team.tla,
         flag: team.crest,
-        color: colorPalette[idx % colorPalette.length],
+        color: teamColors[team.tla] || "#cbd5e1",
         finalVotes
       };
     });
@@ -205,8 +218,8 @@ export async function GET() {
       };
     });
 
-    // Top 4 plotted teams
-    const teams = allMappedTeams.slice(0, 4);
+    // Top plotted teams (all of them)
+    const teams = allMappedTeams;
 
     // 5. Construct the dynamic timeline (June 11 to now)
     let chartData: any[] = [];
@@ -269,8 +282,8 @@ export async function GET() {
         };
       }).filter(r => r.date !== "null" && r.date !== "");
 
-      // Generate date range from June 11, 2026 to today
-      const startDate = new Date("2026-06-11");
+      // Generate date range from Sept 1, 2025 to today
+      const startDate = new Date("2025-09-01");
       const endDate = new Date();
       const dateRange: string[] = [];
       for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
@@ -300,7 +313,7 @@ export async function GET() {
 
         const totalUpToNow = Object.values(cumulativeCounts).reduce((sum, count) => sum + count, 0);
         const dateLabel = new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        const point: Record<string, any> = { date: dateLabel };
+        const point: Record<string, any> = { date: dateLabel, fullDate: dateStr };
 
         teams.forEach(t => {
           if (totalUpToNow > 0) {
@@ -340,7 +353,7 @@ export async function GET() {
     }
 
     if (chartData.length === 0) {
-      const startDate = new Date("2026-06-11");
+      const startDate = new Date("2025-09-01");
       const endDate = new Date();
       const dateRange: string[] = [];
       for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
@@ -348,7 +361,7 @@ export async function GET() {
       }
       chartData = dateRange.map((dateStr, idx) => {
         const dateLabel = new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        const point: Record<string, any> = { date: dateLabel };
+        const point: Record<string, any> = { date: dateLabel, fullDate: dateStr };
         const progress = idx / dateRange.length;
         
         teams.forEach(t => {

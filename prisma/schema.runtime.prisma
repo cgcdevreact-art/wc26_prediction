@@ -590,7 +590,7 @@ model Comment {
   id        String   @id @default(cuid())
   matchId   String   @map("match_id")
   userId    String   @map("user_id")
-  content   String   @db.Text
+  content   String
   isDeleted Boolean  @default(false) @map("is_deleted")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -610,7 +610,7 @@ model CommentReply {
   commentId String   @map("comment_id")
   parentId  String?  @map("parent_id")
   userId    String   @map("user_id")
-  content   String   @db.Text
+  content   String
   isDeleted Boolean  @default(false) @map("is_deleted")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

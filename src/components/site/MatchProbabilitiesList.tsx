@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useFixturesStore } from "@/stores/useFixturesStore";
 import { useVotingStore } from "@/stores/useVotingStore";
 import { VotingCard } from "@/components/voting/VotingCard";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { useSession } from "next-auth/react";
-import { Trophy, Vote, X, Code, Link2, Bookmark, Gift } from "lucide-react";
+import { Trophy, Vote, X, Code, Link2, Bookmark, Gift, Settings, ListFilter } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 export function MatchProbabilitiesList() {
@@ -26,6 +26,11 @@ export function MatchProbabilitiesList() {
   const [confirmWinnerTeam, setConfirmWinnerTeam] = useState<{ id: number; code: string; name: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<"ALL" | "LIVE" | "UPCOMING" | "COMPLETED">("ALL");
 
+  const [timeframe, setTimeframe] = useState<"1H" | "6H" | "1D" | "1W" | "1M" | "ALL">("ALL");
+  const [visibleTeams, setVisibleTeams] = useState<Record<string, boolean>>({});
+  const [showSettings, setShowSettings] = useState(false);
+  const [sortAsc, setSortAsc] = useState(false);
+
   // Detect dark mode change to update chart colors dynamically
   const [isDarkMode, setIsDarkMode] = useState(false);
   useEffect(() => {
@@ -43,6 +48,44 @@ export function MatchProbabilitiesList() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    if (tournamentWinnerPolls?.teams) {
+      const initial: Record<string, boolean> = {};
+      tournamentWinnerPolls.teams.forEach((t, idx) => {
+        initial[t.name] = idx < 4;
+      });
+      setVisibleTeams(initial);
+    }
+  }, [tournamentWinnerPolls]);
+
+  const filteredChartData = useMemo(() => {
+    if (!tournamentWinnerPolls?.chartData) return [];
+    if (timeframe === "ALL") return tournamentWinnerPolls.chartData;
+
+    const now = new Date();
+    let cutoff = new Date();
+
+    if (timeframe === "1H") cutoff.setHours(now.getHours() - 1);
+    else if (timeframe === "6H") cutoff.setHours(now.getHours() - 6);
+    else if (timeframe === "1D") cutoff.setDate(now.getDate() - 1);
+    else if (timeframe === "1W") cutoff.setDate(now.getDate() - 7);
+    else if (timeframe === "1M") cutoff.setMonth(now.getMonth() - 1);
+
+    return tournamentWinnerPolls.chartData.filter((pt: any) => {
+      if (!pt.fullDate) return true;
+      const ptDate = new Date(pt.fullDate);
+      return ptDate >= cutoff;
+    });
+  }, [tournamentWinnerPolls?.chartData, timeframe]);
+
+  const sortedStandings = useMemo(() => {
+    if (!tournamentWinnerPolls?.allTeams) return [];
+    const list = [...tournamentWinnerPolls.allTeams];
+    return list.sort((a, b) => {
+      return sortAsc ? a.prob - b.prob : b.prob - a.prob;
+    });
+  }, [tournamentWinnerPolls?.allTeams, sortAsc]);
 
   // Load fixtures and initial voting state
   useEffect(() => {
@@ -221,9 +264,9 @@ export function MatchProbabilitiesList() {
               {/* Left Column (span 4): Standings List & Comments */}
               <div className="md:col-span-4 flex flex-col justify-between h-full space-y-6">
 
-                {/* Standings List (Top 4 teams only) */}
+                {/* Standings List (Top teams only, sorted) */}
                 <div className="space-y-4">
-                  {tournamentWinnerPolls.allTeams?.map((t) => (
+                  {sortedStandings.map((t) => (
                     <div key={t.code} className="flex items-center justify-between group">
                       <div className="flex items-center gap-3">
                         <div className="w-7 h-5 overflow-hidden rounded-md border border-slate-200 dark:border-[#1f2937] bg-slate-100 dark:bg-slate-900 flex items-center justify-center shrink-0">
@@ -257,12 +300,13 @@ export function MatchProbabilitiesList() {
               </div>
 
               {/* Right Column (span 8): Legend & Stepped Chart */}
-              <div className="md:col-span-8 flex flex-col space-y-4">
+              <div className="md:col-span-8 flex flex-col space-y-4 relative">
 
-                {/* Horizontal Inline Legend */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-white/5 pb-2">
+                {/* Legend & Controls Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 dark:border-white/5 pb-2 relative">
+                  {/* Left: Legend */}
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] font-bold text-slate-500 dark:text-[#6c7a89]">
-                    {tournamentWinnerPolls.teams.map((t) => (
+                    {tournamentWinnerPolls.teams.filter(t => visibleTeams[t.name]).map((t) => (
                       <div key={t.code} className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: t.color }} />
                         <span className="text-slate-700 dark:text-slate-300">{t.name}</span>
@@ -270,12 +314,89 @@ export function MatchProbabilitiesList() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Right: Filters & Settings */}
+                  <div className="flex items-center gap-4 text-xs font-bold text-slate-400 dark:text-[#6c7a89] select-none">
+                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#1e2025]/80 p-0.5 rounded-lg border border-slate-200/50 dark:border-white/5">
+                      {(["1H", "6H", "1D", "1W", "1M", "ALL"] as const).map((tf) => (
+                        <button
+                          key={tf}
+                          onClick={() => setTimeframe(tf)}
+                          className={`cursor-pointer px-1.5 py-0.5 rounded-md text-[10px] uppercase transition-all ${timeframe === tf ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white font-black shadow-xs" : "hover:text-slate-650 dark:hover:text-slate-350"}`}
+                        >
+                          {tf}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    <button 
+                      onClick={() => setSortAsc(!sortAsc)}
+                      title={sortAsc ? "Sort Descending" : "Sort Ascending"}
+                      className={`hover:text-slate-900 dark:hover:text-white transition cursor-pointer p-1 rounded-md ${sortAsc ? "text-cyan-500" : ""}`}
+                    >
+                      <ListFilter className="w-4 h-4" />
+                    </button>
+
+                    <div className="relative">
+                      <button 
+                        onClick={() => setShowSettings(!showSettings)}
+                        title="Show on chart"
+                        className={`hover:text-slate-900 dark:hover:text-white transition cursor-pointer p-1 rounded-md ${showSettings ? "bg-slate-100 dark:bg-white/10 text-cyan-500 dark:text-neon" : ""}`}
+                      >
+                        <Settings className="w-4 h-4" />
+                      </button>
+
+                      {/* Dropdown Popover */}
+                      {showSettings && (
+                        <div className="absolute right-0 top-full mt-2 w-60 bg-white dark:bg-[#16181d] border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-xl z-50 space-y-3">
+                          <div className="flex justify-between items-center border-b border-slate-100 dark:border-white/5 pb-2">
+                            <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                              Show on chart
+                            </h4>
+                            <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                            {tournamentWinnerPolls.teams.map((t) => {
+                              const isVisible = !!visibleTeams[t.name];
+                              return (
+                                <div key={t.code} className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: t.color }} />
+                                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{t.name}</span>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setVisibleTeams(prev => ({
+                                        ...prev,
+                                        [t.name]: !prev[t.name]
+                                      }));
+                                    }}
+                                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                      isVisible ? "bg-cyan-500" : "bg-slate-200 dark:bg-slate-800"
+                                    }`}
+                                  >
+                                    <span
+                                      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
+                                        isVisible ? "translate-x-3" : "translate-x-0"
+                                      }`}
+                                    />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Stepped Line Chart */}
                 <div className="h-[240px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={tournamentWinnerPolls.chartData} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
+                    <LineChart data={filteredChartData} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
                       <CartesianGrid vertical={false} stroke={gridStroke} strokeDasharray="3 3" opacity={0.6} />
                       <XAxis dataKey="date" stroke={axisStroke} fontSize={10} tickLine={false} axisLine={false} tickMargin={10} />
                       <YAxis
@@ -298,17 +419,17 @@ export function MatchProbabilitiesList() {
                         labelStyle={{ fontSize: '10px', color: axisStroke, fontWeight: 'bold' }}
                         itemStyle={{ fontSize: '11px', fontWeight: 'bold' }}
                       />
-                      {tournamentWinnerPolls.teams.map((t) => (
+                      {tournamentWinnerPolls.teams.filter(t => visibleTeams[t.name]).map((t) => (
                         <Line
                           key={t.code}
                           type="stepAfter"
                           dataKey={t.name}
                           stroke={t.color}
-                          strokeWidth={2.2}
+                          strokeWidth={["FRA", "ESP", "ARG", "ENG"].includes(t.code) ? 2.5 : 1.5}
                           name={t.name}
                           isAnimationActive={false}
                           dot={(props: any) => {
-                            if (props.index !== tournamentWinnerPolls.chartData.length - 1) return <g key={`dot-${t.name}-${props.index}`}></g>;
+                            if (props.index !== filteredChartData.length - 1) return <g key={`dot-${t.name}-${props.index}`}></g>;
                             return (
                               <circle
                                 key={`dot-${t.name}-${props.index}`}
@@ -338,8 +459,11 @@ export function MatchProbabilitiesList() {
               <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
                 Active Match Prediction Pools
               </h4>
-              <p className="text-[10px] text-muted-foreground">
-                Vote on upcoming match winners.
+              <p className="text-[10px] text-muted-foreground transition-all duration-300">
+                {statusFilter === "ALL" && "Vote on match prediction pools and view results."}
+                {statusFilter === "LIVE" && "Predict outcomes for active live matches in real-time."}
+                {statusFilter === "UPCOMING" && "Vote on upcoming match winners."}
+                {statusFilter === "COMPLETED" && "View completed match prediction results."}
               </p>
             </div>
             {/* Pill Tabs Filter in Top-Right Corner */}

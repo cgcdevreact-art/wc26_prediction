@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureTablesExist } from "../../votes/route";
+import { auth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,6 +44,24 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Check if the current user has voted on these matches
+    const session = await auth();
+    const currentUserId = session?.user?.id;
+    const votedMatchIds = new Set<string>();
+
+    if (currentUserId) {
+      const userVotes = await prisma.matchPrediction.findMany({
+        where: {
+          userId: currentUserId,
+          matchId: { in: matchIds },
+        },
+        select: {
+          matchId: true,
+        },
+      });
+      userVotes.forEach((v) => votedMatchIds.add(v.matchId));
+    }
+
     const formatted = matches.map((match) => {
       const id = String(match.matchNo);
       const home = voteCounts[id]?.HOME || 0;
@@ -51,6 +70,7 @@ export async function GET(request: NextRequest) {
 
       const homePercent = total > 0 ? Math.round((home / total) * 100) : 50;
       const awayPercent = 100 - homePercent;
+      const hasVoted = votedMatchIds.has(id);
 
       return {
         match_no: match.matchNo,
@@ -74,6 +94,7 @@ export async function GET(request: NextRequest) {
           homePercent,
           awayPercent,
           totalVotes: total,
+          hasVoted,
         },
       };
     });
