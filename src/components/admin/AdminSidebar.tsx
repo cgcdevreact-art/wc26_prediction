@@ -13,8 +13,8 @@ import {
   LogOut,
   ArrowLeft,
   Shield,
-  Menu,
-  X,
+  Megaphone,
+  ListChecks,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -23,6 +23,8 @@ const NAV_ITEMS = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/matches", label: "Matches", icon: Trophy },
   { href: "/admin/predictions", label: "Predictions", icon: Target },
+  { href: "/admin/custom-polls", label: "Custom Polls", icon: ListChecks },
+  { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
 ];
 
 export function AdminSidebar() {

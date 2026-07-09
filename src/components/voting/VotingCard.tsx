@@ -175,7 +175,7 @@ export function VotingCard({ fixture }: VotingCardProps) {
   return (
     <div
       onClick={handleCardClick}
-      className="min-w-[280px] md:min-w-[320px] h-[360px] bg-white dark:bg-[#16181D] rounded-2xl border border-slate-200 dark:border-white/5 p-5 shadow-lg flex flex-col justify-between hover:shadow-xl hover:border-slate-300/80 dark:hover:border-white/10 transition-all duration-300 cursor-pointer select-none"
+      className="min-w-[280px] self-stretch md:min-w-[320px] bg-white dark:bg-[#16181D] rounded-2xl border border-slate-200 dark:border-white/5 p-5 shadow-lg flex h-full min-h-[360px] flex-col justify-between hover:shadow-xl hover:border-slate-300/80 dark:hover:border-white/10 transition-all duration-300 cursor-pointer select-none"
     >
       <div className="space-y-4 flex-grow flex flex-col justify-between">
         {/* Top stage info */}
