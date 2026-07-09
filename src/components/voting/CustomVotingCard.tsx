@@ -117,7 +117,7 @@ export function CustomVotingCard({ poll }: CustomVotingCardProps) {
           <div className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-wider">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
               <Vote className="h-3 w-3" />
-              Community Poll
+              Fans Prediction
             </span>
             <span
               className={`flex items-center gap-1 ${
@@ -286,7 +286,7 @@ export function CustomVotingCard({ poll }: CustomVotingCardProps) {
         <div className="relative mt-4 border-t border-slate-100 pt-3 dark:border-white/5">
           <div className="flex items-center justify-between">
             <div className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              {hasVoted ? "Community results unlocked" : isLocked ? "Voting unavailable" : "Tap an option to vote"}
+              {hasVoted ? "Fans Prediction results unlocked" : isLocked ? "Voting unavailable" : "Tap an option to vote"}
               <div className="mt-0.5 text-slate-500 dark:text-slate-400 font-bold normal-case text-[10px]">
                 {state.totalVotes} votes cast
               </div>

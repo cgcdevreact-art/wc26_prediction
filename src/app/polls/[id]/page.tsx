@@ -3,7 +3,7 @@ import { Footer } from "@/components/site/Footer";
 import PollDetailClient from "./PollDetailClient";
 
 export const metadata = {
-  title: "Community Poll — WC26 Predict",
+  title: "Fans Prediction — WC26 Predict",
   description: "Vote and see community results for this poll.",
 };
 
