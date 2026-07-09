@@ -22,6 +22,8 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { GlobalAuthModal } from "@/components/site/GlobalAuthModal";
 import { CookieConsent } from "@/components/site/CookieConsent";
+import { GlobalAnnouncementModal } from "@/components/site/GlobalAnnouncementModal";
+import { getActiveAnnouncement } from "@/app/actions/announcements";
 
 export const metadata: Metadata = {
   title: "26WC Prediction",
@@ -42,6 +44,7 @@ export default async function RootLayout({
   const groupsConfig = getGroupsConfig();
   const cupResults = await getCupResults();
   const session = await auth();
+  const activeAnnouncement = await getActiveAnnouncement();
 
   return (
     <html
@@ -80,6 +83,7 @@ export default async function RootLayout({
               <GlobalAuthModal />
               <CookieConsent />
               <Toaster />
+              <GlobalAnnouncementModal announcement={activeAnnouncement} />
             </TeamsProvider>
           </ThemeProvider>
         </SessionProvider>

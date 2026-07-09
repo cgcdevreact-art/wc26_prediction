@@ -5,13 +5,14 @@ import { FixtureView } from "@/services/fixturesService";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { format } from "date-fns";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { CountdownTimer } from "@/components/voting/CountdownTimer";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 import {
   Trophy, TrendingUp, ShieldAlert, Clock,
   MapPin, CheckCircle2, Loader2,
   MessageSquare, Share2, CornerDownRight, Send, Filter,
-  ThumbsUp, ShieldCheck, ChevronDown, ChevronUp, Flag, Lock
+  ThumbsUp, ShieldCheck, ChevronDown, ChevronUp, Flag, Lock, ArrowLeft
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -27,6 +28,7 @@ interface MatchDetailClientProps {
 
 export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
   const { data: session } = useSession();
+  const router = useRouter();
   const matchId = String(fixture.match_no);
   const currentUserId = session?.user?.id || null;
   const allFixtures = useFixturesStore((state) => state.fixtures);
@@ -379,6 +381,15 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
 
   return (
     <div className="container mx-auto px-4 space-y-8">
+      <div className="flex">
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back
+        </button>
+      </div>
 
       {/* RICH HEADER BANNER */}
       <div className="relative overflow-hidden bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:via-[#1E293B] dark:to-slate-900 rounded-[2.5rem] p-6 md:p-10 text-slate-900 dark:text-white shadow-xl border border-slate-200 dark:border-white/10">
