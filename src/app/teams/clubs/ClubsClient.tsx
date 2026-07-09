@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Search, Trophy, Globe, Award, Users, ChevronLeft, ChevronRight, X, Sparkles, Shield, BarChart3 } from "lucide-react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { FIFA_TO_FULL_NAME } from "@/lib/team-mapping";
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Cell } from "recharts";
 
 const RAW_CLUB_NAME_ALIASES: Record<string, string[]> = {
