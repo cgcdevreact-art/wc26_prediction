@@ -56,7 +56,7 @@ function TableHeaderCell({ label, tooltip, children }: { label?: string; tooltip
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="cursor-help underline decoration-dotted decoration-muted-foreground/45 hover:decoration-foreground/60 transition-colors">
+          <span className="shrink-0 cursor-help underline decoration-dotted decoration-muted-foreground/45 hover:decoration-foreground/60 transition-colors">
             {children || label}
           </span>
         </TooltipTrigger>
@@ -715,22 +715,22 @@ export default function TeamsClient({
 
       <Tabs defaultValue="list" className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <TabsList className="h-auto flex-wrap justify-start rounded-[1.5rem] border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
+          <TabsList className="h-auto flex w-full md:w-auto overflow-x-auto scrollbar-none whitespace-nowrap justify-start rounded-[1.5rem] border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
             <TabsTrigger
               value="list"
-              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="shrink-0 flex-none rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 whitespace-nowrap data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
             >
               Teams List
             </TabsTrigger>
             <TabsTrigger
               value="rankings"
-              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="shrink-0 flex-none rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 whitespace-nowrap data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
             >
               Team Rankings
             </TabsTrigger>
             <TabsTrigger
               value="players"
-              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="shrink-0 flex-none rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 whitespace-nowrap data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
             >
               Player Rankings
             </TabsTrigger>
@@ -1014,7 +1014,7 @@ export default function TeamsClient({
               </select>
             </div>
             <div className="overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
-              <table className="w-full text-left text-[11px] table-auto">
+              <table className="w-full text-left text-[11px] table-auto whitespace-nowrap min-w-max">
                 <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[10px] sm:text-xs font-bold uppercase tracking-[0.12em] text-slate-700 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-200">
                   <tr>
                     <th className="w-8 px-1 py-3 font-semibold whitespace-nowrap">#</th>
