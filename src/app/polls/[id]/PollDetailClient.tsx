@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { ShareLinkDialog } from "@/components/ui/share-link-dialog";
 
 type PollOption = {
   id: string;
@@ -77,6 +78,8 @@ export default function PollDetailClient({ pollId }: PollDetailClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [confirmOption, setConfirmOption] = useState<PollOption | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
 
   // Comments state
   const [comments, setComments] = useState<any[]>([]);
@@ -230,13 +233,8 @@ export default function PollDetailClient({ pollId }: PollDetailClientProps) {
   };
 
   const handleShare = () => {
-    const url = window.location.href;
-    if (navigator.share) {
-      navigator.share({ title: poll?.question || "Community Poll", url });
-    } else {
-      navigator.clipboard.writeText(url);
-      toast.success("Link copied to clipboard!");
-    }
+    setShareUrl(window.location.href);
+    setShareModalOpen(true);
   };
 
   // Computed stats
@@ -324,7 +322,7 @@ export default function PollDetailClient({ pollId }: PollDetailClientProps) {
             <div className="flex flex-wrap items-center gap-3">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
                 <Vote className="h-3.5 w-3.5" />
-                Community Poll
+                Fans Prediction
               </span>
               <span className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ring-1 ${statusConfig.color}`}>
                 {statusConfig.dot && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />}
@@ -385,7 +383,7 @@ export default function PollDetailClient({ pollId }: PollDetailClientProps) {
                   VOTE DISTRIBUTION
                 </div>
                 <h3 className="font-display font-black text-lg tracking-tight text-slate-900 dark:text-white">
-                  Community Sentiment
+                  Fans Sentiment
                 </h3>
               </div>
 
@@ -394,7 +392,7 @@ export default function PollDetailClient({ pollId }: PollDetailClientProps) {
                   <BarChart3 className="w-8 h-8 text-slate-300 dark:text-slate-600" />
                   <h4 className="font-display font-extrabold text-sm text-slate-600 dark:text-slate-300">No votes yet</h4>
                   <p className="text-xs text-slate-400 max-w-sm">
-                    Be the first to vote and see the community's sentiment!
+                    Be the first to vote and see the Fans's sentiment!
                   </p>
                 </div>
               ) : (
@@ -479,8 +477,8 @@ export default function PollDetailClient({ pollId }: PollDetailClientProps) {
               {/* Comment Composer */}
               <div className="space-y-3">
                 <div className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-widest flex items-center gap-1.5">
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  DISCUSSION
+                  {/* <MessageSquare className="w-3.5 h-3.5" /> */}
+                  {/* DISCUSSION */}
                 </div>
                 <textarea
                   value={newCommentText}
@@ -697,6 +695,17 @@ export default function PollDetailClient({ pollId }: PollDetailClientProps) {
           </div>
         </div>
       )}
+
+      <ShareLinkDialog
+        open={shareModalOpen}
+        onOpenChange={setShareModalOpen}
+        url={shareUrl}
+        title="Share This Poll"
+        description="Anyone with this link can view this prediction poll and follow the Fans sentiment results in read-only mode."
+        xText={`Check out this WC26 fan poll: ${poll.question}`}
+        whatsappText={`Check out this WC26 fan poll: ${poll.question}`}
+        copySuccessMessage="Poll link copied to clipboard!"
+      />
     </>
   );
 }

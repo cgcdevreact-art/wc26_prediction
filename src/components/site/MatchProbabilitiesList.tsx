@@ -250,7 +250,7 @@ export function MatchProbabilitiesList() {
   const tooltipBorder = isDarkMode ? "rgba(255,255,255,0.08)" : "#e2e8f0";
 
   const renderWinnerChart = (heightClassName: string) => (
-    <div className={`${heightClassName} w-full`}>
+    <div className={`${heightClassName} min-w-0 w-full`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={filteredChartData} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke={gridStroke} strokeDasharray="3 3" opacity={0.6} />
@@ -310,7 +310,7 @@ export function MatchProbabilitiesList() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
 
         {/* Left Column: Overall World Cup Winner Market (span 7) */}
-        <div className="lg:col-span-7 bg-white dark:bg-[#16181D] rounded-3xl border border-slate-200 dark:border-white/5 p-6 shadow-md flex flex-col justify-between space-y-6">
+        <div className="lg:col-span-7 bg-white dark:bg-[#16181D] rounded-3xl border border-slate-200 dark:border-white/5 p-6 shadow-md flex flex-col gap-6">
 
           {/* Header Row */}
           <div className="flex justify-between items-start">
@@ -321,7 +321,7 @@ export function MatchProbabilitiesList() {
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1.5">
-                  Sports • Soccer • Community Verdict
+                  Sports • Soccer • Fans Verdict
                 </span>
                 <h3 className="text-xl font-black tracking-tight text-slate-900 dark:text-white font-display">
                   World Cup Winner Aggregated Prediction
@@ -346,10 +346,10 @@ export function MatchProbabilitiesList() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
             </div>
           ) : tournamentWinnerPolls && (
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(240px,0.9fr)_minmax(0,1.6fr)] xl:grid-cols-[minmax(260px,0.95fr)_minmax(0,1.55fr)]">
 
               {/* Left Column (span 4): Standings List & Comments */}
-              <div className="md:col-span-4 flex flex-col justify-between h-full space-y-6">
+              <div className="flex h-full min-w-0 flex-col justify-between space-y-6">
 
                 {/* Standings List (Top teams only, sorted) */}
                 <div className="space-y-4">
@@ -397,12 +397,12 @@ export function MatchProbabilitiesList() {
               </div>
 
               {/* Right Column (span 8): Legend & Stepped Chart */}
-              <div className="md:col-span-8 flex flex-col space-y-4 relative">
+              <div className="relative flex min-w-0 flex-col space-y-4">
 
                 {/* Legend & Controls Toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 dark:border-white/5 pb-2 relative">
+                <div className="relative flex flex-wrap items-center gap-4 border-b border-slate-100 pb-2 dark:border-white/5 xl:flex-nowrap">
                   {/* Left: Legend */}
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] font-bold text-slate-500 dark:text-[#6c7a89]">
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] font-bold text-slate-500 dark:text-[#6c7a89]">
                     {tournamentWinnerPolls.teams.filter(t => visibleTeams[t.name]).map((t) => (
                       <div key={t.code} className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: t.color }} />
@@ -413,7 +413,7 @@ export function MatchProbabilitiesList() {
                   </div>
 
                   {/* Right: Filters & Settings */}
-                  <div className="flex items-center gap-4 text-xs font-bold text-slate-400 dark:text-[#6c7a89] select-none">
+                  <div className="ml-auto flex shrink-0 items-center gap-4 text-xs font-bold text-slate-400 select-none dark:text-[#6c7a89]">
                     <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#1e2025]/80 p-0.5 rounded-lg border border-slate-200/50 dark:border-white/5">
                       {(["1H", "6H", "1D", "1W", "1M", "ALL"] as const).map((tf) => (
                         <button
