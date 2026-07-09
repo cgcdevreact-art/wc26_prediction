@@ -14,6 +14,8 @@ import {
   Shield,
   Megaphone,
   ListChecks,
+  Menu,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 
