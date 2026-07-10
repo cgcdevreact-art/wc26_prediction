@@ -401,21 +401,21 @@ export function MatchProbabilitiesList() {
               <div className="relative flex min-w-0 flex-col space-y-4 flex-grow">
 
                 {/* Legend & Controls Toolbar */}
-                <div className="relative flex flex-wrap items-center gap-4 border-b border-slate-100 pb-2 dark:border-white/5 xl:flex-nowrap">
+                <div className="relative flex flex-col items-stretch gap-3 border-b border-slate-100 pb-2 dark:border-white/5 sm:flex-row sm:flex-wrap sm:items-start xl:flex-nowrap">
                   {/* Left: Legend */}
-                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] font-bold text-slate-500 dark:text-[#6c7a89]">
+                  <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-3 gap-y-2 text-[10px] font-bold text-slate-500 dark:text-[#6c7a89] sm:flex sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1.5">
                     {tournamentWinnerPolls.teams.filter(t => visibleTeams[t.name]).map((t) => (
-                      <div key={t.code} className="flex items-center gap-1">
+                      <div key={t.code} className="flex min-w-0 items-center gap-1">
                         <span className="w-2 h-2 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: t.color }} />
-                        <span className="text-slate-700 dark:text-slate-300">{t.name}</span>
-                        <span className="text-slate-900 dark:text-white font-mono">{t.exactProbability}%</span>
+                        <span className="truncate text-slate-700 dark:text-slate-300">{t.name}</span>
+                        <span className="shrink-0 text-slate-900 dark:text-white font-mono">{t.exactProbability}%</span>
                       </div>
                     ))}
                   </div>
 
                   {/* Right: Filters & Settings */}
-                  <div className="ml-auto flex shrink-0 items-center gap-4 text-xs font-bold text-slate-400 select-none dark:text-[#6c7a89]">
-                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#1e2025]/80 p-0.5 rounded-lg border border-slate-200/50 dark:border-white/5">
+                  <div className="flex w-full items-center justify-between gap-3 text-xs font-bold text-slate-400 select-none dark:text-[#6c7a89] sm:ml-auto sm:w-auto sm:shrink-0 sm:justify-start sm:gap-4">
+                    <div className="flex min-w-0 items-center gap-1 bg-slate-50 dark:bg-[#1e2025]/80 p-0.5 rounded-lg border border-slate-200/50 dark:border-white/5 sm:gap-2">
                       {(["1H", "6H", "1D", "1W", "1M", "ALL"] as const).map((tf) => (
                         <button
                           key={tf}
@@ -427,72 +427,74 @@ export function MatchProbabilitiesList() {
                       ))}
                     </div>
 
-                    <button
-                      onClick={() => setSortAsc(!sortAsc)}
-                      title={sortAsc ? "Sort Descending" : "Sort Ascending"}
-                      className={`hover:text-slate-900 dark:hover:text-white transition cursor-pointer p-1 rounded-md ${sortAsc ? "text-cyan-500" : ""}`}
-                    >
-                      <ListFilter className="w-4 h-4" />
-                    </button>
-
-                    <div className="relative">
+                    <div className="flex shrink-0 items-center gap-2 sm:gap-4">
                       <button
-                        onClick={() => setIsChartExpanded(true)}
-                        title="Expand chart"
-                        className="hover:text-slate-900 dark:hover:text-white transition cursor-pointer p-1 rounded-md"
+                        onClick={() => setSortAsc(!sortAsc)}
+                        title={sortAsc ? "Sort Descending" : "Sort Ascending"}
+                        className={`hover:text-slate-900 dark:hover:text-white transition cursor-pointer p-1 rounded-md ${sortAsc ? "text-cyan-500" : ""}`}
                       >
-                        <Maximize2 className="w-4 h-4" />
+                        <ListFilter className="w-4 h-4" />
                       </button>
 
-                      <button
-                        onClick={() => setShowSettings(!showSettings)}
-                        title="Show on chart"
-                        className={`hover:text-slate-900 dark:hover:text-white transition cursor-pointer p-1 rounded-md ${showSettings ? "bg-slate-100 dark:bg-white/10 text-cyan-500 dark:text-neon" : ""}`}
-                      >
-                        <Settings className="w-4 h-4" />
-                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={() => setIsChartExpanded(true)}
+                          title="Expand chart"
+                          className="hover:text-slate-900 dark:hover:text-white transition cursor-pointer p-1 rounded-md"
+                        >
+                          <Maximize2 className="w-4 h-4" />
+                        </button>
 
-                      {/* Dropdown Popover */}
-                      {showSettings && (
-                        <div className="absolute right-0 top-full mt-2 w-60 bg-white dark:bg-[#16181d] border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-xl z-50 space-y-3">
-                          <div className="flex justify-between items-center border-b border-slate-100 dark:border-white/5 pb-2">
-                            <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
-                              Show on chart
-                            </h4>
-                            <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                          <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
-                            {tournamentWinnerPolls.teams.map((t) => {
-                              const isVisible = !!visibleTeams[t.name];
-                              return (
-                                <div key={t.code} className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: t.color }} />
-                                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{t.name}</span>
-                                  </div>
-                                  <button
-                                    onClick={() => {
-                                      setVisibleTeams(prev => ({
-                                        ...prev,
-                                        [t.name]: !prev[t.name]
-                                      }));
-                                    }}
-                                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isVisible ? "bg-cyan-500" : "bg-slate-200 dark:bg-slate-800"
-                                      }`}
-                                  >
-                                    <span
-                                      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${isVisible ? "translate-x-3" : "translate-x-0"
+                        <button
+                          onClick={() => setShowSettings(!showSettings)}
+                          title="Show on chart"
+                          className={`hover:text-slate-900 dark:hover:text-white transition cursor-pointer p-1 rounded-md ${showSettings ? "bg-slate-100 dark:bg-white/10 text-cyan-500 dark:text-neon" : ""}`}
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
+
+                        {/* Dropdown Popover */}
+                        {showSettings && (
+                          <div className="absolute right-0 top-full mt-2 w-60 bg-white dark:bg-[#16181d] border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-xl z-50 space-y-3">
+                            <div className="flex justify-between items-center border-b border-slate-100 dark:border-white/5 pb-2">
+                              <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                                Show on chart
+                              </h4>
+                              <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                              {tournamentWinnerPolls.teams.map((t) => {
+                                const isVisible = !!visibleTeams[t.name];
+                                return (
+                                  <div key={t.code} className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: t.color }} />
+                                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{t.name}</span>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setVisibleTeams(prev => ({
+                                          ...prev,
+                                          [t.name]: !prev[t.name]
+                                        }));
+                                      }}
+                                      className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isVisible ? "bg-cyan-500" : "bg-slate-200 dark:bg-slate-800"
                                         }`}
-                                    />
-                                  </button>
-                                </div>
-                              );
-                            })}
+                                    >
+                                      <span
+                                        className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${isVisible ? "translate-x-3" : "translate-x-0"
+                                          }`}
+                                      />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

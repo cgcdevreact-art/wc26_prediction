@@ -43,6 +43,8 @@ export function Header() {
   const [modalReason, setModalReason] = useState<"plus" | "pro" | "credits" | "guest">("plus");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuPanelRef = useRef<HTMLDivElement>(null);
   const [simulatorMenuOpen, setSimulatorMenuOpen] = useState(false);
   const simulatorMenuRef = useRef<HTMLDivElement>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -56,20 +58,30 @@ export function Header() {
   const isPredictionSectionActive = SIMULATOR_NAV.some((item) => isActiveRoute(item.to));
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: PointerEvent) {
+      const target = event.target as Node;
+
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setDropdownOpen(false);
       }
-      if (simulatorMenuRef.current && !simulatorMenuRef.current.contains(event.target as Node)) {
+      if (simulatorMenuRef.current && !simulatorMenuRef.current.contains(target)) {
         setSimulatorMenuOpen(false);
       }
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
         setProfileMenuOpen(false);
       }
+      if (
+        open &&
+        mobileMenuPanelRef.current &&
+        !mobileMenuPanelRef.current.contains(target) &&
+        !mobileMenuButtonRef.current?.contains(target)
+      ) {
+        setOpen(false);
+      }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
+  }, [open]);
 
   useEffect(() => {
     const tier = session?.user?.subscriptionTier;
@@ -364,13 +376,21 @@ export function Header() {
           )}
         </nav>
 
-        <button onClick={() => setOpen((o) => !o)} className="xl:hidden rounded-md p-2 text-muted-foreground hover:text-foreground" aria-label="menu">
+        <button
+          ref={mobileMenuButtonRef}
+          onClick={() => setOpen((o) => !o)}
+          className="xl:hidden rounded-md p-2 text-muted-foreground hover:text-foreground"
+          aria-label="menu"
+        >
           <Menu className="h-5 w-5" />
         </button>
       </div>
 
       {open && (
-        <div className="xl:hidden border-t border-slate-200 dark:border-white/5 px-4 py-3 flex flex-col gap-2">
+        <div
+          ref={mobileMenuPanelRef}
+          className="xl:hidden border-t border-slate-200 dark:border-white/5 px-4 py-3 flex flex-col gap-2"
+        >
           <div className="rounded-md px-3 py-2 text-sm text-muted-foreground">
             <div className="font-medium text-foreground">Simulator</div>
             <div className="mt-2 flex flex-col gap-1">
