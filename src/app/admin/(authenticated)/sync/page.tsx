@@ -1,14 +1,3 @@
-"use client";
-
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-export default function SyncRedirectPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace("/admin");
-  }, [router]);
-
+export default function DummyPage() {
   return null;
 }

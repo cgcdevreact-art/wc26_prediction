@@ -12,7 +12,7 @@ export async function loginAction(email: string, password: string, callbackUrl: 
     });
 
     const isAdmin = user?.role === "admin";
-    const finalRedirect = isAdmin ? "/admin" : callbackUrl;
+    const finalRedirect = isAdmin ? "/commissioner" : callbackUrl;
 
     if (user?.isBlocked) {
       return { error: "Your account has been blocked." };

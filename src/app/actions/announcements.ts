@@ -72,7 +72,7 @@ export async function createAnnouncement(data: { title: string; description: str
       data,
     });
 
-    revalidatePath("/admin/announcements");
+    revalidatePath("/commissioner/announcements");
     revalidatePath("/");
     
     return { success: true, announcement };
@@ -106,7 +106,7 @@ export async function updateAnnouncement(id: string, data: { title: string; desc
       data,
     });
 
-    revalidatePath("/admin/announcements");
+    revalidatePath("/commissioner/announcements");
     revalidatePath("/");
     
     return { success: true, announcement };
@@ -131,7 +131,7 @@ export async function deleteAnnouncement(id: string) {
       where: { id },
     });
 
-    revalidatePath("/admin/announcements");
+    revalidatePath("/commissioner/announcements");
     revalidatePath("/");
     
     return { success: true };
