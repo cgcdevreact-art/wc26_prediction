@@ -298,7 +298,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
   const [sortBy, setSortBy] = useState<"count" | "rating" | "name">("count");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedClubName, setSelectedClubName] = useState<string | null>(null);
-  
+
   const itemsPerPage = 15;
 
   // Process players data to group by club
@@ -338,7 +338,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
       }
 
       clubMap[clubName].players.push(player);
-      
+
       // Parse rating
       const ratingVal = parseInt((player["Overall Rating"] || "60").replace("%", ""), 10) || 60;
       clubMap[clubName].ratingSum += ratingVal;
@@ -353,7 +353,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
 
     return Object.values(clubMap).map((c) => {
       const avgRating = Math.round(c.ratingSum / c.players.length);
-      
+
       // Clean name: e.g. "Real Madrid (ESP)" -> "Real Madrid"
       const displayName = c.name.replace(/\s*\([^)]*\)\s*$/, "");
 
@@ -404,12 +404,12 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
   // Filter and sort clubs
   const filteredAndSortedClubs = useMemo(() => {
     let result = clubs.filter((club) => {
-      const matchesSearch = 
+      const matchesSearch =
         club.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         club.fullName.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesAssoc = 
-        selectedAssociation === "ALL" || 
+
+      const matchesAssoc =
+        selectedAssociation === "ALL" ||
         club.association === selectedAssociation;
 
       return matchesSearch && matchesAssoc;
@@ -438,10 +438,10 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
   // Calculate current page items
   const totalClubs = filteredAndSortedClubs.length;
   const totalPages = Math.max(1, Math.ceil(totalClubs / itemsPerPage));
-  
+
   // Adjust page if it exceeds total pages
   const activePage = currentPage > totalPages ? totalPages : currentPage;
-  
+
   const paginatedClubs = useMemo(() => {
     const startIndex = (activePage - 1) * itemsPerPage;
     return filteredAndSortedClubs.slice(startIndex, startIndex + itemsPerPage);
@@ -720,20 +720,18 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                       <tr
                         key={club.fullName}
                         onClick={() => setSelectedClubName(isSelected ? null : club.fullName)}
-                        className={`group cursor-pointer transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/[0.02] ${
-                          isSelected ? "bg-cyan-50/30 dark:bg-cyan-950/20" : ""
-                        }`}
+                        className={`group cursor-pointer transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/[0.02] ${isSelected ? "bg-cyan-50/30 dark:bg-cyan-950/20" : ""
+                          }`}
                       >
                         <td className="px-4 py-4 text-center">
-                          <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ring-1 ${
-                            globalIdx === 1 
-                              ? "bg-amber-100 text-amber-800 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-900/30"
-                              : globalIdx === 2
+                          <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ring-1 ${globalIdx === 1
+                            ? "bg-amber-100 text-amber-800 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-900/30"
+                            : globalIdx === 2
                               ? "bg-slate-200 text-slate-800 ring-slate-350 dark:bg-slate-800/80 dark:text-slate-200 dark:ring-slate-700/50"
                               : globalIdx === 3
-                              ? "bg-amber-700/10 text-amber-900 ring-amber-700/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900/10"
-                              : "text-slate-500 ring-slate-200/50 dark:text-slate-400 dark:ring-white/5"
-                          }`}>
+                                ? "bg-amber-700/10 text-amber-900 ring-amber-700/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900/10"
+                                : "text-slate-500 ring-slate-200/50 dark:text-slate-400 dark:ring-white/5"
+                            }`}>
                             {globalIdx}
                           </span>
                         </td>
@@ -774,13 +772,12 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                             {/* Rating Progress pill */}
                             <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100 dark:bg-white/[0.08]">
                               <div
-                                className={`h-full rounded-full bg-gradient-to-r ${
-                                  club.avgRating >= 80 
-                                    ? "from-violet-500 to-indigo-500" 
-                                    : club.avgRating >= 75
+                                className={`h-full rounded-full bg-gradient-to-r ${club.avgRating >= 80
+                                  ? "from-violet-500 to-indigo-500"
+                                  : club.avgRating >= 75
                                     ? "from-emerald-500 to-teal-500"
                                     : "from-cyan-500 to-blue-500"
-                                }`}
+                                  }`}
                                 style={{ width: `${club.avgRating}%` }}
                               />
                             </div>
@@ -967,11 +964,11 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
 
                 <div className="space-y-3">
                   {selectedClub.players.map((player, idx) => {
-                    const posCode = player["Position Code"] || player.PositionCode || player.Position?.slice(0,2);
+                    const posCode = player["Position Code"] || player.PositionCode || player.Position?.slice(0, 2);
                     const ratingStr = parseInt((player["Overall Rating"] || "0").replace("%", ""), 10) || 60;
-                    
+
                     return (
-                      <div 
+                      <div
                         key={idx}
                         className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-slate-50/30 hover:border-slate-200/60 dark:border-white/5 dark:bg-white/[0.01] dark:hover:border-white/10 transition-all duration-200 shadow-sm"
                       >
