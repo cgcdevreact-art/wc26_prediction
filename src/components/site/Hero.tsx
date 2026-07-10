@@ -192,7 +192,7 @@ export function Hero() {
           <div className="mt-8">
             <div className="mb-2 flex items-center justify-between">
               <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Countdown to Final</div>
-              <div className="text-xs text-muted-foreground">Jul 19, 2026 · New York New Jersey Stadium</div>
+              <div className="text-xs text-muted-foreground">Jul 19, 2026 · New York New, Jersey Stadium</div>
             </div>
             <Countdown />
           </div>
@@ -299,7 +299,7 @@ export function Hero() {
           <Carousel setApi={setCarouselApi} className="w-full" opts={{ align: "start", loop: false }}>
             <CarouselContent className="-ml-3">
               {todayMatches.map((match) => (
-                <CarouselItem key={match.match_no} className="pl-3 basis-[85%] sm:basis-[48%] md:basis-[32%] lg:basis-[24%]">
+                <CarouselItem key={match.match_no} className="pl-3 basis-[85%] sm:basis-[48%] lg:basis-[32%] xl:basis-[24%]">
                   <HeroMatchCard
                     match={match}
                     onClick={handleMatchCardClick}

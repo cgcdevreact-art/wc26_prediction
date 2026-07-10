@@ -5,17 +5,19 @@ import { FixtureView } from "@/services/fixturesService";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { format } from "date-fns";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { CountdownTimer } from "@/components/voting/CountdownTimer";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 import {
   Trophy, TrendingUp, ShieldAlert, Clock,
   MapPin, CheckCircle2, Loader2,
   MessageSquare, Share2, CornerDownRight, Send, Filter,
-  ThumbsUp, ShieldCheck, ChevronDown, ChevronUp, Flag, Lock
+  ThumbsUp, ShieldCheck, ChevronDown, ChevronUp, Flag, Lock, ArrowLeft
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useFixturesStore } from "@/stores/useFixturesStore";
+import { ShareLinkDialog } from "@/components/ui/share-link-dialog";
 interface MatchDetailClientProps {
   fixture: FixtureView & {
     lineups?: {
@@ -27,6 +29,7 @@ interface MatchDetailClientProps {
 
 export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
   const { data: session } = useSession();
+  const router = useRouter();
   const matchId = String(fixture.match_no);
   const currentUserId = session?.user?.id || null;
   const allFixtures = useFixturesStore((state) => state.fixtures);
@@ -66,6 +69,8 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState<string>("");
   const [collapsedComments, setCollapsedComments] = useState<Record<string, boolean>>({});
+  const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
+  const [shareUrl, setShareUrl] = useState<string>("");
 
   // Related matches
   const [loadingRelated, setLoadingRelated] = useState<boolean>(true);
@@ -302,6 +307,11 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
     setCollapsedComments(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const handleShare = () => {
+    setShareUrl(window.location.href);
+    setShareModalOpen(true);
+  };
+
   // Prediction stats calculations
   const sentimentStats = useMemo(() => {
     const total = predictionsSummary.totalVotes;
@@ -379,6 +389,15 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
 
   return (
     <div className="container mx-auto px-4 space-y-8">
+      <div className="flex">
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back
+        </button>
+      </div>
 
       {/* RICH HEADER BANNER */}
       <div className="relative overflow-hidden bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:via-[#1E293B] dark:to-slate-900 rounded-[2.5rem] p-6 md:p-10 text-slate-900 dark:text-white shadow-xl border border-slate-200 dark:border-white/10">
@@ -529,7 +548,7 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
                 <Lock className="w-8 h-8 text-cyan-500 animate-pulse" />
                 <h4 className="font-display font-extrabold text-sm text-slate-800 dark:text-white">Predictions Trend Locked</h4>
                 <p className="text-xs text-slate-400 max-w-sm">
-                  Vote on this match in the Prediction Pool to reveal the community verdict and historical market trends!
+                  Vote on this match in the Prediction Pool to reveal the Fans verdict and historical market trends!
                 </p>
               </div>
             ) : (
@@ -624,7 +643,7 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
           {!userPrediction && fixture.status !== "COMPLETED" ? (
             <div className="bg-white dark:bg-[#16181D] rounded-3xl border border-slate-200 dark:border-white/5 p-6 shadow-md flex justify-center items-center gap-2 text-xs text-slate-400 font-bold uppercase tracking-wider">
               <Lock className="w-4 h-4 text-cyan-500" />
-              Community Insights Locked until you predict
+              Fans Insights Locked until you predict
             </div>
           ) : (
             <div className="bg-white dark:bg-[#16181D] rounded-3xl border border-slate-200 dark:border-white/5 p-6 shadow-md grid grid-cols-2 md:grid-cols-5 gap-6">
@@ -1160,10 +1179,7 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
             {/* Secondary actions */}
             <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex gap-2">
               <button
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  toast.success("Match URL copied to clipboard!");
-                }}
+                onClick={handleShare}
                 className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 text-slate-650 dark:text-slate-300 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition"
               >
                 <Share2 className="w-3.5 h-3.5" />
@@ -1265,6 +1281,17 @@ export function MatchDetailClient({ fixture }: MatchDetailClientProps) {
           </div>
         </div>
       )}
+
+      <ShareLinkDialog
+        open={shareModalOpen}
+        onOpenChange={setShareModalOpen}
+        url={shareUrl}
+        title="Share This Match Prediction"
+        description={`Anyone with this link can view the ${fixture.homeTeamObj.name} vs ${fixture.awayTeamObj.name} prediction pool and discussion in read-only mode.`}
+        xText={`Check out this WC26 match prediction: ${fixture.homeTeamObj.name} vs ${fixture.awayTeamObj.name}`}
+        whatsappText={`Check out this WC26 match prediction: ${fixture.homeTeamObj.name} vs ${fixture.awayTeamObj.name}`}
+        copySuccessMessage="Match link copied to clipboard!"
+      />
     </div>
   );
 }

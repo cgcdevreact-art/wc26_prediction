@@ -231,9 +231,9 @@ export default async function PredictionsPage(props: {
 
             {/* Predicted Champion Preview */}
             {championCode && teamsMap.get(championCode) && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/10 dark:border-amber-500/20 text-xs shadow-sm self-start sm:self-auto">
+              <div className="inline-flex w-fit max-w-full items-center gap-2 self-start rounded-2xl border border-amber-500/10 bg-amber-500/5 px-3 py-1.5 text-xs font-bold text-amber-800 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300 sm:self-auto">
                 <Trophy className="h-4 w-4 text-gold shrink-0" />
-                <span className="text-slate-550 dark:text-slate-450">Champion:</span>
+                <span className="shrink-0 text-slate-550 dark:text-slate-450">Champion:</span>
                 <CountryFlag
                   code={championCode}
                   flag={teamsMap.get(championCode)?.flag || ""}
@@ -241,7 +241,9 @@ export default async function PredictionsPage(props: {
                   className="h-3.5 w-5 rounded-[2px] object-cover"
                   emojiClassName="text-sm leading-none"
                 />
-                <span className="font-display font-extrabold text-gradient">{teamsMap.get(championCode)?.name}</span>
+                <span className="truncate font-display font-extrabold text-gradient">
+                  {teamsMap.get(championCode)?.name}
+                </span>
               </div>
             )}
           </div>

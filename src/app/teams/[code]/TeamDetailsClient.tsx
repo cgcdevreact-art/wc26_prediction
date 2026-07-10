@@ -212,8 +212,12 @@ export default function TeamDetailsClient({
     return (
       <div className="text-center py-20">
         <h2 className="text-2xl font-bold text-foreground">Team not found</h2>
-        <Link href="/teams" className="mt-4 inline-block text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
-          &larr; Back to Teams
+        <Link
+          href="/teams"
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-slate-700 shadow-[0_6px_18px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back</span>
         </Link>
       </div>
     );
@@ -224,9 +228,12 @@ export default function TeamDetailsClient({
 
   return (
     <div className="animate-in fade-in duration-500 pb-20">
-      <Link href="/teams" className="inline-flex items-center text-muted-foreground hover:text-foreground mb-8 transition-colors">
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Teams
+      <Link
+        href="/teams"
+        className="mb-8 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black uppercase tracking-[0.14em] text-slate-700 shadow-[0_6px_18px_rgba(15,23,42,0.08)] transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        <span>Back</span>
       </Link>
 
       {/* Team Header & Editable Stats */}

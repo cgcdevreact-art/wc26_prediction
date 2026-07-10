@@ -662,7 +662,7 @@ export function WildcardCountrySection() {
                 Quick Selection
               </label>
               <div className="-mx-1 overflow-x-auto pb-2 sm:mx-0">
-                <div className="grid grid-flow-col auto-cols-[calc((100%-1.875rem)/4)] gap-2.5 px-1 sm:flex sm:flex-wrap sm:px-0">
+                <div className="grid grid-flow-col auto-cols-[9.75rem] gap-2.5 px-1 sm:flex sm:flex-wrap sm:px-0">
                 {featuredTeams.map((team) => {
                   if (!team) return null;
                   const active = team.selectionCode === selectedCode;
@@ -670,7 +670,7 @@ export function WildcardCountrySection() {
                     <button
                       key={team.selectionCode}
                       onClick={() => handleSelectCode(team.selectionCode)}
-                      className={`inline-flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition cursor-pointer sm:w-auto ${active
+                      className={`inline-flex w-full min-w-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition cursor-pointer sm:w-auto ${active
                         ? "border-neon/40 bg-neon/10 text-slate-950 dark:text-white font-bold shadow-[0_0_12px_rgba(6,182,212,0.15)]"
                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.02] dark:text-muted-foreground dark:hover:bg-white/5 dark:hover:text-white"
                         }`}
@@ -682,7 +682,7 @@ export function WildcardCountrySection() {
                         className="h-4.5 w-6.5 rounded object-cover"
                         emojiClassName="text-lg leading-none"
                       />
-                      <span className="truncate">{team.name}</span>
+                      <span className="min-w-0 flex-1 truncate">{team.name}</span>
                     </button>
                   );
                 })}
@@ -693,7 +693,7 @@ export function WildcardCountrySection() {
                     <div
                       key={cc.code}
                       onClick={() => handleSelectCode(cc.code)}
-                      className={`inline-flex min-w-0 items-center gap-2 rounded-xl border pl-3 pr-2 py-2 text-sm font-semibold transition cursor-pointer relative overflow-hidden group sm:w-auto ${
+                      className={`inline-flex w-full min-w-0 items-center gap-2 rounded-xl border pl-3 pr-2 py-2 text-sm font-semibold transition cursor-pointer relative overflow-hidden group sm:w-auto ${
                         active
                           ? "border-neon-2/45 bg-neon-2/15 text-slate-950 dark:text-white font-bold shadow-[0_0_15px_rgba(178,57,210,0.18)]"
                           : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.02] dark:text-muted-foreground dark:hover:bg-white/5 dark:hover:text-white"
@@ -706,7 +706,7 @@ export function WildcardCountrySection() {
                         className="h-4.5 w-6 rounded object-cover"
                         emojiClassName="text-lg leading-none"
                       />
-                      <span className="truncate">{cc.name}</span>
+                      <span className="min-w-0 flex-1 truncate">{cc.name}</span>
                       <span className="text-[8px] tracking-wider uppercase bg-neon-2/20 text-neon-2 font-bold px-1.5 py-0.5 rounded">Custom</span>
                       <button
                         type="button"

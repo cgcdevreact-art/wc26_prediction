@@ -22,6 +22,8 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { GlobalAuthModal } from "@/components/site/GlobalAuthModal";
 import { CookieConsent } from "@/components/site/CookieConsent";
+import { GlobalAnnouncementModal } from "@/components/site/GlobalAnnouncementModal";
+import { getActiveAnnouncement } from "@/app/actions/announcements";
 
 export const metadata: Metadata = {
   title: "26WC Prediction",
@@ -42,6 +44,7 @@ export default async function RootLayout({
   const groupsConfig = getGroupsConfig();
   const cupResults = await getCupResults();
   const session = await auth();
+  const activeAnnouncement = await getActiveAnnouncement();
 
   return (
     <html
@@ -70,7 +73,9 @@ export default async function RootLayout({
           }}
         />
 
-        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4746258958164249" crossOrigin="anonymous"></script>
+        {process.env.NEXT_PUBLIC_APP_ENV === "production" && (
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4746258958164249" crossOrigin="anonymous"></script>
+        )}
       </head>
       <body className={`${inter.variable} ${spaceGrotesk.variable} min-h-full flex flex-col`} suppressHydrationWarning>
         <SessionProvider session={session}>
@@ -80,6 +85,7 @@ export default async function RootLayout({
               <GlobalAuthModal />
               <CookieConsent />
               <Toaster />
+              <GlobalAnnouncementModal announcement={activeAnnouncement} />
             </TeamsProvider>
           </ThemeProvider>
         </SessionProvider>

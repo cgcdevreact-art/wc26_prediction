@@ -175,7 +175,7 @@ export function VotingCard({ fixture }: VotingCardProps) {
   return (
     <div
       onClick={handleCardClick}
-      className="min-w-[280px] md:min-w-[320px] h-[360px] bg-white dark:bg-[#16181D] rounded-2xl border border-slate-200 dark:border-white/5 p-5 shadow-lg flex flex-col justify-between hover:shadow-xl hover:border-slate-300/80 dark:hover:border-white/10 transition-all duration-300 cursor-pointer select-none"
+      className="min-w-[280px] self-stretch md:min-w-[320px] bg-white dark:bg-[#16181D] rounded-2xl border border-slate-200 dark:border-white/5 p-5 shadow-lg flex h-full min-h-[360px] flex-col justify-between hover:shadow-xl hover:border-slate-300/80 dark:hover:border-white/10 transition-all duration-300 cursor-pointer select-none"
     >
       <div className="space-y-4 flex-grow flex flex-col justify-between">
         {/* Top stage info */}
@@ -251,6 +251,50 @@ export function VotingCard({ fixture }: VotingCardProps) {
             </span>
           </div>
         </div>
+
+        {userVote && !isCompleted && (
+          <div className="bg-slate-50 dark:bg-white/[0.02] p-4 rounded-2xl border border-slate-200 dark:border-white/5 space-y-4 w-full">
+            <div className="flex items-center gap-2 text-[10px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-widest">
+              <CheckCircle2 className="w-4.5 h-4.5" />
+              <span>✔ Predicted {userVote === "HOME" ? fixture.homeTeamObj.name : fixture.awayTeamObj.name}</span>
+            </div>
+
+            <div className="space-y-3 text-[11px] font-bold">
+              {/* Home Team Row */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-slate-800 dark:text-slate-300">
+                  <span>{fixture.homeTeamObj.name}</span>
+                  <span className="font-mono">{stats.homeProb}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-500"
+                    style={{ width: `${stats.homeProb}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Away Team Row */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-slate-800 dark:text-slate-300">
+                  <span>{fixture.awayTeamObj.name}</span>
+                  <span className="font-mono">{stats.awayProb}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-rose-500 transition-all duration-500"
+                    style={{ width: `${stats.awayProb}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+              <span>Confidence: {Math.abs(stats.homeProb - stats.awayProb)}%</span>
+              <span>Total Votes: {stats.totalVotes}</span>
+            </div>
+          </div>
+        )}
 
         {/* Date and Location */}
         <div className="text-[10px] text-slate-450 dark:text-slate-500 font-medium text-center">

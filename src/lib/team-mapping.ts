@@ -54,3 +54,8 @@ export const TEAM_INFO: Record<string, TeamMapping> = {
   "Curacao": { code: "CUW", flag: "🇨🇼", confederation: "CONCACAF" },
   "New Zealand": { code: "NZL", flag: "🇳🇿", confederation: "OFC" }
 };
+
+export const FIFA_TO_FULL_NAME: Record<string, string> = Object.entries(TEAM_INFO).reduce((acc, [name, info]) => {
+  acc[info.code] = name;
+  return acc;
+}, {} as Record<string, string>);

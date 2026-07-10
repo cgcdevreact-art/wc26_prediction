@@ -1,350 +1,188 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { Search, Trophy, Globe, Award, Users, ChevronLeft, ChevronRight, X, Sparkles, Shield } from "lucide-react";
+import { Search, Trophy, Globe, Award, Users, ChevronLeft, ChevronRight, X, Sparkles, Shield, BarChart3 } from "lucide-react";
 import { CountryFlag } from "@/components/ui/CountryFlag";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { FIFA_TO_FULL_NAME } from "@/lib/team-mapping";
+import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 
-const FIFA_TO_FULL_NAME: Record<string, string> = {
-  AFG: "Afghanistan",
-  ALB: "Albania",
-  ALG: "Algeria",
-  AND: "Andorra",
-  ANG: "Angola",
-  ANT: "Antigua & Barbuda",
-  ARG: "Argentina",
-  ARM: "Armenia",
-  ARU: "Aruba",
-  ASA: "American Samoa",
-  AUS: "Australia",
-  AUT: "Austria",
-  AZE: "Azerbaijan",
-  BAH: "Bahamas",
-  BAN: "Bangladesh",
-  BDI: "Burundi",
-  BEL: "Belgium",
-  BEN: "Benin",
-  BER: "Bermuda",
-  BFA: "Burkina Faso",
-  BHR: "Bahrain",
-  BIH: "Bosnia & Herzegovina",
-  BLR: "Belarus",
-  BLZ: "Belize",
-  BOL: "Bolivia",
-  BOT: "Botswana",
-  BRA: "Brazil",
-  BRU: "Brunei",
-  BUL: "Bulgaria",
-  CAM: "Cambodia",
-  CAN: "Canada",
-  CAY: "Cayman Islands",
-  CGO: "Congo",
-  CHA: "Chad",
-  CHI: "Chile",
-  CHN: "China",
-  CIV: "Ivory Coast",
-  CMR: "Cameroon",
-  COD: "DR Congo",
-  COK: "Cook Islands",
-  COL: "Colombia",
-  COM: "Comoros",
-  CPV: "Cape Verde",
-  CRC: "Costa Rica",
-  CRO: "Croatia",
-  CTA: "Central African Republic",
-  CUB: "Cuba",
-  CUR: "Curaçao",
-  CUW: "Curaçao",
-  CYP: "Cyprus",
-  CZE: "Czech Republic",
-  DEN: "Denmark",
-  DJI: "Djibouti",
-  DMA: "Dominica",
-  DOM: "Dominican Republic",
-  ECU: "Ecuador",
-  EGY: "Egypt",
-  ENG: "England",
-  EQG: "Equatorial Guinea",
-  ERI: "Eritrea",
-  ESP: "Spain",
-  EST: "Estonia",
-  ETH: "Ethiopia",
-  FIJ: "Fiji",
-  FIN: "Finland",
-  FRA: "France",
-  FRG: "Germany",
-  FRO: "Faroe Islands",
-  GAB: "Gabon",
-  GAM: "Gambia",
-  GEO: "Georgia",
-  GER: "Germany",
-  GHA: "Ghana",
-  GIB: "Gibraltar",
-  GPE: "Guadeloupe",
-  GRN: "Grenada",
-  GUA: "Guatemala",
-  GUI: "Guinea",
-  GUM: "Guam",
-  GUY: "Guyana",
-  HAI: "Haiti",
-  HKG: "Hong Kong",
-  HON: "Honduras",
-  HUN: "Hungary",
-  INA: "Indonesia",
-  IND: "India",
-  IRL: "Ireland",
-  IRN: "Iran",
-  IRQ: "Iraq",
-  ISL: "Iceland",
-  ISR: "Israel",
-  ITA: "Italy",
-  JAM: "Jamaica",
-  JOR: "Jordan",
-  JPN: "Japan",
-  KAZ: "Kazakhstan",
-  KEN: "Kenya",
-  KGZ: "Kyrgyzstan",
-  KOR: "South Korea",
-  KSA: "Saudi Arabia",
-  KUW: "Kuwait",
-  LAO: "Laos",
-  LVA: "Latvia",
-  LBN: "Lebanon",
-  LBR: "Liberia",
-  LBY: "Libya",
-  LCA: "Saint Lucia",
-  LES: "Lesotho",
-  LIE: "Liechtenstein",
-  LTU: "Lithuania",
-  LUX: "Luxembourg",
-  MAC: "Macau",
-  MAD: "Madagascar",
-  MAR: "Morocco",
-  MAS: "Malaysia",
-  MDA: "Moldova",
-  MDV: "Maldives",
-  MEX: "Mexico",
-  MGL: "Mongolia",
-  MKD: "North Macedonia",
-  MLI: "Mali",
-  MLT: "Malta",
-  MNE: "Montenegro",
-  MOZ: "Mozambique",
-  MRI: "Mauritius",
-  MSH: "Montserrat",
-  MTN: "Mauritania",
-  MWI: "Malawi",
-  MYA: "Myanmar",
-  NAM: "Namibia",
-  NCA: "Nicaragua",
-  NED: "Netherlands",
-  NEP: "Nepal",
-  NGA: "Nigeria",
-  NIG: "Niger",
-  NIR: "Northern Ireland",
-  NOR: "Norway",
-  NZL: "New Zealand",
-  OMA: "Oman",
-  PAK: "Pakistan",
-  PAN: "Panama",
-  PAR: "Paraguay",
-  PER: "Peru",
-  PHI: "Philippines",
-  PLE: "Palestine",
-  PNG: "Papua New Guinea",
-  POL: "Poland",
-  POR: "Portugal",
-  PRK: "North Korea",
-  PUR: "Puerto Rico",
-  QAT: "Qatar",
-  ROU: "Romania",
-  RSA: "South Africa",
-  RUS: "Russia",
-  RWA: "Rwanda",
-  SAM: "Samoa",
-  SCO: "Scotland",
-  SEN: "Senegal",
-  SEY: "Seychelles",
-  SGP: "Singapore",
-  SHN: "Saint Helena",
-  SLE: "Sierra Leone",
-  SLV: "El Salvador",
-  SMR: "San Marino",
-  SOL: "Solomon Islands",
-  SOM: "Somalia",
-  SRB: "Serbia",
-  SRI: "Sri Lanka",
-  SSD: "South Sudan",
-  STP: "São Tomé & Príncipe",
-  SUI: "Switzerland",
-  SUR: "Suriname",
-  SVK: "Slovakia",
-  SVN: "Slovenia",
-  SWE: "Sweden",
-  SWZ: "Swaziland",
-  SYR: "Syria",
-  TAH: "Tahiti",
-  TAN: "Tanzania",
-  TCA: "Turks & Caicos",
-  TGO: "Togo",
-  THA: "Thailand",
-  TJK: "Tajikistan",
-  TKM: "Turkmenistan",
-  TLS: "East Timor",
-  TOG: "Togo",
-  TGA: "Tonga",
-  TRI: "Trinidad & Tobago",
-  TUN: "Tunisia",
-  TUR: "Turkey",
-  UAE: "United Arab Emirates",
-  UGA: "Uganda",
-  UKR: "Ukraine",
-  URU: "Uruguay",
-  USA: "United States",
-  UZB: "Uzbekistan",
-  VAN: "Vanuatu",
-  VEN: "Venezuela",
-  VIE: "Vietnam",
-  VIN: "St. Vincent & Grenadines",
-  WAL: "Wales",
-  YEM: "Yemen",
-  ZAM: "Zambia",
-  ZIM: "Zimbabwe"
+const RAW_CLUB_NAME_ALIASES: Record<string, string[]> = {
+  "Atletico De Madrid": ["Atletico Madrid"],
+  "Real Madrid C. F.": ["Real Madrid", "Real Madrid CF"],
+  "FC Internazionale Milano": ["Inter Milan", "Inter"],
+  "SE Palmeiras": ["Palmeiras"],
+  "CR Flamengo": ["Flamengo"],
+  "SSC Napoli": ["Napoli"],
+  "Tottenham Hotspur FC": ["Tottenham Hotspur", "Tottenham"],
+  "Manchester City FC": ["Manchester City"],
+  "Manchester United FC": ["Manchester United"],
+  "Liverpool FC": ["Liverpool"],
+  "Chelsea FC": ["Chelsea"],
+  "Juventus FC": ["Juventus"],
+  "FC Barcelona": ["Barcelona"],
+  "Brighton & Hove Albion FC": ["Brighton & Hove Albion", "Brighton"],
+  "Wolverhampton Wanderers FC": ["Wolverhampton Wanderers", "Wolves"],
+  "Heart Of Midlothian FC": ["Heart of Midlothian", "Hearts"],
+  "Fenerbahce SK": ["Fenerbahce"],
+  "Galatasaray SK": ["Galatasaray"],
+  "Al Hilal SC": ["Al Hilal"],
+  "Al Ahli FC": ["Al Ahli"],
+  "SL Ben ca": ["Benfica", "SL Benfica"],
+  "CA River Plate": ["River Plate"],
+  "CA Boca Juniors": ["Boca Juniors"],
+  "CF Monterrey": ["Monterrey"],
+  "Club America": ["America", "Club America"],
+  "FC Cincinnatti": ["FC Cincinnati", "Cincinnati"],
+  "Borussia Munchengladbach": ["Borussia Monchengladbach", "Borussia Mgladbach"],
+  "Bayer 04 Leverkusen": ["Bayer Leverkusen", "Leverkusen"],
+  "FC Red Bull Salzburg": ["Red Bull Salzburg", "Salzburg"],
+  "Olympique Marseille": ["Marseille"],
+  "Olympique Lyonnais": ["Lyon"],
+  "Paris Saint-Germain": ["PSG"],
+  "New York City FC": ["New York City"],
+  "Inter Miami CF": ["Inter Miami"],
+  "Celtic FC": ["Celtic"],
+  "AFC Bournemouth": ["Bournemouth"],
+  "Aston Villa FC": ["Aston Villa"],
+  "Leicester City FC": ["Leicester City"],
+  "Leeds United FC": ["Leeds United"],
+  "Watford FC": ["Watford"],
+  "Norwich City FC": ["Norwich City"],
+  "Coventry City FC": ["Coventry City"],
+  "Fulham FC": ["Fulham"],
+  "Crystal Palace FC": ["Crystal Palace"],
+  "Chicago Fire FC": ["Chicago Fire"],
+  "Charlotte FC": ["Charlotte"],
+  "Swansea City AFC": ["Swansea City"],
 };
 
-// Static pre-cached URLs for top world clubs to load instantly and save API bandwidth
-const PRE_CACHED_LOGOS: Record<string, string> = {
-  "Manchester City": "https://www.thesportsdb.com/images/media/team/badge/xqyyxy1473531117.png",
-  "Manchester United": "https://www.thesportsdb.com/images/media/team/badge/z3vj581628172349.png",
-  "Liverpool": "https://www.thesportsdb.com/images/media/team/badge/091wxm1670932049.png",
-  "Chelsea": "https://www.thesportsdb.com/images/media/team/badge/97vsn71628172081.png",
-  "Arsenal": "https://www.thesportsdb.com/images/media/team/badge/uyhbfe1612467090.png",
-  "Real Madrid": "https://www.thesportsdb.com/images/media/team/badge/vvvupq1437264177.png",
-  "FC Barcelona": "https://www.thesportsdb.com/images/media/team/badge/0296rr1519754714.png",
-  "Barcelona": "https://www.thesportsdb.com/images/media/team/badge/0296rr1519754714.png",
-  "Atletico Madrid": "https://www.thesportsdb.com/images/media/team/badge/1f5m061612466986.png",
-  "Bayern Munich": "https://www.thesportsdb.com/images/media/team/badge/14101a1670932170.png",
-  "Borussia Dortmund": "https://www.thesportsdb.com/images/media/team/badge/vryusy1421422731.png",
-  "Paris Saint-Germain": "https://www.thesportsdb.com/images/media/team/badge/7697411634567431.png",
-  "Juventus": "https://www.thesportsdb.com/images/media/team/badge/d82hch1634567299.png",
-  "Inter Milan": "https://www.thesportsdb.com/images/media/team/badge/l94hca1621516246.png",
-  "Inter": "https://www.thesportsdb.com/images/media/team/badge/l94hca1621516246.png",
-  "AC Milan": "https://www.thesportsdb.com/images/media/team/badge/578fsh1628173459.png",
-  "Napoli": "https://www.thesportsdb.com/images/media/team/badge/q2t9691621516298.png",
-  "Tottenham Hotspur": "https://www.thesportsdb.com/images/media/team/badge/9514f71628172153.png",
-  "Tottenham": "https://www.thesportsdb.com/images/media/team/badge/9514f71628172153.png",
-  "Ajax": "https://www.thesportsdb.com/images/media/team/badge/9a37e11634567086.png",
-  "Boca Juniors": "https://www.thesportsdb.com/images/media/team/badge/9f4t681533036113.png",
-  "River Plate": "https://www.thesportsdb.com/images/media/team/badge/2sn6p11608678854.png",
-  "Flamengo": "https://www.thesportsdb.com/images/media/team/badge/uprswx1420760459.png",
-  "Palmeiras": "https://www.thesportsdb.com/images/media/team/badge/b2g9p71556054178.png",
-  "Al Hilal": "https://www.thesportsdb.com/images/media/team/badge/y25px01648507421.png",
-  "Al Ittihad": "https://www.thesportsdb.com/images/media/team/badge/qtxvuy1420800662.png",
-  "Al Nassr": "https://www.thesportsdb.com/images/media/team/badge/346e2y1572522295.png"
-};
+const normalizeClubName = (name: string) =>
+  name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s*\([^)]*\)\s*$/, "")
+    .replace(/[.'’]/g, "")
+    .replace(/\s*&\s*/g, " and ")
+    .replace(/\s+/g, " ")
+    .trim();
 
-// In-memory and LocalStorage cache for resolved club logos to prevent rate limiting
-const LOGO_CACHE_KEY = "wc26_club_logos_cache_v3";
-const memoryCache: Record<string, string> = { ...PRE_CACHED_LOGOS };
+const CLUB_NAME_ALIASES: Record<string, string[]> = Object.fromEntries(
+  Object.entries(RAW_CLUB_NAME_ALIASES).map(([clubName, aliases]) => [
+    normalizeClubName(clubName),
+    aliases.map(normalizeClubName),
+  ])
+);
 
-if (typeof window !== "undefined") {
-  try {
-    const saved = localStorage.getItem(LOGO_CACHE_KEY);
-    if (saved) {
-      Object.assign(memoryCache, JSON.parse(saved));
-    }
-  } catch (e) {
-    console.error("Failed to load logo cache:", e);
+const simplifyClubName = (name: string) =>
+  name
+    .replace(/^(FC|CF|AC|SC|AS|FK|SV|RC|UD|SSC|CD|CA|CR|SE|SL|US|BSC|OGC|APOEL|PFC|AFC|Club|1\.\s*FC|1\.\s*FSV|FSV)\s+/i, "")
+    .replace(/\s+(FC|CF|AC|SC|AS|FK|SV|RC|UD|SSC|CD|CA|CR|SE|SL|US|BSC|OGC|Club)$/i, "")
+    .replace(/\b(De|Of|and|the)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const buildSearchTerms = (clubName: string) => {
+  const cleanName = normalizeClubName(clubName);
+  const terms = new Set<string>();
+  const aliasTerms = CLUB_NAME_ALIASES[cleanName] || [];
+
+  terms.add(cleanName);
+  aliasTerms.forEach((alias) => terms.add(alias));
+
+  const simplified = simplifyClubName(cleanName);
+  if (simplified && simplified !== cleanName) {
+    terms.add(simplified);
   }
-}
 
-const saveCache = () => {
-  if (typeof window !== "undefined") {
+  aliasTerms.forEach((alias) => {
+    const simplifiedAlias = simplifyClubName(alias);
+    if (simplifiedAlias && simplifiedAlias !== alias) {
+      terms.add(simplifiedAlias);
+    }
+  });
+
+  return Array.from(terms).filter(Boolean);
+};
+
+type SportsDbTeam = {
+  strBadge?: string | null;
+  strTeamBadge?: string | null;
+  strLogo?: string | null;
+  strTeamLogo?: string | null;
+  strTeam?: string | null;
+  strAlternate?: string | null;
+};
+
+const scoreClubMatch = (clubName: string, team: SportsDbTeam) => {
+  const normalizedClub = normalizeClubName(clubName).toLowerCase();
+  const candidates = [
+    team.strTeam,
+    team.strAlternate,
+    simplifyClubName(team.strTeam || ""),
+    simplifyClubName(team.strAlternate || ""),
+  ]
+    .filter(Boolean)
+    .map((value) => normalizeClubName(value || "").toLowerCase());
+
+  let score = 0;
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (candidate === normalizedClub) score += 10;
+    if (candidate.includes(normalizedClub) || normalizedClub.includes(candidate)) score += 5;
+    if (candidate === simplifyClubName(normalizedClub).toLowerCase()) score += 4;
+  }
+
+  return score;
+};
+
+const resolveClubLogo = async (clubName: string): Promise<string | null> => {
+  const searchTerms = buildSearchTerms(clubName);
+
+  for (const searchTerm of searchTerms) {
     try {
-      localStorage.setItem(LOGO_CACHE_KEY, JSON.stringify(memoryCache));
-    } catch (e) {
-      console.error("Failed to save logo cache:", e);
-    }
-  }
-};
-
-// Global request queue for logo fetches to process sequentially (throttling)
-interface QueueItem {
-  cleanName: string;
-  resolve: (url: string | null) => void;
-}
-const requestQueue: QueueItem[] = [];
-let isProcessingQueue = false;
-
-const processQueue = async () => {
-  if (isProcessingQueue || requestQueue.length === 0) return;
-  isProcessingQueue = true;
-
-  while (requestQueue.length > 0) {
-    const item = requestQueue.shift();
-    if (item) {
-      const { cleanName, resolve } = item;
-
-      // Double-check cache in case it resolved while waiting in the queue
-      if (memoryCache[cleanName]) {
-        resolve(memoryCache[cleanName] === "FAILED" ? null : memoryCache[cleanName]);
+      const res = await fetch(
+        `https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(searchTerm)}`
+      );
+      if (!res.ok) {
         continue;
       }
 
-      const fetchLogo = async (searchTerm: string): Promise<string | null> => {
-        try {
-          const res = await fetch(
-            `https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(searchTerm)}`
-          );
-          const data = await res.json();
-          if (data.teams && data.teams.length > 0) {
-            const badge = data.teams[0].strBadge || data.teams[0].strTeamBadge;
-            if (badge) return badge;
-          }
-        } catch (e) {
-          // fetch error
-        }
-        return null;
-      };
-
-      // Try 1: cleaned name
-      let badge = await fetchLogo(cleanName);
-
-      // Try 2: simplified name (stripping prefixes/suffixes)
-      if (!badge) {
-        const simplified = cleanName
-          .replace(/^(FC|CF|AC|SC|AS|FK|SV|RC|UD|SSC|Cd|Club|1\.\s*FC|1\.\s*FSV|FSV)\s+/i, "")
-          .replace(/\s+(FC|CF|AC|SC|AS|FK|SV|RC|UD|SSC|Club)$/i, "")
-          .trim();
-
-        if (simplified && simplified !== cleanName) {
-          badge = await fetchLogo(simplified);
-        }
+      const data = await res.json();
+      const teams: SportsDbTeam[] = Array.isArray(data?.teams) ? data.teams : [];
+      if (teams.length === 0) {
+        continue;
       }
 
+      const bestTeam = [...teams]
+        .sort((a, b) => scoreClubMatch(searchTerm, b) - scoreClubMatch(searchTerm, a))[0];
+
+      const badge = bestTeam?.strBadge || bestTeam?.strTeamBadge || bestTeam?.strLogo || bestTeam?.strTeamLogo;
       if (badge) {
-        memoryCache[cleanName] = badge;
-        saveCache();
-        resolve(badge);
-      } else {
-        // Cache failures to prevent spammed requests for un-resolvable small clubs
-        memoryCache[cleanName] = "FAILED";
-        saveCache();
-        resolve(null);
+        return badge;
       }
-
-      // Sequential delay (150ms) to bypass rate limits and keep user interaction smooth
-      await new Promise((r) => setTimeout(r, 150));
+    } catch {
+      continue;
     }
   }
 
-  isProcessingQueue = false;
+  return null;
 };
 
-const queueLogoFetch = (cleanName: string): Promise<string | null> => {
-  return new Promise((resolve) => {
-    requestQueue.push({ cleanName, resolve });
-    processQueue();
-  });
+const buildPaginationItems = (currentPage: number, totalPages: number) => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, "dots", totalPages] as const;
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [1, "dots", totalPages - 3, totalPages - 2, totalPages - 1, totalPages] as const;
+  }
+
+  return [1, "dots", currentPage - 1, currentPage, currentPage + 1, "dots", totalPages] as const;
 };
 
 export function ClubLogo({
@@ -356,35 +194,23 @@ export function ClubLogo({
   className?: string;
   fallbackClassName?: string;
 }) {
-  const cleanName = name.replace(/\s*\([^)]*\)\s*$/, "").trim();
-  const [logoUrl, setLogoUrl] = useState<string | null>(() => {
-    const cached = memoryCache[cleanName];
-    return cached && cached !== "FAILED" ? cached : null;
-  });
-  const [failed, setFailed] = useState(() => memoryCache[cleanName] === "FAILED");
+  const cleanName = normalizeClubName(name);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [resolvedName, setResolvedName] = useState(cleanName);
 
   useEffect(() => {
-    if (memoryCache[cleanName]) {
-      if (memoryCache[cleanName] === "FAILED") {
-        setFailed(true);
-        setLogoUrl(null);
-      } else {
-        setLogoUrl(memoryCache[cleanName]);
-        setFailed(false);
-      }
-      return;
-    }
-
-    setFailed(false);
-
     let active = true;
-    queueLogoFetch(cleanName).then((badge) => {
+    resolveClubLogo(cleanName).then((badge) => {
       if (!active) return;
       if (badge) {
         setLogoUrl(badge);
         setFailed(false);
+        setResolvedName(cleanName);
       } else {
+        setLogoUrl(null);
         setFailed(true);
+        setResolvedName(cleanName);
       }
     });
 
@@ -393,7 +219,7 @@ export function ClubLogo({
     };
   }, [cleanName]);
 
-  if (logoUrl && !failed) {
+  if (logoUrl && !failed && resolvedName === cleanName) {
     return (
       <img
         src={logoUrl}
@@ -401,7 +227,9 @@ export function ClubLogo({
         className={`${className} object-contain`}
         loading="lazy"
         onError={() => {
+          setLogoUrl(null);
           setFailed(true);
+          setResolvedName(cleanName);
         }}
       />
     );
@@ -413,6 +241,32 @@ export function ClubLogo({
       <Shield className="h-full w-full opacity-[0.08] absolute p-1 text-slate-400 dark:text-slate-500" />
       <span className="relative z-10">{initial}</span>
     </div>
+  );
+}
+
+function ClubChartLogoTick({
+  x,
+  y,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string };
+}) {
+  const clubName = payload?.value || "";
+
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      <foreignObject x={-22} y={8} width={44} height={44}>
+        <div className="flex h-11 w-11 items-center justify-center">
+          <ClubLogo
+            name={clubName}
+            className="h-10 w-10 object-contain"
+            fallbackClassName="h-10 w-10 text-slate-400 bg-slate-50 dark:bg-white/[0.03] dark:text-slate-500"
+          />
+        </div>
+      </foreignObject>
+    </g>
   );
 }
 
@@ -439,6 +293,8 @@ interface ClubsClientProps {
 export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAssociation, setSelectedAssociation] = useState<string>("ALL");
+  const [chartAssociation, setChartAssociation] = useState<string>("ALL");
+  const [chartLimit, setChartLimit] = useState<number>(10);
   const [sortBy, setSortBy] = useState<"count" | "rating" | "name">("count");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedClubName, setSelectedClubName] = useState<string | null>(null);
@@ -591,6 +447,46 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
     return filteredAndSortedClubs.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredAndSortedClubs, activePage, itemsPerPage]);
 
+  const paginationItems = useMemo(
+    () => buildPaginationItems(activePage, totalPages),
+    [activePage, totalPages]
+  );
+
+  const associationNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+
+    players.forEach((player) => {
+      const code = player["Team Code"]?.trim();
+      const name = player.Team?.trim();
+
+      if (code && name && !map[code]) {
+        map[code] = name;
+      }
+    });
+
+    return map;
+  }, [players]);
+
+  const getAssociationLabel = (associationCode: string) =>
+    associationNameMap[associationCode] || associationCode || "Unknown";
+
+  const chartClubs = useMemo(() => {
+    const filtered = clubs
+      .filter((club) => chartAssociation === "ALL" || club.association === chartAssociation)
+      .sort((a, b) => {
+        if (b.playersCount !== a.playersCount) return b.playersCount - a.playersCount;
+        return a.displayName.localeCompare(b.displayName);
+      })
+      .slice(0, chartLimit);
+
+    return filtered.map((club, index) => ({
+      name: club.displayName,
+      fullName: club.fullName,
+      players: club.playersCount,
+      association: getAssociationLabel(club.association),
+    }));
+  }, [chartAssociation, chartLimit, clubs]);
+
   // Find the selected club details
   const selectedClub = useMemo(() => {
     if (!selectedClubName) return null;
@@ -606,6 +502,10 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
   const handleAssociationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedAssociation(e.target.value);
     setCurrentPage(1);
+  };
+
+  const handleChartAssociationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setChartAssociation(e.target.value);
   };
 
   const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -633,6 +533,127 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
 
   return (
     <div className="space-y-6">
+      <Accordion
+        type="single"
+        collapsible
+        defaultValue="club-player-chart"
+        className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950"
+      >
+        <AccordionItem value="club-player-chart" className="border-none">
+          <AccordionTrigger className="border-b border-slate-200 bg-gradient-to-r from-[#0a8a45]/8 via-[#2c7c87]/8 to-[#af3fd1]/8 px-5 py-5 hover:no-underline dark:border-white/10 dark:from-[#0a8a45]/12 dark:via-[#2c7c87]/12 dark:to-[#af3fd1]/12">
+            <div className="flex w-full flex-col gap-2 text-left">
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200">
+                <BarChart3 className="h-3.5 w-3.5 text-[#2c7c87]" />
+                Club Player Chart
+              </div>
+              <h2 className="font-display text-2xl font-extrabold tracking-tight text-slate-950 dark:text-white">
+                World Cup Players by Club
+              </h2>
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Compare how many World Cup players each club contributes, and narrow the chart by country association.
+              </p>
+            </div>
+          </AccordionTrigger>
+
+          <AccordionContent className="px-5 pb-5 pt-5 sm:px-6 sm:pb-6">
+            <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="text-sm text-slate-500 dark:text-slate-400">
+                Showing <span className="font-bold text-slate-900 dark:text-white">{chartClubs.length}</span> clubs
+                {chartAssociation !== "ALL" && (
+                  <>
+                    {" "}from <span className="font-bold text-slate-900 dark:text-white">{getAssociationLabel(chartAssociation)}</span>
+                  </>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <select
+                  value={chartAssociation}
+                  onChange={handleChartAssociationChange}
+                  className="h-11 min-w-[220px] rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-800 shadow-sm outline-none transition focus:border-cyan-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:focus:border-cyan-400"
+                >
+                  <option value="ALL">All Associations</option>
+                  {uniqueAssociations.map((assoc) => (
+                    <option key={assoc} value={assoc}>
+                      {getAssociationLabel(assoc)}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={chartLimit}
+                  onChange={(e) => setChartLimit(Number(e.target.value))}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-800 shadow-sm outline-none transition focus:border-cyan-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200 dark:focus:border-cyan-400"
+                >
+                  {[5, 10, 15, 20].map((count) => (
+                    <option key={count} value={count}>
+                      Top {count} Clubs
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="h-[360px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartClubs} margin={{ top: 12, right: 10, left: -18, bottom: 44 }} barCategoryGap="35%">
+                    <defs>
+                      <linearGradient id="clubRankingsBar" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#0b7f38" />
+                        <stop offset="18%" stopColor="#0b7f38" />
+                        <stop offset="58%" stopColor="#6f7b8d" />
+                        <stop offset="100%" stopColor="#ad39c8" />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} stroke="#cbd5e1" strokeDasharray="3 3" strokeOpacity={0.4} />
+                    <XAxis
+                      dataKey="fullName"
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                      height={64}
+                      tick={<ClubChartLogoTick />}
+                    />
+                    <YAxis
+                      allowDecimals={false}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#64748b", fontSize: 11 }}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(148, 163, 184, 0.08)" }}
+                      contentStyle={{
+                        borderRadius: "16px",
+                        border: "1px solid rgba(148,163,184,0.16)",
+                        backgroundColor: "#0f172a",
+                        color: "white",
+                      }}
+                      formatter={(value: number) => [`${value} players`, "World Cup Players"]}
+                      labelFormatter={(label) => {
+                        const club = chartClubs.find((item) => item.fullName === label);
+                        return club ? `${club.fullName} • ${club.association}` : label;
+                      }}
+                    />
+                    <Bar
+                      dataKey="players"
+                      radius={[10, 10, 0, 0]}
+                      fill="url(#clubRankingsBar)"
+                      onClick={(data) => {
+                        if (data?.fullName) {
+                          setSelectedClubName(data.fullName);
+                        }
+                      }}
+                      className="cursor-pointer"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
       {/* Search & Filters Section */}
       <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.08)] md:grid-cols-3 dark:border-white/10 dark:bg-slate-950">
         <div className="relative">
@@ -655,7 +676,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
             <option value="ALL">All Associations</option>
             {uniqueAssociations.map((assoc) => (
               <option key={assoc} value={assoc}>
-                {FIFA_TO_FULL_NAME[assoc] || assoc}
+                {getAssociationLabel(assoc)}
               </option>
             ))}
           </select>
@@ -728,11 +749,11 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <CountryFlag
                                   code={club.association}
-                                  name={club.association}
+                                  name={getAssociationLabel(club.association)}
                                   className="h-3 w-4.5 rounded-[1px] object-cover shadow-sm border border-slate-200/20 dark:border-white/5"
                                 />
-                                <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-                                  {FIFA_TO_FULL_NAME[club.association] || club.association || "Unknown"}
+                                <span className="text-[10px] text-muted-foreground tracking-wide font-medium">
+                                  {getAssociationLabel(club.association)}
                                 </span>
                               </div>
                             </div>
@@ -799,7 +820,7 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4 dark:border-white/10">
+              <div className="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 sm:flex-row sm:items-end sm:justify-between dark:border-white/10">
                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                   Showing <span className="font-bold text-slate-800 dark:text-slate-200">{(activePage - 1) * itemsPerPage + 1}</span> to{" "}
                   <span className="font-bold text-slate-800 dark:text-slate-200">
@@ -808,26 +829,52 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                   of <span className="font-bold text-slate-800 dark:text-slate-200">{totalClubs}</span> clubs
                 </span>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    disabled={activePage === 1}
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-white/10 dark:bg-white/[0.02] dark:text-slate-300 dark:hover:bg-white/[0.08]"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-1.5 self-end">
+                    <button
+                      disabled={activePage === 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-[0_4px_10px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:text-slate-700 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:pointer-events-none disabled:opacity-40 dark:border-white/10 dark:bg-slate-950 dark:text-slate-500 dark:hover:border-white/15 dark:hover:text-slate-200"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
 
-                  <div className="flex h-9 items-center px-3 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-white/[0.04] rounded-lg">
-                    {activePage} / {totalPages}
+                    {paginationItems.map((item, index) =>
+                      item === "dots" ? (
+                        <span
+                          key={`dots-${index}`}
+                          className="inline-flex h-8 w-6 items-center justify-center text-sm font-semibold tracking-[0.22em] text-slate-400 dark:text-slate-500"
+                        >
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={item}
+                          onClick={() => setCurrentPage(item)}
+                          className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border text-sm font-semibold transition ${
+                            item === activePage
+                              ? "border-slate-900 bg-slate-900 text-white shadow-[0_8px_18px_rgba(15,23,42,0.16)] dark:border-white dark:bg-white dark:text-slate-950"
+                              : "border-slate-200 bg-white text-slate-700 shadow-[0_4px_10px_rgba(15,23,42,0.05)] hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-white/15 dark:hover:bg-white/[0.03]"
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      )
+                    )}
+
+                    <button
+                      disabled={activePage === totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-[0_4px_10px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:text-slate-700 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:pointer-events-none disabled:opacity-40 dark:border-white/10 dark:bg-slate-950 dark:text-slate-500 dark:hover:border-white/15 dark:hover:text-slate-200"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
                   </div>
 
-                  <button
-                    disabled={activePage === totalPages}
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-white/10 dark:bg-white/[0.02] dark:text-slate-300 dark:hover:bg-white/[0.08]"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    Page <span className="font-bold text-slate-900 dark:text-white">{activePage}</span> of{" "}
+                    <span className="font-bold text-slate-900 dark:text-white">{totalPages}</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -860,11 +907,11 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <CountryFlag
                         code={selectedClub.association}
-                        name={selectedClub.association}
+                        name={getAssociationLabel(selectedClub.association)}
                         className="h-3.5 w-5 rounded-sm object-cover border border-slate-200/40 dark:border-white/5"
                       />
-                      <p className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
-                        {FIFA_TO_FULL_NAME[selectedClub.association] || selectedClub.association || "Unknown association"}
+                      <p className="text-xs font-bold tracking-wide text-cyan-600 dark:text-cyan-400">
+                        {getAssociationLabel(selectedClub.association)}
                       </p>
                     </div>
                   </div>

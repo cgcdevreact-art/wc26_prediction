@@ -10,7 +10,7 @@ npm run cron:fixtures
 
 It calls:
 
-`POST /api/admin/sync/fixtures`
+`POST /api/commissioner/sync/fixtures`
 
 using `CRON_SECRET` or `AUTH_SECRET` from your `.env*` files.
 

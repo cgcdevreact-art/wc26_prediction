@@ -385,7 +385,7 @@ export default function SavedPredictionsClient() {
         className="w-full bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-[2rem] relative shadow-[0_18px_50px_rgba(15,23,42,0.08)] mt-8"
       >
         <AccordionItem value={accordionValue} className="border-none relative overflow-hidden rounded-[2rem]">
-          <div className="absolute top-7 right-14 hidden md:flex items-center select-none pointer-events-none z-10">
+          <div className="absolute top-7 right-14 hidden lg:flex items-center select-none pointer-events-none z-10">
             <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 ring-1 ring-inset ring-slate-200 dark:ring-white/10">
               {isHypo ? "Custom / Hypothetical" : "Country Prediction"}
             </span>
@@ -394,6 +394,11 @@ export default function SavedPredictionsClient() {
             <div className="text-left">
               <div className="font-display font-extrabold text-2xl text-foreground dark:text-white tracking-tight">{title}</div>
               <div className="text-xs text-[#00c6ff] mt-1 font-bold tracking-wider uppercase">{subtitle}</div>
+              <div className="mt-3 lg:hidden">
+                <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-white/[0.04] px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 ring-1 ring-inset ring-slate-200 dark:ring-white/10">
+                  {isHypo ? "Custom / Hypothetical" : "Country Prediction"}
+                </span>
+              </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 md:px-8 pb-6 md:pb-8">
@@ -857,7 +862,7 @@ export default function SavedPredictionsClient() {
                 ) : (
                   <div className="border-t border-slate-200 dark:border-white/10 pt-6">
                     <div className="space-y-6">
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div className="flex flex-col justify-between items-start gap-4 md:flex-row md:items-center">
                         <div>
                           <h4 className="font-display font-extrabold text-base text-foreground flex items-center gap-2">
                             <TrendingUp className="w-5 h-5 text-cyan-500" />
@@ -865,19 +870,19 @@ export default function SavedPredictionsClient() {
                           </h4>
                           <p className="text-xs text-muted-foreground mt-0.5">Visualize side-by-side attributes or progression probabilities</p>
                         </div>
-                        <div className="flex bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200/50 dark:border-white/5 self-stretch sm:self-auto">
+                        <div className="flex w-full max-w-full bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200/50 dark:border-white/5 md:w-auto">
                           <button
                             onClick={subTier === "free" ? () => {
                               setUpgradeReason("plus");
                               setUpgradeOpen(true);
                             } : () => setMetricMode("progression")}
-                            className={`flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition ${metricMode === "progression" ? "bg-white dark:bg-white/10 text-cyan-600 dark:text-neon shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                            className={`flex-1 whitespace-nowrap px-3 py-2 text-xs font-bold rounded-lg transition sm:px-4 md:flex-none ${metricMode === "progression" ? "bg-white dark:bg-white/10 text-cyan-600 dark:text-neon shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                           >
                             Progression Curve
                           </button>
                           <button
                             onClick={() => setMetricMode("attributes")}
-                            className={`flex-1 sm:flex-none px-4 py-2 text-xs font-bold rounded-lg transition ${metricMode === "attributes" ? "bg-white dark:bg-white/10 text-cyan-600 dark:text-neon shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                            className={`flex-1 whitespace-nowrap px-3 py-2 text-xs font-bold rounded-lg transition sm:px-4 md:flex-none ${metricMode === "attributes" ? "bg-white dark:bg-white/10 text-cyan-600 dark:text-neon shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                           >
                             Attributes Profile
                           </button>
