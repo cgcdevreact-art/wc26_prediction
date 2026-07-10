@@ -17,7 +17,7 @@ if (!cronSecret) {
   process.exit(1);
 }
 
-const url = new URL("/api/admin/sync/fixtures", baseUrl).toString();
+const url = new URL("/api/commissioner/sync/fixtures", baseUrl).toString();
 
 try {
   const response = await fetch(url, {

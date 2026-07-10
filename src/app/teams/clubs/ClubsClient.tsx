@@ -5,7 +5,7 @@ import { Search, Trophy, Globe, Award, Users, ChevronLeft, ChevronRight, X, Spar
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { FIFA_TO_FULL_NAME } from "@/lib/team-mapping";
-import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Cell } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 
 const RAW_CLUB_NAME_ALIASES: Record<string, string[]> = {
   "Atletico De Madrid": ["Atletico Madrid"],
@@ -484,12 +484,6 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
       fullName: club.fullName,
       players: club.playersCount,
       association: getAssociationLabel(club.association),
-      fill:
-        index % 3 === 0
-          ? "#0a8a45"
-          : index % 3 === 1
-          ? "#2c7c87"
-          : "#af3fd1",
     }));
   }, [chartAssociation, chartLimit, clubs]);
 
@@ -605,10 +599,11 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartClubs} margin={{ top: 12, right: 10, left: -18, bottom: 44 }} barCategoryGap="35%">
                     <defs>
-                      <linearGradient id="clubRankingsBar" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#0a8a45" />
-                        <stop offset="50%" stopColor="#2c7c87" />
-                        <stop offset="100%" stopColor="#af3fd1" />
+                      <linearGradient id="clubRankingsBar" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#0b7f38" />
+                        <stop offset="18%" stopColor="#0b7f38" />
+                        <stop offset="58%" stopColor="#6f7b8d" />
+                        <stop offset="100%" stopColor="#ad39c8" />
                       </linearGradient>
                     </defs>
                     <CartesianGrid vertical={false} stroke="#cbd5e1" strokeDasharray="3 3" strokeOpacity={0.4} />
@@ -649,11 +644,8 @@ export default function ClubsClient({ players, flagMap }: ClubsClientProps) {
                           setSelectedClubName(data.fullName);
                         }
                       }}
-                    >
-                      {chartClubs.map((entry) => (
-                        <Cell key={entry.fullName} fill={entry.fill} className="cursor-pointer" />
-                      ))}
-                    </Bar>
+                      className="cursor-pointer"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

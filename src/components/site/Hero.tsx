@@ -192,7 +192,7 @@ export function Hero() {
           <div className="mt-8">
             <div className="mb-2 flex items-center justify-between">
               <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Countdown to Final</div>
-              <div className="text-xs text-muted-foreground">Jul 19, 2026 · New York New Jersey Stadium</div>
+              <div className="text-xs text-muted-foreground">Jul 19, 2026 · New York New, Jersey Stadium</div>
             </div>
             <Countdown />
           </div>

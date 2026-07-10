@@ -346,13 +346,13 @@ export function MatchProbabilitiesList() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
             </div>
           ) : tournamentWinnerPolls && (
-            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(240px,0.9fr)_minmax(0,1.6fr)] xl:grid-cols-[minmax(260px,0.95fr)_minmax(0,1.55fr)]">
+            <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[minmax(240px,0.9fr)_minmax(0,1.6fr)] xl:grid-cols-[minmax(260px,0.95fr)_minmax(0,1.55fr)] flex-1">
 
               {/* Left Column (span 4): Standings List & Comments */}
               <div className="flex h-full min-w-0 flex-col justify-between space-y-6">
 
                 {/* Standings List (Top teams only, sorted) */}
-                <div className="space-y-4">
+                <div className="flex-1 flex flex-col justify-between">
                   {sortedStandings.map((t) => (
                     <div key={t.code} className="flex items-center justify-between group">
                       <div className="flex items-center gap-3">
@@ -370,23 +370,24 @@ export function MatchProbabilitiesList() {
                         </span>
                         <button
                           onClick={() => handleWinnerVoteClick((t as any).id || 0, t.code)}
-                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
-                            userVotes["tournament-winner"] === t.code
+                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer group ${userVotes["tournament-winner"] === t.code
                               ? "bg-[#fffbeb] dark:bg-[#f59e0b]/10 border-2 border-[#f59e0b] text-[#d97706] dark:text-[#f59e0b]"
                               : "bg-[#f8fafc] dark:bg-[#1e2025]/50 border border-[#e2e8f0] dark:border-white/5 text-[#64748b] dark:text-slate-400 hover:bg-[#f1f5f9] hover:border-[#cbd5e1] hover:text-[#475569] dark:hover:bg-white/10 dark:hover:text-white"
-                          }`}
+                            }`}
                           title="Vote as tournament champion"
                         >
                           {userVotes["tournament-winner"] === t.code ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="4" y="4" width="16" height="16" rx="3" />
-                              <path d="M9 12l2 2 4-4" />
-                            </svg>
+                            <img
+                              src="/voting.svg"
+                              alt="Voted"
+                              className="block w-5.5 h-5.5 object-contain transition-all duration-200 scale-110 group-hover:scale-120 active:scale-95"
+                            />
                           ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="4" y="4" width="16" height="16" rx="3" />
-                              <path d="M9 12l2 2 4-4" />
-                            </svg>
+                            <img
+                              src="/voting.svg"
+                              alt="Vote"
+                              className="block w-5.5 h-5.5 object-contain opacity-55 dark:opacity-40 grayscale group-hover:opacity-100 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-200 active:scale-95"
+                            />
                           )}
                         </button>
                       </div>
@@ -397,7 +398,7 @@ export function MatchProbabilitiesList() {
               </div>
 
               {/* Right Column (span 8): Legend & Stepped Chart */}
-              <div className="relative flex min-w-0 flex-col space-y-4">
+              <div className="relative flex min-w-0 flex-col space-y-4 flex-grow">
 
                 {/* Legend & Controls Toolbar */}
                 <div className="relative flex flex-wrap items-center gap-4 border-b border-slate-100 pb-2 dark:border-white/5 xl:flex-nowrap">
@@ -497,7 +498,7 @@ export function MatchProbabilitiesList() {
                 </div>
 
                 {/* Stepped Line Chart */}
-                {renderWinnerChart("h-[240px]")}
+                {renderWinnerChart("flex-grow min-h-[240px]")}
               </div>
             </div>
           )}
@@ -507,7 +508,7 @@ export function MatchProbabilitiesList() {
         <div className="lg:col-span-5 flex h-full min-w-0 flex-col justify-start space-y-4">
           <div className="px-1 flex flex-wrap justify-between items-start gap-3">
             <div>
-              <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">
+              <h4 className="text-xs font-black text-slate-700 dark:text-slate-350 uppercase tracking-widest mb-1">
                 Active Prediction Pools
               </h4>
               <p className="text-[10px] text-muted-foreground transition-all duration-300">
@@ -548,9 +549,9 @@ export function MatchProbabilitiesList() {
               <div className="w-full py-10 text-center text-xs text-muted-foreground border border-dashed border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50/50 dark:bg-white/[0.01] flex flex-col items-center justify-center gap-3">
                 {statusFilter === "LIVE" ? (
                   <>
-                    <img 
-                      src="/lottie/Soccer_empty_state.svg" 
-                      className="w-20 h-20 opacity-75 dark:opacity-60" 
+                    <img
+                      src="/lottie/Soccer_empty_state.svg"
+                      className="w-20 h-20 opacity-75 dark:opacity-60"
                       alt="No live matches"
                     />
                     <span className="font-bold text-slate-500 dark:text-slate-450">
