@@ -123,8 +123,8 @@ export function CustomVotingCard({ poll }: CustomVotingCardProps) {
             </span>
             <span
               className={`flex items-center gap-1 ${state.status === "LIVE"
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-slate-400 dark:text-slate-500"
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-slate-400 dark:text-slate-500"
                 }`}
             >
               {state.status === "LIVE" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />}
@@ -203,7 +203,7 @@ export function CustomVotingCard({ poll }: CustomVotingCardProps) {
 
           {/* Voting Options */}
           <div
-            className={`space-y-2.5 ${hasOverflowOptions ? "max-h-[10.5rem] overflow-y-auto pr-1 scrollbar-custom" : ""}`}
+            className={`space-y-2.5 ${hasOverflowOptions ? "max-h-[10rem] overflow-y-auto pr-1 scrollbar-custom" : ""}`}
           >
             {state.options.map((option, index) => {
               const isSelected = state.userOptionId === option.id;
@@ -216,8 +216,8 @@ export function CustomVotingCard({ poll }: CustomVotingCardProps) {
                   onClick={() => handleVoteClick(option)}
                   disabled={Boolean(submittingId) || hasVoted || isLocked}
                   className={`group relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left transition-all duration-200 ${isSelected
-                      ? "border-emerald-300 bg-emerald-50 ring-1 ring-emerald-200 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:ring-emerald-500/20"
-                      : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/30 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-indigo-500/20 dark:hover:bg-indigo-500/5"
+                    ? "border-emerald-300 bg-emerald-50 ring-1 ring-emerald-200 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:ring-emerald-500/20"
+                    : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-indigo-50/30 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-indigo-500/20 dark:hover:bg-indigo-500/5"
                     } disabled:cursor-not-allowed`}
                 >
                   {/* Background fill for results */}
