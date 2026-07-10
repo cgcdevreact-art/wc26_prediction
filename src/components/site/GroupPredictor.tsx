@@ -719,7 +719,7 @@ export function GroupPredictor({
   const [confirmSimGroup, setConfirmSimGroup] = useState<string | null>(null);
   const [deleteGroupTarget, setDeleteGroupTarget] = useState<string | null>(null);
   const [resetTarget, setResetTarget] = useState<"all" | "knockouts" | null>(null);
-  const [simScope, setSimScope] = useState<"whole" | "r32">("whole");
+  const [simScope, setSimScope] = useState<"whole" | "r32" | "r16" | "qf" | "sf" | "final">("whole");
   const [simModelDropdownOpen, setSimModelDropdownOpen] = useState(false);
 
   const handleConfirmSimulation = () => {
@@ -727,7 +727,7 @@ export function GroupPredictor({
       if (simScope === "whole") {
         handleWholeTournamentSimulationWithCredits();
       } else {
-        handleAiPredictKnockoutsWithCredits(true);
+        handleSimulateRoundWithCredits(simScope);
       }
     } else if (confirmSimType === "group" && confirmSimGroup) {
       predictGroup(confirmSimGroup);
@@ -811,6 +811,13 @@ export function GroupPredictor({
     const allowed = await consumeCredit();
     if (allowed) {
       handleAiPredictKnockouts(forceOverwrite);
+    }
+  };
+
+  const handleSimulateRoundWithCredits = async (round: "r32" | "r16" | "qf" | "sf" | "final") => {
+    const allowed = await consumeCredit();
+    if (allowed) {
+      handleSimulateRound(round);
     }
   };
 
@@ -3430,60 +3437,142 @@ export function GroupPredictor({
   };
 
 
-  const handleSimulateRound = (round: "r32" | "r16" | "qf" | "sf" | "final") => {
+  const handleSimulateRound = (startRound: "r32" | "r16" | "qf" | "sf" | "final") => {
     const updatedWinners = { ...koWinners };
     const updatedScores = { ...koScores };
     let simulatedThirdWinner = thirdWinner;
     let simulatedThirdScores = { ...thirdScores };
 
-    const matchups = koMatchups[round];
-    matchups.forEach((m, idx) => {
-      if (!m.home || !m.away) return;
-      const { hs, as, winner } = simulateKoMatch(m.home, m.away);
-      updatedWinners[round][idx] = winner;
-      updatedScores[`${round}-${idx}`] = { home: hs, away: as };
-    });
+    const getResolvedWinner = (rName: "r32" | "r16" | "qf" | "sf", mIdx: number, home: string | null, away: string | null) => {
+      if (!home || !away) return null;
+      if (useRealScores) {
+        const realMatch = getLiveFixtureForTeams(home, away);
+        if (realMatch) {
+          const isCompleted = realMatch.status === "COMPLETED" || realMatch.status === "LIVE";
+          const hasRealScore = isCompleted && realMatch.homeScore !== "-" && realMatch.awayScore !== "-";
+          if (hasRealScore) {
+            const hScore = Number(realMatch.homeScore);
+            const aScore = Number(realMatch.awayScore);
+            const apiHomeCode = (realMatch.homeTeamObj?.code || "").toUpperCase().trim();
+            const isSwapped = apiHomeCode !== home.toUpperCase().trim();
+            const actualHomeScore = isSwapped ? aScore : hScore;
+            const actualAwayScore = isSwapped ? hScore : aScore;
+            if (actualHomeScore > actualAwayScore) return home;
+            if (actualAwayScore > actualHomeScore) return away;
+            const stages = ["Round of 32", "Round of 16", "Quarter-Finals", "Semi-Finals", "Final"];
+            const currentStageIndex = stages.indexOf(realMatch.stageName);
+            if (currentStageIndex >= 0) {
+              const homeCode = home.toUpperCase().trim();
+              const awayCode = away.toUpperCase().trim();
+              for (const f of apiFixtures) {
+                const fStageIndex = stages.indexOf(f.stageName);
+                if (fStageIndex > currentStageIndex && f.isKnockout) {
+                  const fHome = (f.homeTeamObj?.code || "").toUpperCase().trim();
+                  const fAway = (f.awayTeamObj?.code || "").toUpperCase().trim();
+                  if (fHome === homeCode || fAway === homeCode) return home;
+                  if (fHome === awayCode || fAway === awayCode) return away;
+                }
+              }
+            }
+            return home;
+          }
+        }
+      }
+      return updatedWinners[rName]?.[mIdx] ?? null;
+    };
 
-    // Reset subsequent rounds
-    if (round === "r32") {
-      updatedWinners.r16 = Array(8).fill(null);
-      updatedWinners.qf = Array(4).fill(null);
-      updatedWinners.sf = Array(2).fill(null);
-      updatedWinners.final = [null];
-      simulatedThirdWinner = null;
-      simulatedThirdScores = { home: "", away: "" };
-    } else if (round === "r16") {
-      updatedWinners.qf = Array(4).fill(null);
-      updatedWinners.sf = Array(2).fill(null);
-      updatedWinners.final = [null];
-      simulatedThirdWinner = null;
-      simulatedThirdScores = { home: "", away: "" };
-    } else if (round === "qf") {
-      updatedWinners.sf = Array(2).fill(null);
-      updatedWinners.final = [null];
-      simulatedThirdWinner = null;
-      simulatedThirdScores = { home: "", away: "" };
-    } else if (round === "sf") {
-      updatedWinners.final = [null];
-      simulatedThirdWinner = null;
-      simulatedThirdScores = { home: "", away: "" };
-    } else if (round === "final") {
-      // Simulate 3rd place match as well if semi-final losers are available
-      const homeMatch = koMatchups.sf[0];
-      const awayMatch = koMatchups.sf[1];
-      const homeWinner = updatedWinners.sf[0];
-      const awayWinner = updatedWinners.sf[1];
+    // 1. R32 Matchups simulation
+    const r32Matchups = r32Teams.map((pair) => ({
+      home: pair?.home ?? null,
+      away: pair?.away ?? null,
+    }));
+    if (startRound === "r32") {
+      r32Matchups.forEach((m, idx) => {
+        if (!m.home || !m.away) return;
+        const { hs, as, winner } = simulateKoMatch(m.home, m.away);
+        updatedWinners.r32[idx] = winner;
+        updatedScores[`r32-${idx}`] = { home: hs, away: as };
+      });
+    }
 
+    // 2. R16 Matchups simulation
+    const r16Matchups = [];
+    for (let i = 0; i < 8; i++) {
+      const parentHome = r32Matchups[2 * i];
+      const parentAway = r32Matchups[2 * i + 1];
+      const homeWinner = getResolvedWinner("r32", 2 * i, parentHome.home, parentHome.away);
+      const awayWinner = getResolvedWinner("r32", 2 * i + 1, parentAway.home, parentAway.away);
+      r16Matchups.push({ home: homeWinner, away: awayWinner });
+    }
+    if (startRound === "r32" || startRound === "r16") {
+      r16Matchups.forEach((m, idx) => {
+        if (!m.home || !m.away) return;
+        const { hs, as, winner } = simulateKoMatch(m.home, m.away);
+        updatedWinners.r16[idx] = winner;
+        updatedScores[`r16-${idx}`] = { home: hs, away: as };
+      });
+    }
+
+    // 3. QF Matchups simulation
+    const qfMatchups = [];
+    for (let i = 0; i < 4; i++) {
+      const parentHome = r16Matchups[2 * i];
+      const parentAway = r16Matchups[2 * i + 1];
+      const homeWinner = getResolvedWinner("r16", 2 * i, parentHome.home, parentHome.away);
+      const awayWinner = getResolvedWinner("r16", 2 * i + 1, parentAway.home, parentAway.away);
+      qfMatchups.push({ home: homeWinner, away: awayWinner });
+    }
+    if (startRound === "r32" || startRound === "r16" || startRound === "qf") {
+      qfMatchups.forEach((m, idx) => {
+        if (!m.home || !m.away) return;
+        const { hs, as, winner } = simulateKoMatch(m.home, m.away);
+        updatedWinners.qf[idx] = winner;
+        updatedScores[`qf-${idx}`] = { home: hs, away: as };
+      });
+    }
+
+    // 4. SF Matchups simulation
+    const sfMatchups = [];
+    for (let i = 0; i < 2; i++) {
+      const parentHome = qfMatchups[2 * i];
+      const parentAway = qfMatchups[2 * i + 1];
+      const homeWinner = getResolvedWinner("qf", 2 * i, parentHome.home, parentHome.away);
+      const awayWinner = getResolvedWinner("qf", 2 * i + 1, parentAway.home, parentAway.away);
+      sfMatchups.push({ home: homeWinner, away: awayWinner });
+    }
+    if (startRound === "r32" || startRound === "r16" || startRound === "qf" || startRound === "sf") {
+      sfMatchups.forEach((m, idx) => {
+        if (!m.home || !m.away) return;
+        const { hs, as, winner } = simulateKoMatch(m.home, m.away);
+        updatedWinners.sf[idx] = winner;
+        updatedScores[`sf-${idx}`] = { home: hs, away: as };
+      });
+    }
+
+    // 5. Final & Third Place Matchups simulation
+    const parentHome = sfMatchups[0];
+    const parentAway = sfMatchups[1];
+    const homeWinner = getResolvedWinner("sf", 0, parentHome.home, parentHome.away);
+    const awayWinner = getResolvedWinner("sf", 1, parentAway.home, parentAway.away);
+    const finalMatchups = [{ home: homeWinner, away: awayWinner }];
+
+    if (startRound === "r32" || startRound === "r16" || startRound === "qf" || startRound === "sf" || startRound === "final") {
+      finalMatchups.forEach((m, idx) => {
+        if (!m.home || !m.away) return;
+        const { hs, as, winner } = simulateKoMatch(m.home, m.away);
+        updatedWinners.final[idx] = winner;
+        updatedScores[`final-${idx}`] = { home: hs, away: as };
+      });
+
+      // Simulate Third place match
       let homeLoser: string | null = null;
       let awayLoser: string | null = null;
-
-      if (homeMatch.home && homeMatch.away && homeWinner) {
-        homeLoser = homeWinner === homeMatch.home ? homeMatch.away : homeMatch.home;
+      if (parentHome.home && parentHome.away && homeWinner) {
+        homeLoser = homeWinner === parentHome.home ? parentHome.away : parentHome.home;
       }
-      if (awayMatch.home && awayMatch.away && awayWinner) {
-        awayLoser = awayWinner === awayMatch.home ? awayMatch.away : awayMatch.home;
+      if (parentAway.home && parentAway.away && awayWinner) {
+        awayLoser = awayWinner === parentAway.home ? parentAway.away : parentAway.home;
       }
-
       if (homeLoser && awayLoser) {
         const { hs, as, winner } = simulateKoMatch(homeLoser, awayLoser);
         simulatedThirdWinner = winner;
@@ -3496,6 +3585,14 @@ export function GroupPredictor({
     setKoScores(updatedScores);
     setKoWinners(updatedWinners);
     saveBulkToDb(matches, updatedWinners, updatedScores, simulatedThirdWinner, simulatedThirdScores);
+  };
+
+  const isRoundComplete = (round: "r32" | "r16" | "qf" | "sf") => {
+    const matchups = koMatchups[round];
+    if (!matchups || matchups.length === 0) return false;
+    return matchups.every((m, idx) => {
+      return getKoMatchWinnerAndScore(round, idx, m.home, m.away).winnerCode !== null;
+    });
   };
 
   // AI Predict knockouts
@@ -5850,11 +5947,11 @@ export function GroupPredictor({
                 {confirmSimType === "all" ? (
                   <>
                     <p className="mb-3">Choose the simulation scope. This will use your model configuration to predict scores.</p>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-3">
                       <button
                         type="button"
                         onClick={() => setSimScope("whole")}
-                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${simScope === "whole"
+                        className={`w-full p-3 rounded-xl border-2 text-left transition cursor-pointer ${simScope === "whole"
                           ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
                           : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
                           }`}
@@ -5869,24 +5966,36 @@ export function GroupPredictor({
                           Simulate all 48 group matches + knockout bracket through the Final
                         </p>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setSimScope("r32")}
-                        className={`p-3 rounded-xl border-2 text-left transition cursor-pointer ${simScope === "r32"
-                          ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
-                          : "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
-                          }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <Sparkles className={`h-4 w-4 ${simScope === "r32" ? "text-cyan-500" : "text-slate-400"}`} />
-                          <span className={`font-bold text-xs uppercase tracking-wider ${simScope === "r32" ? "text-cyan-600 dark:text-cyan-400" : "text-slate-600 dark:text-slate-300"}`}>
-                            Round of 32
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
-                          Simulate knockout bracket starting from Round of 32 through the Final
-                        </p>
-                      </button>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { id: "r32", name: "Round of 32", disabled: false },
+                          { id: "r16", name: "Round of 16", disabled: !isRoundComplete("r32") },
+                          { id: "qf", name: "Quarterfinals", disabled: !isRoundComplete("r16") },
+                          { id: "sf", name: "Semifinals", disabled: !isRoundComplete("qf") },
+                          { id: "final", name: "Final", disabled: !isRoundComplete("sf") }
+                        ].map((round) => (
+                          <button
+                            key={round.id}
+                            type="button"
+                            disabled={round.disabled}
+                            onClick={() => setSimScope(round.id as any)}
+                            className={`p-3 rounded-xl border-2 text-left transition ${round.disabled ? "opacity-50 cursor-not-allowed border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-900/50" : "cursor-pointer"} ${!round.disabled && simScope === round.id
+                              ? "border-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/5 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+                              : !round.disabled ? "border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20" : ""
+                              }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <Sparkles className={`h-4 w-4 ${simScope === round.id ? "text-cyan-500" : "text-slate-400"}`} />
+                              <span className={`font-bold text-[11px] uppercase tracking-wider ${simScope === round.id ? "text-cyan-600 dark:text-cyan-400" : "text-slate-600 dark:text-slate-300"}`}>
+                                {round.name}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight">
+                              {round.disabled ? "Previous round incomplete" : `Simulate matches in the ${round.name}`}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </>
                 ) : (

@@ -73,7 +73,9 @@ export default async function RootLayout({
           }}
         />
 
-        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4746258958164249" crossOrigin="anonymous"></script>
+        {process.env.NEXT_PUBLIC_APP_ENV === "production" && (
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4746258958164249" crossOrigin="anonymous"></script>
+        )}
       </head>
       <body className={`${inter.variable} ${spaceGrotesk.variable} min-h-full flex flex-col`} suppressHydrationWarning>
         <SessionProvider session={session}>

@@ -36,10 +36,10 @@ export function CommissionerSidebar() {
         </div>
         <div className="leading-tight">
           <div className="text-sm font-bold tracking-wide text-slate-900">
-            26WC PREDICTION <span className="bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">COMMISSIONER</span>
+            2026WC PREDICTION <span className="bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent"></span>
           </div>
           <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">
-            Control Panel
+            Admin Panel
           </div>
         </div>
       </div>

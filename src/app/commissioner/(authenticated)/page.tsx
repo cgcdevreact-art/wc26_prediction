@@ -6,7 +6,7 @@ export default function CommissionerDashboard() {
     <>
       <CommissionerHeader
         title="Dashboard"
-        description="Overview of 26WC Prediction"
+        description="Overview of 2026WC Prediction"
       />
       <DashboardContent />
     </>
