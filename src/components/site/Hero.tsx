@@ -299,7 +299,7 @@ export function Hero() {
           <Carousel setApi={setCarouselApi} className="w-full" opts={{ align: "start", loop: false }}>
             <CarouselContent className="-ml-3">
               {todayMatches.map((match) => (
-                <CarouselItem key={match.match_no} className="pl-3 basis-[85%] sm:basis-[48%] md:basis-[32%] lg:basis-[24%]">
+                <CarouselItem key={match.match_no} className="pl-3 basis-[85%] sm:basis-[48%] lg:basis-[32%] xl:basis-[24%]">
                   <HeroMatchCard
                     match={match}
                     onClick={handleMatchCardClick}
