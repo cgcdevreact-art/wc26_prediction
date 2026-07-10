@@ -12,7 +12,8 @@ import {
   AreaChart,
   Area,
   BarChart,
-  Bar
+  Bar,
+  Cell
 } from "recharts";
 
 interface ChartData {
@@ -23,18 +24,47 @@ interface ChartData {
   predictions: number;
 }
 
+interface PlanData {
+  name: string;
+  count: number;
+}
+
+interface RevenueData {
+  name: string;
+  revenue: number;
+}
+
+const PLAN_COLORS: Record<string, string> = {
+  Free: "#94a3b8",      // Slate 400
+  Advanced: "#3b82f6",  // Blue 500
+  Expert: "#a855f7"     // Purple 500
+};
+
 export function DashboardCharts({
   dataDays,
   dataMonths,
-  dataYears
+  dataYears,
+  planDistribution
 }: {
   dataDays: ChartData[];
   dataMonths: ChartData[];
   dataYears: ChartData[];
+  planDistribution?: {
+    userPlansData: PlanData[];
+    userRevenueData: RevenueData[];
+  };
 }) {
   const [filter, setFilter] = useState("days");
 
   const data = filter === "days" ? dataDays : filter === "months" ? dataMonths : dataYears;
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+    }).format(value);
+  };
 
   return (
     <div className="mt-8">
@@ -52,12 +82,70 @@ export function DashboardCharts({
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* User Plans Distribution Chart */}
+        {planDistribution?.userPlansData && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">Users by Subscription Plan</h3>
+            <div className="h-[250px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={planDistribution.userPlansData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    itemStyle={{ fontWeight: 'bold' }}
+                  />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={40} minPointSize={8}>
+                    {planDistribution.userPlansData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={PLAN_COLORS[entry.name] || "#6366f1"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Monthly Revenue Chart */}
+        {planDistribution?.userRevenueData && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">Monthly Revenue by Plan</h3>
+            <div className="h-[250px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={planDistribution.userRevenueData} margin={{ top: 10, right: 10, left: 15, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
+                  <YAxis 
+                    tick={{ fontSize: 12, fill: "#64748b" }} 
+                    axisLine={false} 
+                    tickLine={false}
+                    tickFormatter={(value) => `$${value}`}
+                  />
+                  <Tooltip
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    itemStyle={{ fontWeight: 'bold' }}
+                    formatter={(value: any) => [formatCurrency(Number(value)), "Revenue"]}
+                  />
+                  <Bar dataKey="revenue" radius={[4, 4, 0, 0]} barSize={40} minPointSize={8}>
+                    {planDistribution.userRevenueData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={PLAN_COLORS[entry.name] || "#6366f1"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
         {/* Users Growth Chart */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-800 mb-4">Total Users</h3>
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
@@ -82,7 +170,7 @@ export function DashboardCharts({
           <h3 className="text-sm font-semibold text-slate-800 mb-4">Total Predictions</h3>
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorPreds" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -107,7 +195,7 @@ export function DashboardCharts({
           <h3 className="text-sm font-semibold text-slate-800 mb-4">Total Matches</h3>
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
@@ -126,7 +214,7 @@ export function DashboardCharts({
           <h3 className="text-sm font-semibold text-slate-800 mb-4">Paid Subscribers</h3>
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <LineChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />

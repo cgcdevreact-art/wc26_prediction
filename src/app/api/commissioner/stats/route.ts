@@ -5,8 +5,7 @@ export async function GET() {
   try {
     const now = new Date();
     
-    // Overview Stats
-    const [totalUsers, totalMatches, totalPredictions, paidSubscribers, recentUsers] = await Promise.all([
+    const [totalUsers, totalMatches, totalPredictions, paidSubscribers, recentUsers, freeUsers, plusUsers, proUsers] = await Promise.all([
       prisma.user.count(),
       prisma.match.count(),
       prisma.prediction.count(),
@@ -21,7 +20,10 @@ export async function GET() {
           role: true,
           createdAt: true
         }
-      })
+      }),
+      prisma.user.count({ where: { subscriptionTier: "free" } }),
+      prisma.user.count({ where: { subscriptionTier: "plus" } }),
+      prisma.user.count({ where: { subscriptionTier: "pro" } }),
     ]);
 
     // Calculate changes (this week vs total)
@@ -100,6 +102,18 @@ export async function GET() {
       });
     }
 
+    const userPlansData = [
+      { name: "Free", count: freeUsers },
+      { name: "Advanced", count: plusUsers },
+      { name: "Expert", count: proUsers },
+    ];
+
+    const userRevenueData = [
+      { name: "Free", revenue: 0 },
+      { name: "Advanced", revenue: plusUsers * 30.0 },
+      { name: "Expert", revenue: proUsers * 233.10 },
+    ];
+
     return NextResponse.json({
       overview: {
         totalUsers, newUsers,
@@ -110,6 +124,10 @@ export async function GET() {
       },
       charts: {
         dataDays, dataMonths, dataYears
+      },
+      planDistribution: {
+        userPlansData,
+        userRevenueData
       }
     });
 

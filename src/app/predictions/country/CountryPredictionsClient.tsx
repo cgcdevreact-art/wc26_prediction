@@ -168,6 +168,7 @@ export default function CountryPredictionsClient({
   const [useRealScores, setUseRealScores] = useState(true);
   const [liveFixtures, setLiveFixtures] = useState<any[]>([]);
   const [isOverridesModalOpen, setIsOverridesModalOpen] = useState(false);
+  const [simLabOpen, setSimLabOpen] = useState(true);
   const [staticDefaultPlayers, setStaticDefaultPlayers] = useState<Record<string, any>>({});
   const [staticDefaultTeams, setStaticDefaultTeams] = useState<any[]>([]);
 
@@ -2242,9 +2243,9 @@ export default function CountryPredictionsClient({
         </div>
       </div>
 
-      <div className="mb-6 grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="mb-6 grid items-stretch gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         {/* Left Column: Stacked Sidebar */}
-        <div className="space-y-6 shrink-0 xl:w-[320px]">
+        <div className="space-y-6 shrink-0 xl:w-[320px] flex flex-col">
           {/* Left list of countries: Futuristic Sidebar Control */}
           <Accordion
             type="multiple"
@@ -2359,10 +2360,12 @@ export default function CountryPredictionsClient({
           <Accordion
             id="country-simulation-lab"
             type="multiple"
-            className="rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] relative dark:border-white/10 dark:bg-slate-900"
+            value={simLabOpen ? ["simulation-lab"] : []}
+            onValueChange={(val) => setSimLabOpen(val.includes("simulation-lab"))}
+            className={`rounded-[2rem] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)] relative dark:border-white/10 dark:bg-slate-900 flex flex-col transition-all duration-300 ${simLabOpen ? "flex-1" : "flex-initial"}`}
           >
-            <AccordionItem value="simulation-lab" className="border-none">
-              <AccordionTrigger className="px-5 pt-5 pb-3 hover:no-underline">
+            <AccordionItem value="simulation-lab" className={`border-none flex flex-col transition-all duration-300 ${simLabOpen ? "flex-1" : "flex-initial"}`}>
+              <AccordionTrigger className="px-5 pt-5 pb-3 hover:no-underline shrink-0">
                 <div className="flex items-center justify-between w-full pr-4">
                   <div>
                     <div className="font-display font-bold text-base text-foreground">Simulation Lab</div>
@@ -2378,8 +2381,8 @@ export default function CountryPredictionsClient({
                   </span>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-5 pb-5">
-                <div className="space-y-4">
+              <AccordionContent className="px-5 pb-5 flex-1 flex flex-col [&>div]:flex [&>div]:flex-col [&>div]:flex-1 [&>div]:justify-between">
+                <div className="space-y-4 flex flex-col flex-1 justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-white/5">
                       <span className="text-xs font-semibold text-slate-700 dark:text-white/70 flex items-center">

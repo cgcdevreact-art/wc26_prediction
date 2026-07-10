@@ -88,6 +88,7 @@ export function DashboardContent() {
         dataDays={charts.dataDays} 
         dataMonths={charts.dataMonths} 
         dataYears={charts.dataYears} 
+        planDistribution={data.planDistribution}
       />
 
       {/* Content Blocks */}
