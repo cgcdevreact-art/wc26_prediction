@@ -376,14 +376,16 @@ export function VotingCard({ fixture }: VotingCardProps) {
               </div>
             )}
 
-            <VotePercentage
-              homeProb={stats.homeProb}
-              awayProb={stats.awayProb}
-              homeCode={fixture.homeTeamObj.code}
-              awayCode={fixture.awayTeamObj.code}
-              isAuthenticated={!!session}
-              hasVoted={!!userVote}
-            />
+            {!userVote && (
+              <VotePercentage
+                homeProb={stats.homeProb}
+                awayProb={stats.awayProb}
+                homeCode={fixture.homeTeamObj.code}
+                awayCode={fixture.awayTeamObj.code}
+                isAuthenticated={!!session}
+                hasVoted={!!userVote}
+              />
+            )}
             <div className={`text-[9px] font-bold text-slate-400 uppercase text-center transition-opacity duration-300 ${!userVote ? "opacity-45" : ""}`}>
               {userVote ? `${stats.totalVotes} Votes Cast` : "- Votes Cast"}
             </div>

@@ -108,6 +108,42 @@ export default function TeamsClient({
   } | null>(null);
   const [isSavingStats, setIsSavingStats] = useState(false);
 
+  const [activeTab, setActiveTab] = useState("list");
+  const [isTabTransitioning, setIsTabTransitioning] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(53);
+
+  useEffect(() => {
+    const headerEl = document.querySelector("header");
+    if (headerEl) {
+      setHeaderHeight(headerEl.offsetHeight);
+      const resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setHeaderHeight(entry.target.clientHeight);
+        }
+      });
+      resizeObserver.observe(headerEl);
+      return () => resizeObserver.disconnect();
+    }
+  }, []);
+
+  const handleTabChange = (val: string) => {
+    if (val === activeTab) return;
+    setIsTabTransitioning(false);
+    setTimeout(() => {
+      setActiveTab(val);
+      setIsTabTransitioning(true);
+    }, 10);
+  };
+
+  useEffect(() => {
+    if (isTabTransitioning) {
+      const timer = setTimeout(() => {
+        setIsTabTransitioning(false);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isTabTransitioning]);
+
   const getTeamGroup = (teamCode: string) => {
     for (const [group, codes] of Object.entries(groupsConfig)) {
       if (codes.includes(teamCode)) return group;
@@ -347,6 +383,27 @@ export default function TeamsClient({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {isTabTransitioning && (
+        <div 
+          className="fixed left-0 right-0 z-50 h-[3px] overflow-hidden bg-white/10 dark:bg-black/20"
+          style={{ top: `${headerHeight}px` }}
+        >
+          <div 
+            className="h-full bg-gradient-to-r from-[#0a8a45] via-[#2c7c87] to-[#af3fd1] rounded-r-full"
+            style={{
+              animation: "tabProgress 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards"
+            }}
+          />
+          <style>{`
+            @keyframes tabProgress {
+              0% { width: 0%; opacity: 1; }
+              50% { width: 70%; opacity: 1; }
+              80% { width: 100%; opacity: 1; }
+              100% { width: 100%; opacity: 0; }
+            }
+          `}</style>
+        </div>
+      )}
       {/* Plan Capabilities Accordion */}
       <div className="rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-[0_20px_50px_rgba(15,23,42,0.06)] backdrop-blur-md dark:border-white/5 dark:bg-slate-900/60 overflow-hidden mb-8 animate-in fade-in duration-500">
         <button
@@ -713,7 +770,7 @@ export default function TeamsClient({
         )}
       </div>
 
-      <Tabs defaultValue="list" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <TabsList className="h-auto flex w-full md:w-auto overflow-x-auto scrollbar-none whitespace-nowrap justify-start rounded-[1.5rem] border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
             <TabsTrigger
