@@ -15,8 +15,8 @@ const QF = [
 
 export function BracketPreview() {
   const sf = [
-    [QF[0][0], QF[1][0]],
-    [QF[2][0], QF[3][0]],
+    [QF[0][0], QF[2][0]],
+    [QF[1][0], QF[3][0]],
   ] as const;
   const finalists = [sf[0][0], sf[1][0]];
   const champ = "ARG";
