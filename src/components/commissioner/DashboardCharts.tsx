@@ -50,13 +50,32 @@ export function DashboardCharts({
   dataMonths: ChartData[];
   dataYears: ChartData[];
   planDistribution?: {
-    userPlansData: PlanData[];
-    userRevenueData: RevenueData[];
+    days?: {
+      userPlansData: PlanData[];
+      userRevenueData: RevenueData[];
+    };
+    months?: {
+      userPlansData: PlanData[];
+      userRevenueData: RevenueData[];
+    };
+    years?: {
+      userPlansData: PlanData[];
+      userRevenueData: RevenueData[];
+    };
+    userPlansData?: PlanData[];
+    userRevenueData?: RevenueData[];
   };
 }) {
   const [filter, setFilter] = useState("days");
 
   const data = filter === "days" ? dataDays : filter === "months" ? dataMonths : dataYears;
+
+  const currentPlanDistribution = planDistribution
+    ? (planDistribution[filter as "days" | "months" | "years"] || {
+        userPlansData: planDistribution.userPlansData || [],
+        userRevenueData: planDistribution.userRevenueData || [],
+      })
+    : null;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -83,12 +102,12 @@ export function DashboardCharts({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* User Plans Distribution Chart */}
-        {planDistribution?.userPlansData && (
+        {currentPlanDistribution?.userPlansData && (
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h3 className="text-sm font-semibold text-slate-800 mb-4">Users by Subscription Plan</h3>
             <div className="h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={planDistribution.userPlansData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <BarChart data={currentPlanDistribution.userPlansData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
@@ -98,7 +117,7 @@ export function DashboardCharts({
                     itemStyle={{ fontWeight: 'bold' }}
                   />
                   <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={40} minPointSize={8}>
-                    {planDistribution.userPlansData.map((entry, index) => (
+                    {currentPlanDistribution.userPlansData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={PLAN_COLORS[entry.name] || "#6366f1"} />
                     ))}
                   </Bar>
@@ -109,12 +128,12 @@ export function DashboardCharts({
         )}
 
         {/* Monthly Revenue Chart */}
-        {planDistribution?.userRevenueData && (
+        {currentPlanDistribution?.userRevenueData && (
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h3 className="text-sm font-semibold text-slate-800 mb-4">Monthly Revenue by Plan</h3>
             <div className="h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={planDistribution.userRevenueData} margin={{ top: 10, right: 10, left: 15, bottom: 0 }}>
+                <BarChart data={currentPlanDistribution.userRevenueData} margin={{ top: 10, right: 10, left: 15, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
                   <YAxis 
@@ -130,7 +149,7 @@ export function DashboardCharts({
                     formatter={(value: any) => [formatCurrency(Number(value)), "Revenue"]}
                   />
                   <Bar dataKey="revenue" radius={[4, 4, 0, 0]} barSize={40} minPointSize={8}>
-                    {planDistribution.userRevenueData.map((entry, index) => (
+                    {currentPlanDistribution.userRevenueData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={PLAN_COLORS[entry.name] || "#6366f1"} />
                     ))}
                   </Bar>

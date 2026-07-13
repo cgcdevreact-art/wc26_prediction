@@ -447,6 +447,7 @@ export default function CountryPredictionsClient({
   const handleLoadPrediction = (prediction: any, isShared: boolean = false) => {
     try {
       ignoreResetRef.current = true;
+      loadedFromPredictionRef.current = true;
       const data = readPredictionPayload<any>(prediction.predictedPayload, prediction.predictedWinner);
 
       if (!data) {
@@ -993,6 +994,7 @@ export default function CountryPredictionsClient({
 
   const isSnapshotRestoredRef = useRef<boolean>(false);
   const lastOverrideStateRef = useRef<{ isOverrideDisabled: boolean; isCustom: boolean; selectedCode: string } | null>(null);
+  const loadedFromPredictionRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!selectedTeam || !isInitialized) return;
@@ -1002,7 +1004,8 @@ export default function CountryPredictionsClient({
     const isOverrideDisabled = storeTeam?.isOverrideDisabled ?? false;
     const isCustom = storeTeam?.isCustom ?? false;
 
-    if (ignoreResetRef.current) {
+    if (ignoreResetRef.current || loadedFromPredictionRef.current) {
+      loadedFromPredictionRef.current = false;
       lastOverrideStateRef.current = { isOverrideDisabled, isCustom, selectedCode };
       return;
     }
@@ -1104,6 +1107,7 @@ export default function CountryPredictionsClient({
       }
 
       ignoreResetRef.current = true;
+      loadedFromPredictionRef.current = true;
       hasSeenSelectionChange.current = false;
       isSnapshotRestoredRef.current = true;
       setSelectedCode(snapshot.selectedCode);
