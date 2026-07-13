@@ -1657,9 +1657,12 @@ export default function CountryPredictionsClient({
 
                 // Simulate SF
                 const finalTeams: string[] = [];
+                const sfMatchPairs = [
+                  { home: sfTeams[0], away: sfTeams[2] },
+                  { home: sfTeams[1], away: sfTeams[3] }
+                ];
                 for (let i = 0; i < 2; i++) {
-                  const home = sfTeams[2 * i];
-                  const away = sfTeams[2 * i + 1];
+                  const { home, away } = sfMatchPairs[i];
                   if (!home || !away || home === away) {
                     continue iterationLoop;
                   }

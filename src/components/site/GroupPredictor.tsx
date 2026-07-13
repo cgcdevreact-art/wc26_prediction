@@ -2428,13 +2428,19 @@ export function GroupPredictor({
       const wa = evaluateMatch("r16", 2 * i + 1, fa.home, fa.away).winnerCode;
       resolvedMatchups.qf.push({ home: wh, away: wa });
     }
-    for (let i = 0; i < 2; i++) {
-      const fh = resolvedMatchups.qf[2 * i];
-      const fa = resolvedMatchups.qf[2 * i + 1];
-      const wh = evaluateMatch("qf", 2 * i, fh.home, fh.away).winnerCode;
-      const wa = evaluateMatch("qf", 2 * i + 1, fa.home, fa.away).winnerCode;
-      resolvedMatchups.sf.push({ home: wh, away: wa });
-    }
+    const qf0_res = resolvedMatchups.qf[0];
+    const qf1_res = resolvedMatchups.qf[1];
+    const qf2_res = resolvedMatchups.qf[2];
+    const qf3_res = resolvedMatchups.qf[3];
+
+    resolvedMatchups.sf.push({
+      home: evaluateMatch("qf", 0, qf0_res.home, qf0_res.away).winnerCode,
+      away: evaluateMatch("qf", 2, qf2_res.home, qf2_res.away).winnerCode,
+    });
+    resolvedMatchups.sf.push({
+      home: evaluateMatch("qf", 1, qf1_res.home, qf1_res.away).winnerCode,
+      away: evaluateMatch("qf", 3, qf3_res.home, qf3_res.away).winnerCode,
+    });
     const sf0 = resolvedMatchups.sf[0];
     const sf1 = resolvedMatchups.sf[1];
     const w_sf0 = evaluateMatch("sf", 0, sf0.home, sf0.away).winnerCode;
@@ -2716,17 +2722,19 @@ export function GroupPredictor({
     }
 
     // SF: Propagate resolved winners from QF
-    for (let i = 0; i < 2; i++) {
-      const feederHome = matchups.qf[2 * i];
-      const feederAway = matchups.qf[2 * i + 1];
-      const winnerHome = getKoMatchWinnerAndScore("qf", 2 * i, feederHome.home, feederHome.away).winnerCode;
-      const winnerAway = getKoMatchWinnerAndScore("qf", 2 * i + 1, feederAway.home, feederAway.away).winnerCode;
+    const qf0_prop = matchups.qf[0];
+    const qf1_prop = matchups.qf[1];
+    const qf2_prop = matchups.qf[2];
+    const qf3_prop = matchups.qf[3];
 
-      matchups.sf.push({
-        home: winnerHome,
-        away: winnerAway
-      });
-    }
+    matchups.sf.push({
+      home: getKoMatchWinnerAndScore("qf", 0, qf0_prop.home, qf0_prop.away).winnerCode,
+      away: getKoMatchWinnerAndScore("qf", 2, qf2_prop.home, qf2_prop.away).winnerCode
+    });
+    matchups.sf.push({
+      home: getKoMatchWinnerAndScore("qf", 1, qf1_prop.home, qf1_prop.away).winnerCode,
+      away: getKoMatchWinnerAndScore("qf", 3, qf3_prop.home, qf3_prop.away).winnerCode
+    });
 
     // Final: Propagate resolved winners from SF
     const feederHome = matchups.sf[0];
@@ -3313,9 +3321,12 @@ export function GroupPredictor({
     }
 
     // SF
+    const sfPairs = [
+      { home: updatedWinners.qf[0], away: updatedWinners.qf[2] },
+      { home: updatedWinners.qf[1], away: updatedWinners.qf[3] }
+    ];
     for (let idx = 0; idx < 2; idx++) {
-      const home = updatedWinners.qf[2 * idx];
-      const away = updatedWinners.qf[2 * idx + 1];
+      const { home, away } = sfPairs[idx];
       if (!home || !away) continue;
       const { hs, as, winner } = simulateKoMatch(home, away);
       updatedWinners.sf[idx] = winner;
@@ -3332,8 +3343,8 @@ export function GroupPredictor({
     }
 
     // 3rd Place Match
-    const homeMatch = { home: updatedWinners.qf[0], away: updatedWinners.qf[1] };
-    const awayMatch = { home: updatedWinners.qf[2], away: updatedWinners.qf[3] };
+    const homeMatch = { home: updatedWinners.qf[0], away: updatedWinners.qf[2] };
+    const awayMatch = { home: updatedWinners.qf[1], away: updatedWinners.qf[3] };
     const homeWinner = updatedWinners.sf[0];
     const awayWinner = updatedWinners.sf[1];
 
@@ -3591,14 +3602,16 @@ export function GroupPredictor({
     }
 
     // 4. SF Matchups simulation
-    const sfMatchups = [];
-    for (let i = 0; i < 2; i++) {
-      const parentHome = qfMatchups[2 * i];
-      const parentAway = qfMatchups[2 * i + 1];
-      const homeWinner = getResolvedWinner("qf", 2 * i, parentHome.home, parentHome.away);
-      const awayWinner = getResolvedWinner("qf", 2 * i + 1, parentAway.home, parentAway.away);
-      sfMatchups.push({ home: homeWinner, away: awayWinner });
-    }
+    const sfMatchups = [
+      {
+        home: getResolvedWinner("qf", 0, qfMatchups[0].home, qfMatchups[0].away),
+        away: getResolvedWinner("qf", 2, qfMatchups[2].home, qfMatchups[2].away)
+      },
+      {
+        home: getResolvedWinner("qf", 1, qfMatchups[1].home, qfMatchups[1].away),
+        away: getResolvedWinner("qf", 3, qfMatchups[3].home, qfMatchups[3].away)
+      }
+    ];
     if (startRound === "r32" || startRound === "r16" || startRound === "qf" || startRound === "sf") {
       sfMatchups.forEach((m, idx) => {
         if (!m.home || !m.away) return;
@@ -3732,9 +3745,12 @@ export function GroupPredictor({
     }
 
     // SF
+    const sfPairs = [
+      { home: updatedWinners.qf[0], away: updatedWinners.qf[2] },
+      { home: updatedWinners.qf[1], away: updatedWinners.qf[3] }
+    ];
     for (let idx = 0; idx < 2; idx++) {
-      const home = updatedWinners.qf[2 * idx];
-      const away = updatedWinners.qf[2 * idx + 1];
+      const { home, away } = sfPairs[idx];
       if (!home || !away) continue;
       if (!updatedWinners.sf[idx]) {
         const { hs, as, winner } = simulateKoMatch(home, away);
@@ -3758,8 +3774,8 @@ export function GroupPredictor({
     let simulatedThirdWinner = forceOverwrite ? null : thirdWinner;
     let simulatedThirdScores: { home: number | ""; away: number | ""; } = forceOverwrite ? { home: "", away: "" } : { ...thirdScores };
 
-    const homeMatch = { home: updatedWinners.qf[0], away: updatedWinners.qf[1] };
-    const awayMatch = { home: updatedWinners.qf[2], away: updatedWinners.qf[3] };
+    const homeMatch = { home: updatedWinners.qf[0], away: updatedWinners.qf[2] };
+    const awayMatch = { home: updatedWinners.qf[1], away: updatedWinners.qf[3] };
     const homeWinner = updatedWinners.sf[0];
     const awayWinner = updatedWinners.sf[1];
 
