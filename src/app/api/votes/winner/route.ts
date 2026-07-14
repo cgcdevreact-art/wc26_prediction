@@ -139,14 +139,15 @@ async function getActiveTeams() {
     }
   });
 
-  const activeTeams: any[] = [];
+  const teams: any[] = [];
   allTeamsMap.forEach((team, code) => {
-    if (!eliminated.has(code)) {
-      activeTeams.push(team);
-    }
+    teams.push({
+      ...team,
+      eliminated: eliminated.has(code)
+    });
   });
 
-  return activeTeams;
+  return teams;
 }
 
 export async function GET() {
@@ -190,17 +191,20 @@ export async function GET() {
       SUI: "#94a3b8"
     };
 
-    const rawStandings = activeTeams.map((team) => {
-      const finalVotes = dbTeamCounts[team.id] || 0;
-      return {
-        id: team.id,
-        name: team.name,
-        code: team.tla,
-        flag: team.crest,
-        color: teamColors[team.tla] || "#cbd5e1",
-        finalVotes
-      };
-    });
+    const rawStandings = activeTeams
+      .filter((team) => !team.eliminated || teamColors[team.tla] !== undefined)
+      .map((team) => {
+        const finalVotes = dbTeamCounts[team.id] || 0;
+        return {
+          id: team.id,
+          name: team.name,
+          code: team.tla,
+          flag: team.crest,
+          color: teamColors[team.tla] || "#cbd5e1",
+          finalVotes,
+          eliminated: team.eliminated
+        };
+      });
 
     // Sort standings by finalVotes descending
     rawStandings.sort((a, b) => b.finalVotes - a.finalVotes);

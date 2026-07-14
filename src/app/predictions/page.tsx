@@ -241,7 +241,7 @@ export default async function PredictionsPage(props: {
                   className="h-3.5 w-5 rounded-[2px] object-cover"
                   emojiClassName="text-sm leading-none"
                 />
-                <span className="truncate font-display font-extrabold text-gradient">
+                <span className="font-display font-extrabold text-gradient shrink-0">
                   {teamsMap.get(championCode)?.name}
                 </span>
               </div>

@@ -173,8 +173,8 @@ export default function CommissionerUsersPage() {
 
       <div className="flex-1 overflow-y-auto p-8">
         {/* Search */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative flex-1 max-w-md">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center justify-between">
+          <div className="relative flex-1 max-w-md min-w-[280px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -188,7 +188,7 @@ export default function CommissionerUsersPage() {
             />
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <select
               value={roleFilter}
               onChange={(e) => {
@@ -255,7 +255,7 @@ export default function CommissionerUsersPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
