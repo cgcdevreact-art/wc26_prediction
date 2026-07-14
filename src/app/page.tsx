@@ -22,7 +22,7 @@ export default function Page() {
         <LiveStats />
         
         <HomeSectionsAccordion />
-        <InstagramFeed />
+        {/* <InstagramFeed /> */}
       </main>
       <Footer />
       <ScrollToTop />
