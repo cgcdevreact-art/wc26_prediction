@@ -363,7 +363,7 @@ export function MatchProbabilitiesList() {
                   {sortedStandings.filter((t) => !(t as any).eliminated).map((t) => (
                     <div key={t.code} className="flex items-center justify-between group">
                       <div className="flex items-center gap-3">
-                        <div className="w-7 h-5 overflow-hidden rounded-md border border-slate-200 dark:border-[#1f2937] bg-slate-100 dark:bg-slate-900 flex items-center justify-center shrink-0">
+                        <div className="w-7 h-5 overflow-hidden rounded-[2px] border border-slate-200 dark:border-[#1f2937] bg-slate-100 dark:bg-slate-900 flex items-center justify-center shrink-0">
                           <CountryFlag code={t.code} flag={t.flag} name={t.name} className="h-full w-full object-cover scale-110" />
                         </div>
                         <span className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-amber-500 transition">
