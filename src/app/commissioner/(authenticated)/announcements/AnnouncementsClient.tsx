@@ -173,7 +173,8 @@ export default function AnnouncementsClient({ initialAnnouncements }: { initialA
           <CardTitle>Existing Announcements</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Title</TableHead>
@@ -208,6 +209,7 @@ export default function AnnouncementsClient({ initialAnnouncements }: { initialA
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

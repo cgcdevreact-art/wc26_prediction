@@ -76,11 +76,19 @@ export function CommissionerSidebar() {
               </Link>
             );
           })}
+          {/* Mobile-only Back to Site */}
+          <Link
+            href="/"
+            className="group flex shrink-0 lg:hidden items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-all duration-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent"
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-slate-500" />
+            <span>Back to Site</span>
+          </Link>
         </div>
       </nav>
 
       {/* Bottom */}
-      <div className="flex flex-wrap gap-2 border-t border-slate-200 p-3 lg:block lg:space-y-1">
+      <div className="hidden border-t border-slate-200 p-3 lg:block lg:space-y-1">
         <Link
           href="/"
           className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600"

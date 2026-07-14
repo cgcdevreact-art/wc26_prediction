@@ -4128,7 +4128,7 @@ export function GroupPredictor({
                 </div>
               </div>
 
-              <div className={`grid gap-4 sm:gap-6 ${fullWidth ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}>
+              <div className={`grid gap-4 sm:gap-6 ${fullWidth ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"}`}>
                 {Object.keys(GROUPS_CONFIG).map((groupName) => {
                   const groupMatches = matches.filter((m) => m.group === groupName);
                   const groupStandings = standings[groupName];
@@ -4200,15 +4200,15 @@ export function GroupPredictor({
                             )}
                           </div>
                         </div>
-                        <table className="w-full text-[11px] sm:text-xs text-left mb-4 border-collapse">
+                        <table className="w-full text-[11px] sm:text-xs text-left mb-4 border-collapse table-fixed">
                           <thead>
                             <tr className="border-b border-border text-muted-foreground">
-                              <th className="pb-1.5 font-medium w-5">#</th>
-                              <th className="pb-1.5 font-medium">Team</th>
-                              <th className="pb-1.5 font-medium text-center w-10">Elo</th>
-                              <th className="pb-1.5 font-medium text-center w-8">Att</th>
-                              <th className="pb-1.5 font-medium text-center w-8">Def</th>
-                              <th className="pb-1.5 font-medium text-right w-24">Top Player</th>
+                              <th className="pb-1.5 font-medium w-[6%]">#</th>
+                              <th className="pb-1.5 font-medium w-[34%]">Team</th>
+                              <th className="pb-1.5 font-medium text-center w-[14%]">Elo</th>
+                              <th className="pb-1.5 font-medium text-center w-[9%]">Att</th>
+                              <th className="pb-1.5 font-medium text-center w-[9%]">Def</th>
+                              <th className="pb-1.5 font-medium text-right w-[28%]">Top Player</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -4235,22 +4235,24 @@ export function GroupPredictor({
                                       {idx + 1}
                                     </span>
                                   </td>
-                                  <td className="py-1 truncate flex items-center gap-1.5 w-full sm:min-w-[120px]">
-                                    <CountryFlag
-                                      code={row.team.code}
-                                      flag={row.team.flag}
-                                      name={row.team.name}
-                                      className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
-                                      emojiClassName="text-base shrink-0 leading-none"
-                                    />
-                                    <span className="truncate flex items-center gap-1" title={row.team.name}>
-                                      {row.team.name}
-                                      {row.team.isCustom && !bypassOverrides && !storeTeams[row.team.code]?.isOverrideDisabled && (
-                                        <span title="Custom team stats active" className="inline-flex shrink-0">
-                                          <Sparkles className="h-3 w-3 text-purple-500 fill-purple-500/20 animate-pulse" />
-                                        </span>
-                                      )}
-                                    </span>
+                                  <td className="py-1">
+                                    <div className="flex items-center gap-1.5 min-w-[90px] sm:min-w-[110px] max-w-[110px] sm:max-w-[130px] truncate">
+                                      <CountryFlag
+                                        code={row.team.code}
+                                        flag={row.team.flag}
+                                        name={row.team.name}
+                                        className="h-4 w-6 shrink-0 rounded-[2px] object-cover"
+                                        emojiClassName="text-base shrink-0 leading-none"
+                                      />
+                                      <span className="truncate flex items-center gap-1" title={row.team.name}>
+                                        {row.team.name}
+                                        {row.team.isCustom && !bypassOverrides && !storeTeams[row.team.code]?.isOverrideDisabled && (
+                                          <span title="Custom team stats active" className="inline-flex shrink-0">
+                                            <Sparkles className="h-3 w-3 text-purple-500 fill-purple-500/20 animate-pulse" />
+                                          </span>
+                                        )}
+                                      </span>
+                                    </div>
                                   </td>
                                   <td className="py-1 text-center font-mono tabular-nums text-foreground/80 dark:text-white/80">
                                     {row.team.elo && Number.isFinite(row.team.elo) ? Math.round(row.team.elo) : "-"}
@@ -4289,16 +4291,22 @@ export function GroupPredictor({
                                       return Number.isFinite(rounded) ? rounded : "-";
                                     })()}
                                   </td>
-                                  <td className="py-1 text-right text-muted-foreground truncate max-w-[100px] flex items-center justify-end gap-1" title={topPlayerDisp}>
-                                    <span className={`${topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled ? "text-purple-400 font-bold" : "text-neon/90"} font-medium`}>
-                                      {topPlayerName || "N/A"}
-                                    </span>
-                                    {topPlayerRating && <span className="text-[10px] ml-1 text-foreground/50 dark:text-white/40">({topPlayerRating})</span>}
-                                    {topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled && (
-                                      <span title="Player stats edited" className="inline-flex shrink-0">
-                                        <Sparkles className="h-2.5 w-2.5 text-purple-500 fill-purple-500/20" />
+                                  <td className="py-1 text-right text-muted-foreground max-w-[90px] sm:max-w-[110px]" title={topPlayerDisp}>
+                                    <div className="flex items-center justify-end gap-0.5 truncate w-full">
+                                      <span className={`${topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled ? "text-purple-400 font-bold" : "text-neon/90"} font-medium truncate`}>
+                                        {topPlayerName || "N/A"}
                                       </span>
-                                    )}
+                                      {topPlayerRating && (
+                                        <span className="text-[9px] shrink-0 text-foreground/50 dark:text-white/40 ml-0.5">
+                                          ({topPlayerRating})
+                                        </span>
+                                      )}
+                                      {topPlayer?.isCustom && !bypassOverrides && !storePlayers[`${row.team.code}-${topPlayer["Player Name"]}`]?.isOverrideDisabled && (
+                                        <span title="Player stats edited" className="inline-flex shrink-0 ml-0.5">
+                                          <Sparkles className="h-2.5 w-2.5 text-purple-500 fill-purple-500/20" />
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               );
