@@ -106,11 +106,11 @@ const buildSearchTerms = (clubName: string) => {
 };
 
 type SportsDbTeam = {
-  strBadge?: string | null;
+  strBadge    ?: string | null;
   strTeamBadge?: string | null;
-  strLogo?: string | null;
-  strTeamLogo?: string | null;
-  strTeam?: string | null;
+  strLogo     ?: string | null;
+  strTeamLogo ?: string | null;
+  strTeam     ?: string | null;
   strAlternate?: string | null;
 };
 

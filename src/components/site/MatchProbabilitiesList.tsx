@@ -9,11 +9,16 @@ import { CustomPollCardData, CustomVotingCard } from "@/components/voting/Custom
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSession } from "next-auth/react";
-import { Trophy, Vote, X, Code, Link2, Bookmark, Gift, Settings, ListFilter, Maximize2 } from "lucide-react";
+import { Trophy, Vote, X, Code, Link2, Bookmark, Gift, Settings, ListFilter, Maximize2, AlertCircle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { buildAuthModalHref } from "@/lib/auth-modal";
 
 export function MatchProbabilitiesList() {
   const { data: session } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { fixtures, loading, loadFixtures } = useFixturesStore();
   const {
     tournamentWinnerPolls,
@@ -28,6 +33,8 @@ export function MatchProbabilitiesList() {
   const [confirmWinnerTeam, setConfirmWinnerTeam] = useState<{ id: number; code: string; name: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<"ALL" | "LIVE" | "UPCOMING" | "COMPLETED">("ALL");
   const [customPolls, setCustomPolls] = useState<CustomPollCardData[]>([]);
+  const [alreadyVotedTeamName, setAlreadyVotedTeamName] = useState<string | null>(null);
+  const [showSignInModal, setShowSignInModal] = useState<boolean>(false);
 
   const [timeframe, setTimeframe] = useState<"1H" | "6H" | "1D" | "1W" | "1M" | "ALL">("ALL");
   const [visibleTeams, setVisibleTeams] = useState<Record<string, boolean>>({});
@@ -138,7 +145,7 @@ export function MatchProbabilitiesList() {
 
   const handleWinnerVoteClick = (teamId: number, teamCode: string) => {
     if (!session) {
-      toast.error("Please sign in to cast your vote!");
+      setShowSignInModal(true);
       return;
     }
 
@@ -147,7 +154,7 @@ export function MatchProbabilitiesList() {
       const list = tournamentWinnerPolls?.allTeams || tournamentWinnerPolls?.teams || [];
       const votedTeam = list.find((t) => t.code === votedWinnerCode);
       const votedTeamName = votedTeam ? votedTeam.name : votedWinnerCode;
-      toast.error(`You already voted for ${votedTeamName}!`);
+      setAlreadyVotedTeamName(votedTeamName);
       return;
     }
 
@@ -348,15 +355,15 @@ export function MatchProbabilitiesList() {
           ) : tournamentWinnerPolls && (
             <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[minmax(240px,0.9fr)_minmax(0,1.6fr)] xl:grid-cols-[minmax(260px,0.95fr)_minmax(0,1.55fr)] flex-1">
 
-              {/* Left Column (span 4): Standings List & Comments */}
-              <div className="flex h-full min-w-0 flex-col justify-between space-y-6">
+              {/* Left Column (span 4): Standings List */}
+              <div className="flex min-w-0 flex-col justify-start gap-4">
 
                 {/* Standings List (Top teams only, sorted) */}
-                <div className="flex-1 flex flex-col justify-between">
-                  {sortedStandings.map((t) => (
+                <div className="flex flex-col gap-3.5">
+                  {sortedStandings.filter((t) => !(t as any).eliminated).map((t) => (
                     <div key={t.code} className="flex items-center justify-between group">
                       <div className="flex items-center gap-3">
-                        <div className="w-7 h-5 overflow-hidden rounded-md border border-slate-200 dark:border-[#1f2937] bg-slate-100 dark:bg-slate-900 flex items-center justify-center shrink-0">
+                        <div className="w-7 h-5 overflow-hidden rounded-[2px] border border-slate-200 dark:border-[#1f2937] bg-slate-100 dark:bg-slate-900 flex items-center justify-center shrink-0">
                           <CountryFlag code={t.code} flag={t.flag} name={t.name} className="h-full w-full object-cover scale-110" />
                         </div>
                         <span className="text-sm font-bold text-slate-800 dark:text-slate-200 group-hover:text-amber-500 transition">
@@ -368,28 +375,34 @@ export function MatchProbabilitiesList() {
                         <span className="font-mono text-base font-black text-slate-900 dark:text-white">
                           {t.prob}%
                         </span>
-                        <button
-                          onClick={() => handleWinnerVoteClick((t as any).id || 0, t.code)}
-                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer group ${userVotes["tournament-winner"] === t.code
-                              ? "bg-[#fffbeb] dark:bg-[#f59e0b]/10 border-2 border-[#f59e0b] text-[#d97706] dark:text-[#f59e0b]"
-                              : "bg-[#f8fafc] dark:bg-[#1e2025]/50 border border-[#e2e8f0] dark:border-white/5 text-[#64748b] dark:text-slate-400 hover:bg-[#f1f5f9] hover:border-[#cbd5e1] hover:text-[#475569] dark:hover:bg-white/10 dark:hover:text-white"
-                            }`}
-                          title="Vote as tournament champion"
-                        >
-                          {userVotes["tournament-winner"] === t.code ? (
-                            <img
-                              src="/voting.svg"
-                              alt="Voted"
-                              className="block w-5.5 h-5.5 object-contain transition-all duration-200 scale-110 group-hover:scale-120 active:scale-95"
-                            />
-                          ) : (
-                            <img
-                              src="/voting.svg"
-                              alt="Vote"
-                              className="block w-5.5 h-5.5 object-contain opacity-55 dark:opacity-40 grayscale group-hover:opacity-100 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-200 active:scale-95"
-                            />
-                          )}
-                        </button>
+                        {!(t as any).eliminated ? (
+                          <button
+                            onClick={() => handleWinnerVoteClick((t as any).id || 0, t.code)}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer group ${userVotes["tournament-winner"] === t.code
+                                ? "bg-[#fffbeb] dark:bg-[#f59e0b]/10 border-2 border-[#f59e0b] text-[#d97706] dark:text-[#f59e0b]"
+                                : "bg-[#f8fafc] dark:bg-[#1e2025]/50 border border-[#e2e8f0] dark:border-white/5 text-[#64748b] dark:text-slate-400 hover:bg-[#f1f5f9] hover:border-[#cbd5e1] hover:text-[#475569] dark:hover:bg-white/10 dark:hover:text-white"
+                              }`}
+                            title="Vote as tournament champion"
+                          >
+                            {userVotes["tournament-winner"] === t.code ? (
+                              <img
+                                src="/voting.svg"
+                                alt="Voted"
+                                className="block w-5.5 h-5.5 object-contain transition-all duration-200 scale-110 group-hover:scale-120 active:scale-95"
+                              />
+                            ) : (
+                              <img
+                                src="/voting.svg"
+                                alt="Vote"
+                                className="block w-5.5 h-5.5 object-contain opacity-55 dark:opacity-40 grayscale group-hover:opacity-100 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-200 active:scale-95"
+                              />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-450 dark:text-slate-500 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded-md uppercase tracking-wider select-none">
+                            Out
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -595,6 +608,79 @@ export function MatchProbabilitiesList() {
               >
                 Confirm
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {alreadyVotedTeamName && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#16181d] rounded-2xl border border-slate-200 dark:border-white/10 p-5.5 w-full max-w-sm shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setAlreadyVotedTeamName(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-500 transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex flex-col items-center text-center p-1">
+              <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mb-4">
+                <AlertCircle className="w-6 h-6 text-amber-500" />
+              </div>
+              <h3 className="font-display font-black text-base text-slate-800 dark:text-white">Vote Already Cast</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2.5 leading-relaxed">
+                You already voted for <strong>{alreadyVotedTeamName}</strong>! You cannot change your prediction once submitted.
+              </p>
+              <button
+                onClick={() => setAlreadyVotedTeamName(null)}
+                className="w-full mt-5.5 py-2.5 px-4 text-xs font-bold rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 transition cursor-pointer shadow-md"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSignInModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#16181d] rounded-2xl border border-slate-200 dark:border-white/10 p-5.5 w-full max-w-sm shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setShowSignInModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-500 transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex flex-col items-center text-center p-1">
+              <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4">
+                <AlertCircle className="w-6 h-6 text-indigo-500" />
+              </div>
+              <h3 className="font-display font-black text-base text-slate-800 dark:text-white">Authentication Required</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2.5 leading-relaxed">
+                Please sign in to cast your vote!
+              </p>
+              <div className="flex gap-3 w-full mt-5.5">
+                <button
+                  onClick={() => setShowSignInModal(false)}
+                  className="flex-1 py-2.5 px-4 text-xs font-bold rounded-xl border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSignInModal(false);
+                    router.push(
+                      buildAuthModalHref({
+                        pathname,
+                        search: searchParams.toString(),
+                        mode: "signin"
+                      })
+                    );
+                  }}
+                  className="flex-1 py-2.5 px-4 text-xs font-bold rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 transition cursor-pointer shadow-md"
+                >
+                  Sign In
+                </button>
+              </div>
             </div>
           </div>
         </div>

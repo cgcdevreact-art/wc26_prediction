@@ -102,17 +102,57 @@ export async function GET() {
       });
     }
 
-    const userPlansData = [
-      { name: "Free", count: freeUsers },
-      { name: "Advanced", count: plusUsers },
-      { name: "Expert", count: proUsers },
-    ];
+    // In-memory calculations for filter-reactive plan data
+    const sevenDaysAgoUsers = recUsers.filter(u => u.createdAt >= sevenDaysAgo);
+    const freeDays = sevenDaysAgoUsers.filter(u => u.subscriptionTier === "free").length;
+    const plusDays = sevenDaysAgoUsers.filter(u => u.subscriptionTier === "plus").length;
+    const proDays = sevenDaysAgoUsers.filter(u => u.subscriptionTier === "pro").length;
 
-    const userRevenueData = [
-      { name: "Free", revenue: 0 },
-      { name: "Advanced", revenue: plusUsers * 30.0 },
-      { name: "Expert", revenue: proUsers * 233.10 },
-    ];
+    const twentyEightDaysAgo = new Date(now);
+    twentyEightDaysAgo.setDate(twentyEightDaysAgo.getDate() - 28);
+    const twentyEightDaysAgoUsers = recUsers.filter(u => u.createdAt >= twentyEightDaysAgo);
+    const freeMonths = twentyEightDaysAgoUsers.filter(u => u.subscriptionTier === "free").length;
+    const plusMonths = twentyEightDaysAgoUsers.filter(u => u.subscriptionTier === "plus").length;
+    const proMonths = twentyEightDaysAgoUsers.filter(u => u.subscriptionTier === "pro").length;
+
+    const planDistribution = {
+      days: {
+        userPlansData: [
+          { name: "Free", count: freeDays },
+          { name: "Advanced", count: plusDays },
+          { name: "Expert", count: proDays },
+        ],
+        userRevenueData: [
+          { name: "Free", revenue: 0 },
+          { name: "Advanced", revenue: plusDays * 30.0 },
+          { name: "Expert", revenue: proDays * 233.10 },
+        ]
+      },
+      months: {
+        userPlansData: [
+          { name: "Free", count: freeMonths },
+          { name: "Advanced", count: plusMonths },
+          { name: "Expert", count: proMonths },
+        ],
+        userRevenueData: [
+          { name: "Free", revenue: 0 },
+          { name: "Advanced", revenue: plusMonths * 30.0 },
+          { name: "Expert", revenue: proMonths * 233.10 },
+        ]
+      },
+      years: {
+        userPlansData: [
+          { name: "Free", count: freeUsers },
+          { name: "Advanced", count: plusUsers },
+          { name: "Expert", count: proUsers },
+        ],
+        userRevenueData: [
+          { name: "Free", revenue: 0 },
+          { name: "Advanced", revenue: plusUsers * 30.0 },
+          { name: "Expert", revenue: proUsers * 233.10 },
+        ]
+      }
+    };
 
     return NextResponse.json({
       overview: {
@@ -125,10 +165,7 @@ export async function GET() {
       charts: {
         dataDays, dataMonths, dataYears
       },
-      planDistribution: {
-        userPlansData,
-        userRevenueData
-      }
+      planDistribution
     });
 
   } catch (error: any) {

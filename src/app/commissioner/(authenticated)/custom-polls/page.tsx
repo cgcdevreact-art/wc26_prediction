@@ -211,7 +211,8 @@ export default function CommissionerCustomPollsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="flex-1 overflow-y-auto p-4 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header Section */}
       <div className="relative mt-5 overflow-hidden rounded-[2rem] bg-white p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-slate-100">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-cyan-100 to-fuchsia-100 opacity-50 blur-3xl" />
@@ -234,7 +235,7 @@ export default function CommissionerCustomPollsPage() {
         </div>
       </div>
 
-      <div className="grid gap-8 xl:grid-cols-[1.3fr_0.7fr]">
+      <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
         {/* Left Column: Polls List */}
         <div className="flex flex-col gap-6">
           <div className="flex items-center justify-between px-2">
@@ -274,7 +275,7 @@ export default function CommissionerCustomPollsPage() {
                   <div className="absolute inset-0 bg-gradient-to-br from-transparent to-slate-50/50 opacity-0 transition-opacity group-hover:opacity-100" />
 
                   <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-3">
+                    <div className="flex-1 min-w-0 space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ring-1 ${poll.status === 'LIVE' ? 'bg-emerald-50 text-emerald-600 ring-emerald-200' : poll.status === 'UPCOMING' ? 'bg-blue-50 text-blue-600 ring-blue-200' : 'bg-slate-50 text-slate-600 ring-slate-200'}`}>
                           {poll.status}
@@ -318,19 +319,19 @@ export default function CommissionerCustomPollsPage() {
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 shrink-0 self-end lg:self-start">
                       <button
                         onClick={() => startEdit(poll)}
                         className="inline-flex h-9 items-center gap-2 rounded-xl bg-white px-4 text-xs font-bold text-slate-600 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        <Pencil className="h-3.5 w-3.5 shrink-0" />
                         Edit
                       </button>
                       <button
                         onClick={() => handleArchive(poll.id)}
                         className="inline-flex h-9 items-center gap-2 rounded-xl bg-rose-50 px-4 text-xs font-bold text-rose-600 shadow-sm ring-1 ring-rose-200/60 transition-all hover:bg-rose-100 hover:text-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500"
                       >
-                        <Archive className="h-3.5 w-3.5" />
+                        <Archive className="h-3.5 w-3.5 shrink-0" />
                         Archive
                       </button>
                     </div>
@@ -391,7 +392,7 @@ export default function CommissionerCustomPollsPage() {
                   />
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-4">
                   <div className="space-y-2.5">
                     <label className="text-xs font-black uppercase tracking-widest text-slate-500">
                       Status
@@ -408,28 +409,30 @@ export default function CommissionerCustomPollsPage() {
                     </select>
                   </div>
 
-                  <div className="space-y-2.5">
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">
-                      Opens
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={form.opensAt}
-                      onChange={(event) => setForm((prev) => ({ ...prev, opensAt: event.target.value }))}
-                      className="w-full rounded-xl border-0 bg-slate-50 p-3 text-xs font-medium text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-cyan-500"
-                    />
-                  </div>
+                  <div className="grid gap-4 grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                    <div className="space-y-2.5">
+                      <label className="text-xs font-black uppercase tracking-widest text-slate-500">
+                        Opens
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={form.opensAt}
+                        onChange={(event) => setForm((prev) => ({ ...prev, opensAt: event.target.value }))}
+                        className="w-full rounded-xl border-0 bg-slate-50 p-3 text-xs font-medium text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-cyan-500"
+                      />
+                    </div>
 
-                  <div className="space-y-2.5">
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">
-                      Closes
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={form.closesAt}
-                      onChange={(event) => setForm((prev) => ({ ...prev, closesAt: event.target.value }))}
-                      className="w-full rounded-xl border-0 bg-slate-50 p-3 text-xs font-medium text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-cyan-500"
-                    />
+                    <div className="space-y-2.5">
+                      <label className="text-xs font-black uppercase tracking-widest text-slate-500">
+                        Closes
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={form.closesAt}
+                        onChange={(event) => setForm((prev) => ({ ...prev, closesAt: event.target.value }))}
+                        className="w-full rounded-xl border-0 bg-slate-50 p-3 text-xs font-medium text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 transition-all focus:bg-white focus:ring-2 focus:ring-inset focus:ring-cyan-500"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -487,7 +490,7 @@ export default function CommissionerCustomPollsPage() {
                             placeholder="Option Label (e.g., Messi)"
                             required
                           />
-                          <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="grid gap-3 grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                             <input
                               value={option.shortLabel}
                               onChange={(event) => updateOption(index, "shortLabel", event.target.value)}
@@ -524,6 +527,7 @@ export default function CommissionerCustomPollsPage() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

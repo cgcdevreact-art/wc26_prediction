@@ -3,6 +3,7 @@ import { Footer } from "@/components/site/Footer";
 import { Hero } from "@/components/site/Hero";
 import { LiveStats } from "@/components/site/LiveStats";
 import { HomeSectionsAccordion } from "@/components/site/HomeSectionsAccordion";
+import { InstagramFeed } from "@/components/site/InstagramFeed";
 import { ScrollToTop } from "@/components/site/ScrollToTop";
 import Image from "next/image";
 import Link from "next/link";
@@ -21,6 +22,7 @@ export default function Page() {
         <LiveStats />
         
         <HomeSectionsAccordion />
+        {/* <InstagramFeed /> */}
       </main>
       <Footer />
       <ScrollToTop />

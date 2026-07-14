@@ -2,9 +2,12 @@
 
 import { useMemo, useState, useCallback } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
-import { CheckCircle2, Loader2, Vote, ExternalLink, AlertTriangle, Users, TrendingUp, Flame } from "lucide-react";
+import { CheckCircle2, Loader2, Vote, ExternalLink, AlertTriangle, Users, TrendingUp, Flame, X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { buildAuthModalHref } from "@/lib/auth-modal";
 
 type CustomPollOption = {
   id: string;
@@ -42,9 +45,14 @@ const DEFAULT_GRADIENTS = [
 const SOLID_COLORS = ["#0a8a45", "#2c7c87", "#af3fd1", "#0ea5e9"];
 
 export function CustomVotingCard({ poll }: CustomVotingCardProps) {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [state, setState] = useState(poll);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [confirmOption, setConfirmOption] = useState<CustomPollOption | null>(null);
+  const [showSignInModal, setShowSignInModal] = useState(false);
 
   const isLocked = state.status !== "LIVE";
   const hasVoted = Boolean(state.userOptionId);
@@ -94,6 +102,10 @@ export function CustomVotingCard({ poll }: CustomVotingCardProps) {
   }, [state.id]);
 
   const handleVoteClick = (option: CustomPollOption) => {
+    if (!session) {
+      setShowSignInModal(true);
+      return;
+    }
     if (submittingId || hasVoted || isLocked) {
       return;
     }
@@ -354,6 +366,51 @@ export function CustomVotingCard({ poll }: CustomVotingCardProps) {
               >
                 Submit Vote
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSignInModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="mx-4 w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-[#1a1d24] animate-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setShowSignInModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-500 transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex flex-col items-center text-center p-1">
+              <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4">
+                <AlertCircle className="w-6 h-6 text-indigo-500" />
+              </div>
+              <h3 className="font-display font-black text-base text-slate-900 dark:text-white">Authentication Required</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2.5 leading-relaxed">
+                Please sign in to cast your prediction!
+              </p>
+              <div className="flex gap-3 w-full mt-5.5">
+                <button
+                  onClick={() => setShowSignInModal(false)}
+                  className="flex-1 py-2.5 px-4 text-xs font-bold rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSignInModal(false);
+                    router.push(
+                      buildAuthModalHref({
+                        pathname,
+                        search: searchParams.toString(),
+                        mode: "signin"
+                      })
+                    );
+                  }}
+                  className="flex-1 py-2.5 px-4 text-xs font-bold rounded-2xl bg-slate-900 text-white shadow-lg transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </div>
             </div>
           </div>
         </div>

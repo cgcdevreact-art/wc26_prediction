@@ -15,6 +15,22 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
+const InstagramIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+  </svg>
+);
+
 const NAV_ITEMS = [
   { href: "/commissioner", label: "Dashboard", icon: LayoutDashboard },
   { href: "/commissioner/users", label: "Users", icon: Users },
@@ -22,6 +38,7 @@ const NAV_ITEMS = [
   { href: "/commissioner/predictions", label: "Predictions", icon: Target },
   { href: "/commissioner/custom-polls", label: "Custom Polls", icon: ListChecks },
   { href: "/commissioner/announcements", label: "Announcements", icon: Megaphone },
+  { href: "/commissioner/instagram", label: "Instagram", icon: InstagramIcon },
 ];
 
 export function CommissionerSidebar() {
@@ -76,11 +93,19 @@ export function CommissionerSidebar() {
               </Link>
             );
           })}
+          {/* Mobile-only Back to Site */}
+          <Link
+            href="/"
+            className="group flex shrink-0 lg:hidden items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-all duration-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent"
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-slate-500" />
+            <span>Back to Site</span>
+          </Link>
         </div>
       </nav>
 
       {/* Bottom */}
-      <div className="flex flex-wrap gap-2 border-t border-slate-200 p-3 lg:block lg:space-y-1">
+      <div className="hidden border-t border-slate-200 p-3 lg:block lg:space-y-1">
         <Link
           href="/"
           className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600"

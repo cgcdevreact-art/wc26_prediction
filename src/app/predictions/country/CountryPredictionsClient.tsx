@@ -447,6 +447,7 @@ export default function CountryPredictionsClient({
   const handleLoadPrediction = (prediction: any, isShared: boolean = false) => {
     try {
       ignoreResetRef.current = true;
+      loadedFromPredictionRef.current = true;
       const data = readPredictionPayload<any>(prediction.predictedPayload, prediction.predictedWinner);
 
       if (!data) {
@@ -993,6 +994,7 @@ export default function CountryPredictionsClient({
 
   const isSnapshotRestoredRef = useRef<boolean>(false);
   const lastOverrideStateRef = useRef<{ isOverrideDisabled: boolean; isCustom: boolean; selectedCode: string } | null>(null);
+  const loadedFromPredictionRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!selectedTeam || !isInitialized) return;
@@ -1002,7 +1004,8 @@ export default function CountryPredictionsClient({
     const isOverrideDisabled = storeTeam?.isOverrideDisabled ?? false;
     const isCustom = storeTeam?.isCustom ?? false;
 
-    if (ignoreResetRef.current) {
+    if (ignoreResetRef.current || loadedFromPredictionRef.current) {
+      loadedFromPredictionRef.current = false;
       lastOverrideStateRef.current = { isOverrideDisabled, isCustom, selectedCode };
       return;
     }
@@ -1104,6 +1107,7 @@ export default function CountryPredictionsClient({
       }
 
       ignoreResetRef.current = true;
+      loadedFromPredictionRef.current = true;
       hasSeenSelectionChange.current = false;
       isSnapshotRestoredRef.current = true;
       setSelectedCode(snapshot.selectedCode);
@@ -2144,7 +2148,7 @@ export default function CountryPredictionsClient({
       <div className="relative mb-10 overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900">
         <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-emerald-100/70 blur-3xl pointer-events-none dark:bg-neon/10" />
         <div className="absolute -left-20 -bottom-20 h-60 w-60 rounded-full bg-fuchsia-100/70 blur-3xl pointer-events-none dark:bg-neon-2/10" />
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div>
             <div className="text-xs uppercase tracking-[0.25em] text-cyan-600 dark:text-neon flex items-center gap-2 font-bold mb-2">
               <Sparkles className="w-4 h-4 text-cyan-600 dark:text-neon animate-pulse" />
@@ -2181,7 +2185,7 @@ export default function CountryPredictionsClient({
               </div>
             )}
           </div>
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center lg:shrink-0">
             {/* <label
               className={`inline-flex min-h-[56px] items-center gap-3 rounded-2xl border px-4 py-2.5 text-center text-sm font-black transition-all duration-200 cursor-pointer select-none sm:w-auto ${useRealScores
                 ? "bg-cyan-500/10 border-cyan-500/50 text-cyan-600 dark:text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"

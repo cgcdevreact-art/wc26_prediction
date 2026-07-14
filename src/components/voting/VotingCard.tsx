@@ -7,11 +7,12 @@ import { CountryFlag } from "@/components/ui/CountryFlag";
 import { CountdownTimer } from "./CountdownTimer";
 import { VotePercentage } from "./VotePercentage";
 import { format } from "date-fns";
-import { Check, CheckCircle2, Loader2, Trophy } from "lucide-react";
+import { Check, CheckCircle2, Loader2, Trophy, X, AlertCircle } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import React, { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
+import { buildAuthModalHref } from "@/lib/auth-modal";
 
 interface VotingCardProps {
   fixture: FixtureView;
@@ -19,6 +20,8 @@ interface VotingCardProps {
 
 export function VotingCard({ fixture }: VotingCardProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const matchId = String(fixture.match_no);
   const { data: session } = useSession();
 
@@ -33,6 +36,7 @@ export function VotingCard({ fixture }: VotingCardProps) {
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState(false);
   const [confirmChoice, setConfirmChoice] = useState<"HOME" | "AWAY" | null>(null);
+  const [showSignInModal, setShowSignInModal] = useState(false);
 
   const fetchUserPrediction = async () => {
     try {
@@ -334,7 +338,7 @@ export function VotingCard({ fixture }: VotingCardProps) {
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!session) {
-                        toast.error("Please sign in to cast your prediction!");
+                        setShowSignInModal(true);
                         return;
                       }
                       setConfirmChoice("HOME");
@@ -355,7 +359,7 @@ export function VotingCard({ fixture }: VotingCardProps) {
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!session) {
-                        toast.error("Please sign in to cast your prediction!");
+                        setShowSignInModal(true);
                         return;
                       }
                       setConfirmChoice("AWAY");
@@ -376,14 +380,16 @@ export function VotingCard({ fixture }: VotingCardProps) {
               </div>
             )}
 
-            <VotePercentage
-              homeProb={stats.homeProb}
-              awayProb={stats.awayProb}
-              homeCode={fixture.homeTeamObj.code}
-              awayCode={fixture.awayTeamObj.code}
-              isAuthenticated={!!session}
-              hasVoted={!!userVote}
-            />
+            {!userVote && (
+              <VotePercentage
+                homeProb={stats.homeProb}
+                awayProb={stats.awayProb}
+                homeCode={fixture.homeTeamObj.code}
+                awayCode={fixture.awayTeamObj.code}
+                isAuthenticated={!!session}
+                hasVoted={!!userVote}
+              />
+            )}
             <div className={`text-[9px] font-bold text-slate-400 uppercase text-center transition-opacity duration-300 ${!userVote ? "opacity-45" : ""}`}>
               {userVote ? `${stats.totalVotes} Votes Cast` : "- Votes Cast"}
             </div>
@@ -448,6 +454,67 @@ export function VotingCard({ fixture }: VotingCardProps) {
               >
                 Confirm
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSignInModal && (
+        <div 
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowSignInModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 cursor-default"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-[#16181d] rounded-2xl border border-slate-200 dark:border-white/10 p-5.5 w-full max-w-sm shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 cursor-default"
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSignInModal(false);
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-500 transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex flex-col items-center text-center p-1">
+              <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4">
+                <AlertCircle className="w-6 h-6 text-indigo-500" />
+              </div>
+              <h3 className="font-display font-black text-base text-slate-800 dark:text-white">Authentication Required</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2.5 leading-relaxed">
+                Please sign in to cast your prediction!
+              </p>
+              <div className="flex gap-3 w-full mt-5.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowSignInModal(false);
+                  }}
+                  className="flex-1 py-2.5 px-4 text-xs font-bold rounded-xl border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowSignInModal(false);
+                    router.push(
+                      buildAuthModalHref({
+                        pathname,
+                        search: searchParams.toString(),
+                        mode: "signin"
+                      })
+                    );
+                  }}
+                  className="flex-1 py-2.5 px-4 text-xs font-bold rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 transition cursor-pointer shadow-md"
+                >
+                  Sign In
+                </button>
+              </div>
             </div>
           </div>
         </div>
