@@ -5,6 +5,7 @@ import path from "path";
 // Simple in-memory cache for API response
 interface CacheStore {
   posts: any[];
+  username: string;
   timestamp: number;
 }
 
@@ -64,13 +65,13 @@ export async function GET() {
 
   if (!accessToken) {
     // If no access token is configured, return the mock data directly
-    return NextResponse.json({ posts: MOCK_POSTS, fromCache: false, source: "mock" });
+    return NextResponse.json({ posts: MOCK_POSTS, username: "26WCPrediction", fromCache: false, source: "mock" });
   }
 
   // Check if cache is still valid
   const now = Date.now();
   if (cacheStore && now - cacheStore.timestamp < CACHE_DURATION_MS) {
-    return NextResponse.json({ posts: cacheStore.posts, fromCache: true, source: "api" });
+    return NextResponse.json({ posts: cacheStore.posts, username: cacheStore.username, fromCache: true, source: "api" });
   }
 
   try {
@@ -81,27 +82,40 @@ export async function GET() {
       console.warn(`Instagram API returned status: ${res.status}`);
       // Fallback to cache if available, else fallback to mock data
       if (cacheStore) {
-        return NextResponse.json({ posts: cacheStore.posts, fromCache: true, source: "fallback-cache" });
+        return NextResponse.json({ posts: cacheStore.posts, username: cacheStore.username, fromCache: true, source: "fallback-cache" });
       }
-      return NextResponse.json({ posts: MOCK_POSTS, fromCache: false, source: "fallback-mock" });
+      return NextResponse.json({ posts: MOCK_POSTS, username: "26WCPrediction", fromCache: false, source: "fallback-mock" });
     }
 
     const data = await res.json();
     const posts = data.data || [];
 
+    // Fetch the username dynamically from Instagram Graph API
+    let username = "26WCPrediction";
+    try {
+      const meRes = await fetch(`https://graph.instagram.com/me?fields=username&access_token=${accessToken}`);
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        username = meData.username || "26WCPrediction";
+      }
+    } catch (e) {
+      console.error("Failed to fetch instagram username:", e);
+    }
+
     // Save in cache
     cacheStore = {
       posts,
+      username,
       timestamp: now
     };
 
-    return NextResponse.json({ posts, fromCache: false, source: "api" });
+    return NextResponse.json({ posts, username, fromCache: false, source: "api" });
   } catch (error) {
     console.error("Failed to fetch Instagram posts:", error);
     // Return cache if available, else fallback to mock
     if (cacheStore) {
-      return NextResponse.json({ posts: cacheStore.posts, fromCache: true, source: "fallback-cache" });
+      return NextResponse.json({ posts: cacheStore.posts, username: cacheStore.username, fromCache: true, source: "fallback-cache" });
     }
-    return NextResponse.json({ posts: MOCK_POSTS, fromCache: false, source: "fallback-mock" });
+    return NextResponse.json({ posts: MOCK_POSTS, username: "26WCPrediction", fromCache: false, source: "fallback-mock" });
   }
 }

@@ -410,39 +410,39 @@ export default function TeamsClient({
           onClick={() => setCapabilitiesExpanded(!capabilitiesExpanded)}
           className="w-full p-5 text-left transition-colors hover:bg-slate-500/[0.01] sm:p-6"
         >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/15 text-cyan-650 dark:text-neon border border-cyan-500/20">
-              <Info className="h-5 w-5" />
-            </div>
+          <div className="flex flex-col gap-4 min-[500px]:flex-row min-[500px]:items-start min-[500px]:justify-between">
+            <div className="flex flex-col gap-3 min-[500px]:flex-row min-[500px]:items-start">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/15 text-cyan-650 dark:text-neon border border-cyan-500/20">
+                <Info className="h-5 w-5" />
+              </div>
               <div className="min-w-0">
-              <h3 className="font-display text-lg font-black text-slate-900 dark:text-white">
-                Plan Customization & Simulation Capabilities
-              </h3>
-              <p className="max-w-xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                Compare what you can edit, view, and simulate across Free, Advanced, and Expert Predictor tiers
-              </p>
+                <h3 className="font-display text-lg font-black text-slate-900 dark:text-white">
+                  Plan Customization & Simulation Capabilities
+                </h3>
+                <p className="max-w-xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  Compare what you can edit, view, and simulate across Free, Advanced, and Expert Predictor tiers
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4 sm:justify-end">
-            <div className="min-w-0 sm:text-right">
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase block tracking-wider">Current Plan</span>
-              <span className={`mt-1 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${subTier === "pro"
-                ? "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-400 border border-fuchsia-500/20 shadow-[0_0_12px_rgba(217,70,239,0.15)]"
-                : subTier === "plus"
-                  ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.15)]"
-                  : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
-                }`}>
-                {subTier === "pro" ? "Expert Predictor" : subTier === "plus" ? "Advanced Predictor" : "Free Predictor"}
-              </span>
+            <div className="flex items-center justify-between gap-4 w-full min-[500px]:w-auto min-[500px]:justify-end">
+              <div className="min-w-0 min-[500px]:text-right">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase block tracking-wider">Current Plan</span>
+                <span className={`mt-1 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${subTier === "pro"
+                  ? "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-400 border border-fuchsia-500/20 shadow-[0_0_12px_rgba(217,70,239,0.15)]"
+                  : subTier === "plus"
+                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.15)]"
+                    : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+                  }`}>
+                  {subTier === "pro" ? "Expert Predictor" : subTier === "plus" ? "Advanced Predictor" : "Free Predictor"}
+                </span>
+              </div>
+              {capabilitiesExpanded ? (
+                <ChevronUp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+              )}
             </div>
-            {capabilitiesExpanded ? (
-              <ChevronUp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-            )}
-          </div>
           </div>
         </button>
 
@@ -772,22 +772,22 @@ export default function TeamsClient({
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <TabsList className="h-auto flex-wrap justify-start rounded-[1.5rem] border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
+          <TabsList className="flex flex-col w-full h-auto gap-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_12px_30px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_16px_40px_rgba(0,0,0,0.22)] min-[500px]:inline-flex min-[500px]:flex-row min-[500px]:w-auto min-[500px]:gap-0 min-[500px]:rounded-[1.5rem] min-[500px]:p-1.5">
             <TabsTrigger
               value="list"
-              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="w-full text-center text-sm font-semibold px-4 py-2.5 rounded-xl text-slate-650 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300 min-[500px]:w-auto min-[500px]:rounded-full min-[500px]:px-6 min-[500px]:py-2.5 sm:flex-none sm:px-6"
             >
               Teams List
             </TabsTrigger>
             <TabsTrigger
               value="rankings"
-              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="w-full text-center text-sm font-semibold px-4 py-2.5 rounded-xl text-slate-650 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300 min-[500px]:w-auto min-[500px]:rounded-full min-[500px]:px-6 min-[500px]:py-2.5 sm:flex-none sm:px-6"
             >
               Team Rankings
             </TabsTrigger>
             <TabsTrigger
               value="players"
-              className="flex-1 rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition sm:flex-none sm:px-6 data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300"
+              className="w-full text-center text-sm font-semibold px-4 py-2.5 rounded-xl text-slate-650 transition data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0a8a45] data-[state=active]:via-[#2c7c87] data-[state=active]:to-[#af3fd1] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_30px_rgba(44,124,135,0.24)] dark:text-slate-300 min-[500px]:w-auto min-[500px]:rounded-full min-[500px]:px-6 min-[500px]:py-2.5 sm:flex-none sm:px-6"
             >
               Player Rankings
             </TabsTrigger>
@@ -799,7 +799,7 @@ export default function TeamsClient({
                 <CurrentModelIcon className="h-5.5 w-5.5" />
               </div>
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 dark:text-white">
+                <div className="text-[12px] font-black uppercase tracking-[0.16em] text-slate-950 dark:text-white">
                   Simulation Engine
                 </div>
                 <div className="mt-0.5 text-xl font-display font-bold text-slate-900 dark:text-white">
@@ -1071,7 +1071,7 @@ export default function TeamsClient({
               </select>
             </div>
             <div className="overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
-              <table className="w-full text-left text-[11px] table-auto">
+              <table className="w-full min-w-[1000px] text-left text-[11px] table-auto">
                 <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[10px] sm:text-xs font-bold uppercase tracking-[0.12em] text-slate-700 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-200">
                   <tr>
                     <th className="w-8 px-1 py-3 font-semibold whitespace-nowrap">#</th>
