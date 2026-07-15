@@ -159,7 +159,7 @@ function TeamPicker({
   const ring = accent === "neon" ? "ring-neon/40" : "ring-[var(--color-neon-2)]/40";
   const availableTeams = teams.filter((team) => team.code === value || team.code !== excludeCode);
   return (
-      <div className={`rounded-2xl bg-white/5 p-3 ring-1 ${ring}`}>
+    <div className={`rounded-2xl bg-white/5 p-3 ring-1 w-full ${ring}`}>
       <div className="flex items-center gap-3">
         <CountryFlag
           code={t.code}

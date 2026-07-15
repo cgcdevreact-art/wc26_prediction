@@ -55,7 +55,7 @@ function TableHeaderCell({ label, tooltip, children }: { label?: string; tooltip
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="cursor-help underline decoration-dotted decoration-muted-foreground/45 hover:decoration-foreground/60 transition-colors">
+          <span className="shrink-0 cursor-help underline decoration-dotted decoration-muted-foreground/45 hover:decoration-foreground/60 transition-colors">
             {children || label}
           </span>
         </TooltipTrigger>
@@ -278,7 +278,7 @@ export function PlayersRankingsTable({
               <th className="w-10 px-1.5 py-3 font-semibold whitespace-nowrap">#</th>
               <th className="w-[120px] sm:w-[140px] px-1.5 py-3 font-semibold whitespace-nowrap">
                 <button onClick={() => toggleSort("playerName")} className="flex items-center gap-1 whitespace-nowrap">
-                  <span>Player</span>{renderSortIcon("playerName")}
+                  <span className="shrink-0">Player</span>{renderSortIcon("playerName")}
                 </button>
               </th>
               <th className="w-[100px] sm:w-[130px] px-1.5 py-3 font-semibold whitespace-nowrap">
@@ -286,7 +286,7 @@ export function PlayersRankingsTable({
                   onClick={subTier === "free" ? (e) => { e.stopPropagation(); setUpgradeOpen(true); } : () => toggleSort("team")} 
                   className="flex items-center gap-1 whitespace-nowrap"
                 >
-                  <span>Team</span>{renderSortIcon("team")}
+                  <span className="shrink-0">Team</span>{renderSortIcon("team")}
                 </button>
               </th>
               {columns.map((column) => (
