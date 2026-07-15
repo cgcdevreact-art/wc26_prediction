@@ -56,7 +56,7 @@ function TableHeaderCell({ label, tooltip, children }: { label?: string; tooltip
     <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className="cursor-help underline decoration-dotted decoration-muted-foreground/45 hover:decoration-foreground/60 transition-colors">
+          <span className="shrink-0 cursor-help underline decoration-dotted decoration-muted-foreground/45 hover:decoration-foreground/60 transition-colors">
             {children || label}
           </span>
         </TooltipTrigger>
