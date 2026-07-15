@@ -354,39 +354,39 @@ export default function TeamDetailsClient({
           onClick={() => setCapabilitiesExpanded(!capabilitiesExpanded)}
           className="w-full p-5 text-left transition-colors hover:bg-slate-500/[0.01] sm:p-6"
         >
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/15 text-cyan-650 dark:text-neon border border-cyan-500/20">
-              <Info className="h-5 w-5" />
-            </div>
+          <div className="flex flex-col gap-4 min-[500px]:flex-row min-[500px]:items-start min-[500px]:justify-between">
+            <div className="flex flex-col gap-3 min-[500px]:flex-row min-[500px]:items-start">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/15 text-cyan-650 dark:text-neon border border-cyan-500/20">
+                <Info className="h-5 w-5" />
+              </div>
               <div className="min-w-0">
-              <h3 className="font-display text-lg font-black text-slate-900 dark:text-white">
-                Plan Customization & Simulation Capabilities
-              </h3>
-              <p className="max-w-xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                Compare what you can edit, view, and simulate across Free, Advanced, and Expert Predictor tiers
-              </p>
+                <h3 className="font-display text-lg font-black text-slate-900 dark:text-white">
+                  Plan Customization & Simulation Capabilities
+                </h3>
+                <p className="max-w-xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  Compare what you can edit, view, and simulate across Free, Advanced, and Expert Predictor tiers
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4 sm:justify-end">
-            <div className="min-w-0 sm:text-right">
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase block tracking-wider">Current Plan</span>
-              <span className={`mt-1 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${subTier === "pro"
+            <div className="flex items-center justify-between gap-4 w-full min-[500px]:w-auto min-[500px]:justify-end">
+              <div className="min-w-0 min-[500px]:text-right">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase block tracking-wider">Current Plan</span>
+                <span className={`mt-1 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${subTier === "pro"
                   ? "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-400 border border-fuchsia-500/20 shadow-[0_0_12px_rgba(217,70,239,0.15)]"
                   : subTier === "plus"
                     ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.15)]"
                     : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.15)]"
-                }`}>
-                {subTier === "pro" ? "Expert Predictor" : subTier === "plus" ? "Advanced Predictor" : "Free Predictor"}
-              </span>
+                  }`}>
+                  {subTier === "pro" ? "Expert Predictor" : subTier === "plus" ? "Advanced Predictor" : "Free Predictor"}
+                </span>
+              </div>
+              {capabilitiesExpanded ? (
+                <ChevronUp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
+              )}
             </div>
-            {capabilitiesExpanded ? (
-              <ChevronUp className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-slate-500 dark:text-slate-400" />
-            )}
-          </div>
           </div>
         </button>
 

@@ -18,7 +18,7 @@ export function CommissionerHeader({ title, description }: CommissionerHeaderPro
   const { data: session } = useSession();
 
   return (
-    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5">
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-0 justify-between border-b border-slate-200 bg-white px-4 sm:px-8 py-4 sm:py-5">
       <div>
         <h1 className="text-xl font-bold tracking-tight text-slate-900">{title}</h1>
         {description && (

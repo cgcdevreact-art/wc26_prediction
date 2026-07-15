@@ -186,8 +186,8 @@ export default async function ProfilePage() {
     <div className = "min-h-screen bg-hero text-foreground">
       <Header />
 
-      <main className = "mx-auto container px-4 py-16   md:py-24">
-      <div  className = "mb-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+      <main className = "mx-auto container px-4 py-4 md:py-4">
+      <div  className = "mb-5 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
             <div className = "inline-flex items-center gap-2 rounded-full glass px-3.5 py-1 text-xs uppercase tracking-[0.25em] text-neon">
               Account Overview
@@ -336,113 +336,6 @@ export default async function ProfilePage() {
             </div>
           </section>
         </div>
-
-        {/* <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-          <section className = "rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900">
-          <div     className = "flex items-center justify-between border-b border-slate-200 pb-4 dark:border-white/5">
-              <div>
-                <h2 className = "font-display text-2xl font-black text-slate-950 dark:text-white">Recent Activity</h2>
-                <p  className = "mt-1 text-sm text-muted-foreground">Your latest saved prediction actions.</p>
-              </div>
-              <Link href = "/predictions" className = "text-sm font-semibold text-cyan-700 transition hover:text-cyan-600 dark:text-neon">
-                View all
-              </Link>
-            </div>
-
-            <div className = "mt-5 space-y-3">
-              {recentPredictions.length > 0 ? (
-                recentPredictions.map((prediction) => {
-                  const matchup = prediction.match
-                    ? `${prediction.match.homeTeam?.name || prediction.match.homeTeam?.tla || "TBD"} vs ${prediction.match.awayTeam?.name || prediction.match.awayTeam?.tla || "TBD"}`
-                    :  "Tournament projection";
-
-                  const result                          = 
-                        prediction.predictedHomeScore !== null && prediction.predictedAwayScore !== null
-                      ? `${prediction.predictedHomeScore} - ${prediction.predictedAwayScore}`
-                      :  prediction.predictedWinner || "Saved";
-
-                  return (
-                    <div
-                      key       = {prediction.id}
-                      className = "flex items-center justify-between gap-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 dark:border-white/5 dark:bg-white/[0.03]"
-                    >
-                      <div className = "min-w-0">
-                      <div className = "text-xs font-bold uppercase tracking-[0.18em] text-cyan-700 dark:text-neon">
-                          {formatPredictionType(prediction.type)}
-                        </div>
-                        <div className = "mt-1 truncate text-sm font-semibold text-slate-950 dark:text-white">{matchup}</div>
-                        <div className = "mt-1 text-xs text-muted-foreground">
-                          Saved {prediction.createdAt.toLocaleDateString("en-US", {
-                            month: "short",
-                            day  : "numeric",
-                            year : "numeric",
-                          })}
-                        </div>
-                      </div>
-                      <div className = "shrink-0 text-right">
-                      <div className = "text-sm font-black font-mono text-slate-950 dark:text-white">{result}</div>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className = "rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center dark:border-white/10 dark:bg-white/[0.02]">
-                <div className = "text-base font-semibold text-slate-950 dark:text-white">No saved activity yet</div>
-                <p   className = "mt-2 text-sm text-muted-foreground">
-                    Start with the simulator or country projections and your profile will fill up here.
-                  </p>
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className = "rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-900">
-          <div     className = "flex items-center justify-between border-b border-slate-200 pb-4 dark:border-white/5">
-              <div>
-                <h2 className = "font-display text-2xl font-black text-slate-950 dark:text-white">Shortcuts</h2>
-                <p  className = "mt-1 text-sm text-muted-foreground">Jump back into the tools you use most.</p>
-              </div>
-              <BadgeCheck className = "h-7 w-7 text-emerald-500" />
-            </div>
-
-            <div className = "mt-5 space-y-3">
-              {[
-                {
-                  href : "/predictions/country",
-                  title: "Country Predictor",
-                  sub  : "Run nation-level simulations and save full tournament paths.",
-                },
-                {
-                  href : "/simulator",
-                  title: "Match Simulator",
-                  sub  : "Predict group-stage and knockout fixtures with the active model.",
-                },
-                {
-                  href : "/teams",
-                  title: "Teams Explorer",
-                  sub  : "Browse squad depth, ratings, and editable team detail pages.",
-                },
-                {
-                  href : "/subscription",
-                  title: "Billing & Plan",
-                  sub  : "Review your current tier and upgrade when you want more depth.",
-                },
-              ].map((item) => (
-                <Link
-                  key       = {item.href}
-                  href      = {item.href}
-                  className = "flex items-center justify-between rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 transition hover:border-cyan-300 hover:bg-white dark:border-white/5 dark:bg-white/[0.03] dark:hover:border-neon/30 dark:hover:bg-white/[0.05]"
-                >
-                  <div className = "min-w-0">
-                  <div className = "text-sm font-bold text-slate-950 dark:text-white">{item.title}</div>
-                  <div className = "mt-1 text-xs text-muted-foreground">{item.sub}</div>
-                  </div>
-                  <ChevronRight className = "h-4 w-4 shrink-0 text-muted-foreground" />
-                </Link>
-              ))}
-            </div>
-          </section>
-        </div> */}
       </main>
 
       <Footer />

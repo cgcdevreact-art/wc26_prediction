@@ -180,7 +180,7 @@ export default async function PredictionsPage(props: {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
-      <main className="container mx-auto px-4 py-24 md:px-6">
+      <main className="container mx-auto px-4 py-6 md:px-6">
         <div className="mb-12">
           <h1 className="font-display text-4xl font-bold tracking-tight text-gradient sm:text-5xl">
             My Predictions

@@ -4,6 +4,7 @@ import { useTeams } from "@/components/TeamsProvider";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { Flame, TrendingUp, Zap, Users, Activity } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useVotingStore } from "@/stores/useVotingStore";
 
 type LiveStatsResponse = {
   predictionCount: number;
@@ -16,10 +17,43 @@ const POLL_INTERVAL_MS = 15_000;
 
 export function LiveStats() {
   const teams = useTeams();
-  const sorted = [...teams].sort((a, b) => b.prob.champion - a.prob.champion);
-  const top = sorted[0] || teams[0];
-  const fav = sorted[1] || sorted[0] || teams[0];
-  const dh = teams.find((t) => t.code === "MAR") || teams[12] || teams[0];
+  const { tournamentWinnerPolls, loadTournamentWinnerPolls } = useVotingStore();
+
+  useEffect(() => {
+    loadTournamentWinnerPolls();
+  }, [loadTournamentWinnerPolls]);
+
+  // 1. Most Predicted Champion (dynamic from user votes/polls)
+  const topVotedFromPolls = tournamentWinnerPolls?.teams?.[0];
+  const topPredictedTeam = topVotedFromPolls
+    ? (teams.find((t) => t.code === topVotedFromPolls.code) || {
+        code: topVotedFromPolls.code,
+        name: topVotedFromPolls.name,
+        flag: topVotedFromPolls.flag,
+        prob: { champion: topVotedFromPolls.exactProbability ?? topVotedFromPolls.prob ?? 0 }
+      })
+    : null;
+
+  const sortedByModelProb = [...teams].sort((a, b) => b.prob.champion - a.prob.champion);
+  const topPredictedFallback = sortedByModelProb[0] || teams[0];
+  const topPredicted = topPredictedTeam || topPredictedFallback;
+
+  const topPredictedChanceLabel = topVotedFromPolls
+    ? `${(topVotedFromPolls.exactProbability ?? topVotedFromPolls.prob ?? 0).toFixed(1)}% of votes`
+    : (topPredicted ? `${topPredicted.prob.champion.toFixed(1)}% chance` : "Live model signal");
+
+  // 2. Current Favorite (dynamic from highest Elo in teams)
+  const sortedByElo = [...teams].sort((a, b) => b.elo - a.elo);
+  const currentFav = sortedByElo[0] || teams[0];
+
+  // 3. Dark Horse (dynamic from team with champion probability between 4% and 12%)
+  const darkHorses = teams.filter((t) => t.prob.champion >= 4 && t.prob.champion <= 12);
+  const sortedDarkHorses = [...darkHorses].sort((a, b) => b.prob.champion - a.prob.champion);
+  const darkHorseTeam = sortedDarkHorses[0] || teams.find((t) => t.code === "MAR") || teams[12] || teams[0];
+  
+  const darkHorseLabel = darkHorseTeam
+    ? `Rising fast · ${darkHorseTeam.prob.champion.toFixed(1)}% chance`
+    : "Rising fast · +12% this week";
 
   const [stats, setStats] = useState<LiveStatsResponse>({
     predictionCount: 0,
@@ -65,9 +99,9 @@ export function LiveStats() {
   const formatNumber = (value: number) => new Intl.NumberFormat("en-US").format(value);
 
   const items = [
-    { icon: Flame, label: "Most Predicted Champion", team: top, sub: top ? `${top.prob.champion.toFixed(1)}% chance` : "Live model signal" },
-    { icon: TrendingUp, label: "Current Favorite", team: fav, sub: fav ? `Elo ${fav.elo}` : "Live Elo signal" },
-    { icon: Zap, label: "Dark Horse", team: dh, sub: `Rising fast · +12% this week` },
+    { icon: Flame, label: "Most Predicted Champion", team: topPredicted, sub: topPredictedChanceLabel },
+    { icon: TrendingUp, label: "Current Favorite", team: currentFav, sub: currentFav ? `Elo ${currentFav.elo.toFixed(2)}` : "Live Elo signal" },
+    { icon: Zap, label: "Dark Horse", team: darkHorseTeam, sub: darkHorseLabel },
     {
       icon: Activity,
       label: "Predictions Submitted",

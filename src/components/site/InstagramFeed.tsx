@@ -31,9 +31,12 @@ const InstagramIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export function InstagramFeed() {
   const [posts, setPosts] = useState<InstagramPost[]>([]);
+  const [username, setUsername] = useState("26WCPrediction");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selectedPost, setSelectedPost] = useState<InstagramPost | null>(null);
+
+  const otherPosts = selectedPost ? posts.filter((p) => p.id !== selectedPost.id) : [];
 
   useEffect(() => {
     async function fetchPosts() {
@@ -42,6 +45,9 @@ export function InstagramFeed() {
         if (!res.ok) throw new Error("Failed to fetch posts");
         const data = await res.json();
         setPosts(data.posts || []);
+        if (data.username) {
+          setUsername(data.username);
+        }
       } catch (err) {
         console.error("Instagram feed error:", err);
         setError(true);
@@ -184,80 +190,114 @@ export function InstagramFeed() {
             <ChevronLeft className="h-6 w-6" />
           </button>
 
+          {/* Close Button (Fixed relative to overlay) */}
+          <button
+            onClick={() => setSelectedPost(null)}
+            className="fixed right-4 top-4 md:right-8 md:top-8 z-50 rounded-full bg-slate-950/80 p-3 text-white hover:text-white backdrop-blur-sm transition-transform border border-white/15 hover:scale-105 active:scale-95 cursor-pointer shadow-2xl focus:outline-none"
+            aria-label="Close modal"
+          >
+            <X className="h-6 w-6" />
+          </button>
+
           {/* Modal Container */}
           <div
-            className="relative flex flex-col md:flex-row w-full max-w-5xl max-h-[90vh] md:max-h-[85vh] overflow-hidden rounded-[2rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl scale-100 transition-transform duration-300 animate-in zoom-in-95 duration-200 select-text"
+            className="relative flex flex-col w-full max-w-5xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto no-scrollbar rounded-[2rem] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl scale-100 transition-transform duration-300 animate-in zoom-in-95 duration-200 select-text"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close Button */}
-            <button
-              onClick={() => setSelectedPost(null)}
-              className="absolute right-4 top-4 z-20 rounded-full bg-slate-900/60 p-2 text-white/80 hover:text-white backdrop-blur-sm transition-colors border border-white/10 focus:outline-none"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            {/* Main Post Section */}
+            <div className="flex flex-col md:flex-row w-full border-b border-slate-100 dark:border-slate-800/80">
+              {/* Media Frame */}
+              <div className="flex-1 bg-black flex items-center justify-center min-h-[300px] md:min-h-[600px] relative select-none">
+                {selectedPost.media_type === "VIDEO" ? (
+                  <video
+                    src={selectedPost.media_url}
+                    poster={selectedPost.thumbnail_url}
+                    controls
+                    autoPlay
+                    loop
+                    playsInline
+                    className="max-h-[55vh] md:max-h-[70vh] w-full object-contain"
+                  />
+                ) : (
+                  <img
+                    src={selectedPost.media_url}
+                    alt="Instagram post details"
+                    className="max-h-[55vh] md:max-h-[70vh] w-full object-contain"
+                  />
+                )}
+              </div>
 
-            {/* Media Frame */}
-            <div className="flex-1 bg-black flex items-center justify-center min-h-[250px] md:min-h-0 relative select-none">
-              {selectedPost.media_type === "VIDEO" ? (
-                <video
-                  src={selectedPost.media_url}
-                  poster={selectedPost.thumbnail_url}
-                  controls
-                  autoPlay
-                  loop
-                  playsInline
-                  className="max-h-[40vh] md:max-h-[85vh] w-full object-contain"
-                />
-              ) : (
-                <img
-                  src={selectedPost.media_url}
-                  alt="Instagram post details"
-                  className="max-h-[40vh] md:max-h-[85vh] w-full object-contain"
-                />
-              )}
-            </div>
+              {/* Info Section */}
+              <div className="w-full md:w-[380px] bg-white dark:bg-slate-950 p-6 flex flex-col justify-between border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800">
+                <div className="flex-1 space-y-4 pr-1">
+                  {/* Header info */}
+                  <div className="flex items-center gap-3 pb-3.5 border-b border-slate-100 dark:border-slate-800/80">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-500 text-white shadow-sm">
+                      <InstagramIcon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900 dark:text-white">@{username}</h4>
+                      <p className="text-[10px] font-bold text-slate-400">
+                        {new Date(selectedPost.timestamp).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric"
+                        })}
+                      </p>
+                    </div>
+                  </div>
 
-            {/* Info Section */}
-            <div className="w-full md:w-[380px] bg-white dark:bg-slate-950 p-6 flex flex-col justify-between border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800">
-              <div className="flex-1 overflow-y-auto max-h-[25vh] md:max-h-none space-y-4 pr-1">
-                {/* Header info */}
-                <div className="flex items-center gap-3 pb-3.5 border-b border-slate-100 dark:border-slate-800/80">
-                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-tr from-violet-600 to-fuchsia-500 text-white shadow-sm">
-                    <InstagramIcon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black text-slate-900 dark:text-white">@26WCPrediction</h4>
-                    <p className="text-[10px] font-bold text-slate-400">
-                      {new Date(selectedPost.timestamp).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric"
-                      })}
-                    </p>
-                  </div>
+                  {/* Caption / Description text */}
+                  <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-350 whitespace-pre-line font-medium pr-1">
+                    {selectedPost.caption || "View details on Instagram"}
+                  </p>
                 </div>
 
-                {/* Caption / Description text */}
-                <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-350 whitespace-pre-line font-medium pr-1">
-                  {selectedPost.caption || "View details on Instagram"}
-                </p>
-              </div>
-
-              {/* Redirect Action CTA */}
-              <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80">
-                <a
-                  href={selectedPost.permalink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 px-4 py-3.5 text-sm font-bold shadow-md hover:-translate-y-0.5 hover:shadow-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-all duration-200"
-                >
-                  <InstagramIcon className="h-4 w-4" />
-                  <span>View on Instagram</span>
-                  <ExternalLink className="h-3.5 w-3.5 ml-0.5" />
-                </a>
+                {/* Redirect Action CTA */}
+                <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80">
+                  <a
+                    href={selectedPost.permalink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 px-4 py-3.5 text-sm font-bold shadow-md hover:-translate-y-0.5 hover:shadow-lg hover:bg-slate-800 dark:hover:bg-slate-100 transition-all duration-200"
+                  >
+                    <InstagramIcon className="h-4 w-4" />
+                    <span>View on Instagram</span>
+                    <ExternalLink className="h-3.5 w-3.5 ml-0.5" />
+                  </a>
+                </div>
               </div>
             </div>
+
+            {/* More Posts Section */}
+            {otherPosts.length > 0 && (
+              <div className="bg-slate-50/50 dark:bg-slate-950/20 p-6 md:p-8">
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-6">
+                  More posts from {username}
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {otherPosts.map((post) => (
+                    <button
+                      key={post.id}
+                      onClick={() => setSelectedPost(post)}
+                      className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200/60 dark:border-white/5 bg-slate-150 dark:bg-slate-900 shadow-xs cursor-pointer text-left w-full hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                    >
+                      <img
+                        src={post.media_type === "VIDEO" && post.thumbnail_url ? post.thumbnail_url : post.media_url}
+                        alt="More instagram updates"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                      {post.media_type === "VIDEO" && (
+                        <div className="absolute right-2.5 top-2.5 rounded-md bg-black/60 p-1 text-white backdrop-blur-sm shadow-xs ring-1 ring-white/10 z-10">
+                          <Video className="h-3 w-3" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Navigation - Right Arrow */}

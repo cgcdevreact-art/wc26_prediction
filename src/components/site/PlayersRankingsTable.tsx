@@ -272,7 +272,7 @@ export function PlayersRankingsTable({
       </div>
 
       <div className="overflow-x-auto scrollbar-custom rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950">
-        <table className="w-full text-left text-[11px] sm:text-xs table-auto whitespace-nowrap min-w-max">
+        <table className="w-full min-w-[1000px] text-left text-[11px] sm:text-xs table-auto">
           <thead className="border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-cyan-50/40 text-[10px] sm:text-xs font-bold uppercase tracking-[0.14em] text-slate-700 dark:border-white/10 dark:bg-[linear-gradient(90deg,rgba(255,255,255,0.04),rgba(6,182,212,0.05),rgba(255,255,255,0.04))] dark:text-slate-200">
             <tr>
               <th className="w-10 px-1.5 py-3 font-semibold whitespace-nowrap">#</th>

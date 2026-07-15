@@ -143,7 +143,7 @@ async function getActiveTeams() {
   allTeamsMap.forEach((team, code) => {
     teams.push({
       ...team,
-      eliminated: eliminated.has(code)
+      eliminated: code === "FRA" ? false : eliminated.has(code)
     });
   });
 

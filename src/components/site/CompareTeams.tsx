@@ -79,10 +79,10 @@ export function CompareTeams({ standalone = false }: { standalone?: boolean }) {
       )}
       <div className="mt-8 grid gap-5 lg:grid-cols-2 min-w-0">
         <div className="glass-strong rounded-2xl p-5 min-w-0 overflow-hidden">
-          <div className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] items-center gap-3 w-full">
+          <div className="flex flex-col gap-2 min-[500px]:grid min-[500px]:grid-cols-[1fr_auto_1fr] min-[500px]:items-center min-[500px]:gap-3">
             <TeamPicker value={a} onChange={handleTeamAChange} excludeCode={b} accent="neon" />
-            <button onClick={() => { setA(b); setB(a); }} className="grid h-10 w-10 place-items-center rounded-full bg-white/5 hover:bg-white/10 rotate-90 sm:rotate-0 transition duration-200" aria-label="swap">
-              <ArrowLeftRight className="h-4 w-4" />
+            <button onClick={() => { setA(b); setB(a); }} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/5 hover:bg-white/10 self-center" aria-label="swap">
+              <ArrowLeftRight className="h-4 w-4 rotate-90 min-[500px]:rotate-0 transition-transform duration-300" />
             </button>
             <TeamPicker value={b} onChange={handleTeamBChange} excludeCode={a} accent="neon-2" />
           </div>
@@ -170,7 +170,7 @@ function TeamPicker({
         />
         <div className="min-w-0 flex-1">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">#{t.rank}</div>
-          <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full bg-transparent text-base font-semibold outline-none">
+          <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full bg-transparent text-base font-semibold outline-none truncate pr-4">
             {availableTeams.map((tt) => (
               <option key={tt.code} value={tt.code} className="bg-popover text-foreground">{tt.name}</option>
             ))}
