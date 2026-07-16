@@ -2835,20 +2835,24 @@ export function GroupPredictor({
   const sfLosers = useMemo(() => {
     const homeMatch = koMatchups.sf[0];
     const awayMatch = koMatchups.sf[1];
-    const homeWinner = koWinners.sf[0];
-    const awayWinner = koWinners.sf[1];
 
     let homeLoser: string | null = null;
     let awayLoser: string | null = null;
 
-    if (homeMatch?.home && homeMatch?.away && homeWinner) {
-      homeLoser = homeWinner === homeMatch.home ? homeMatch.away : homeMatch.home;
+    if (homeMatch?.home && homeMatch?.away) {
+      const homeWinner = getKoMatchWinnerAndScore("sf", 0, homeMatch.home, homeMatch.away).winnerCode;
+      if (homeWinner) {
+        homeLoser = homeWinner === homeMatch.home ? homeMatch.away : homeMatch.home;
+      }
     }
-    if (awayMatch?.home && awayMatch?.away && awayWinner) {
-      awayLoser = awayWinner === awayMatch.home ? awayMatch.away : awayMatch.home;
+    if (awayMatch?.home && awayMatch?.away) {
+      const awayWinner = getKoMatchWinnerAndScore("sf", 1, awayMatch.home, awayMatch.away).winnerCode;
+      if (awayWinner) {
+        awayLoser = awayWinner === awayMatch.home ? awayMatch.away : awayMatch.home;
+      }
     }
     return { home: homeLoser, away: awayLoser };
-  }, [koMatchups.sf, koWinners.sf]);
+  }, [koMatchups.sf, getKoMatchWinnerAndScore]);
 
   const handleSelectKoWinner = (round: "r32" | "r16" | "qf" | "sf" | "final", matchIndex: number, teamCode: string) => {
     // Determine default scores if empty

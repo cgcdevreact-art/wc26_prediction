@@ -352,7 +352,7 @@ export function MatchProbabilitiesList() {
             <div className="flex justify-center items-center h-[320px]">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
             </div>
-          ) : tournamentWinnerPolls && (
+          ) : tournamentWinnerPolls ? (
             <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-[minmax(240px,0.9fr)_minmax(0,1.6fr)] xl:grid-cols-[minmax(260px,0.95fr)_minmax(0,1.55fr)] flex-1">
 
               {/* Left Column (span 4): Standings List */}
@@ -515,6 +515,12 @@ export function MatchProbabilitiesList() {
                 {/* Stepped Line Chart */}
                 {renderWinnerChart("flex-grow min-h-[240px]")}
               </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[320px] text-center p-6 bg-slate-50 dark:bg-black/10 rounded-2xl border border-dashed border-slate-200 dark:border-white/5">
+              <AlertCircle className="w-8 h-8 text-amber-500 mb-2" />
+              <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Failed to load prediction data</h4>
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs">There was an issue loading the aggregated predictions. Please refresh the page or try again later.</p>
             </div>
           )}
         </div>

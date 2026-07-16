@@ -261,7 +261,7 @@ export function mapFixtures({ gamesData, teamsData, stadiumsData }: FixturesSour
   const stadiumsMap = buildStadiumsMap(stadiumsData);
   const now = new Date();
 
-  return (gamesData.games || [])
+  const mapped = (gamesData.games || [])
     .map((game, index) => {
       const homeTeamName = game.home_team_label || game.home_team_name_en || "TBC";
       const awayTeamName = game.away_team_label || game.away_team_name_en || "TBC";
@@ -342,8 +342,127 @@ export function mapFixtures({ gamesData, teamsData, stadiumsData }: FixturesSour
         isKnockout: game.type !== "group",
         stageName: getStageName(game.type),
       };
-    })
-    .sort((a, b) => a.match_no - b.match_no);
+    });
+
+  // Resolve placeholder names dynamically (Winner/Loser Match X)
+  let changed = true;
+  let iterations = 0;
+  while (changed && iterations < 10) {
+    changed = false;
+    iterations++;
+
+    for (const f of mapped) {
+      // 1. Resolve Home Team if it's a placeholder
+      const homeMatchResult = f.homeTeamObj.name.match(/^(Winner|Loser)\s+Match\s+(\d+)$/i);
+      if (homeMatchResult) {
+        const type = homeMatchResult[1].toLowerCase(); // "winner" or "loser"
+        const targetMatchNo = parseInt(homeMatchResult[2], 10);
+        const targetFixture = mapped.find(tf => tf.match_no === targetMatchNo);
+        
+        if (targetFixture && targetFixture.status === "COMPLETED") {
+          const hs = parseInt(targetFixture.homeScore, 10);
+          const as = parseInt(targetFixture.awayScore, 10);
+          if (!isNaN(hs) && !isNaN(as)) {
+            let winnerObj = null;
+            let loserObj = null;
+            
+            if (hs > as) {
+              winnerObj = targetFixture.homeTeamObj;
+              loserObj = targetFixture.awayTeamObj;
+            } else if (as > hs) {
+              winnerObj = targetFixture.awayTeamObj;
+              loserObj = targetFixture.homeTeamObj;
+            } else {
+              // Tie. Check subsequent matches to see which team advanced
+              const homeCode = targetFixture.homeTeamObj.code;
+              const awayCode = targetFixture.awayTeamObj.code;
+              if (homeCode && awayCode) {
+                const homeAdvanced = mapped.some(m => 
+                  m.isKnockout && 
+                  m.match_no > targetFixture.match_no && 
+                  (m.homeTeamObj.code === homeCode || m.awayTeamObj.code === homeCode)
+                );
+                const awayAdvanced = mapped.some(m => 
+                  m.isKnockout && 
+                  m.match_no > targetFixture.match_no && 
+                  (m.homeTeamObj.code === awayCode || m.awayTeamObj.code === awayCode)
+                );
+                if (homeAdvanced && !awayAdvanced) {
+                  winnerObj = targetFixture.homeTeamObj;
+                  loserObj = targetFixture.awayTeamObj;
+                } else if (awayAdvanced && !homeAdvanced) {
+                  winnerObj = targetFixture.awayTeamObj;
+                  loserObj = targetFixture.homeTeamObj;
+                }
+              }
+            }
+            
+            const resolvedTeam = type === "winner" ? winnerObj : loserObj;
+            if (resolvedTeam && resolvedTeam.code) {
+              f.homeTeamObj = { ...resolvedTeam };
+              changed = true;
+            }
+          }
+        }
+      }
+
+      // 2. Resolve Away Team if it's a placeholder
+      const awayMatchResult = f.awayTeamObj.name.match(/^(Winner|Loser)\s+Match\s+(\d+)$/i);
+      if (awayMatchResult) {
+        const type = awayMatchResult[1].toLowerCase(); // "winner" or "loser"
+        const targetMatchNo = parseInt(awayMatchResult[2], 10);
+        const targetFixture = mapped.find(tf => tf.match_no === targetMatchNo);
+        
+        if (targetFixture && targetFixture.status === "COMPLETED") {
+          const hs = parseInt(targetFixture.homeScore, 10);
+          const as = parseInt(targetFixture.awayScore, 10);
+          if (!isNaN(hs) && !isNaN(as)) {
+            let winnerObj = null;
+            let loserObj = null;
+            
+            if (hs > as) {
+              winnerObj = targetFixture.homeTeamObj;
+              loserObj = targetFixture.awayTeamObj;
+            } else if (as > hs) {
+              winnerObj = targetFixture.awayTeamObj;
+              loserObj = targetFixture.homeTeamObj;
+            } else {
+              // Tie. Check subsequent matches to see which team advanced
+              const homeCode = targetFixture.homeTeamObj.code;
+              const awayCode = targetFixture.awayTeamObj.code;
+              if (homeCode && awayCode) {
+                const homeAdvanced = mapped.some(m => 
+                  m.isKnockout && 
+                  m.match_no > targetFixture.match_no && 
+                  (m.homeTeamObj.code === homeCode || m.awayTeamObj.code === homeCode)
+                );
+                const awayAdvanced = mapped.some(m => 
+                  m.isKnockout && 
+                  m.match_no > targetFixture.match_no && 
+                  (m.homeTeamObj.code === awayCode || m.awayTeamObj.code === awayCode)
+                );
+                if (homeAdvanced && !awayAdvanced) {
+                  winnerObj = targetFixture.homeTeamObj;
+                  loserObj = targetFixture.awayTeamObj;
+                } else if (awayAdvanced && !homeAdvanced) {
+                  winnerObj = targetFixture.awayTeamObj;
+                  loserObj = targetFixture.homeTeamObj;
+                }
+              }
+            }
+            
+            const resolvedTeam = type === "winner" ? winnerObj : loserObj;
+            if (resolvedTeam && resolvedTeam.code) {
+              f.awayTeamObj = { ...resolvedTeam };
+              changed = true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return mapped.sort((a, b) => a.match_no - b.match_no);
 }
 
 function sleep(ms: number) {
