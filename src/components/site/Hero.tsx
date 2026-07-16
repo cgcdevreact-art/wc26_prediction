@@ -92,7 +92,21 @@ export function Hero() {
 
   const activeDate = getActiveDate(fixtures);
   const todayMatches = fixtures
-    .filter((f) => f.date === activeDate)
+    .filter((f) => {
+      if (f.date === activeDate) return true;
+      
+      const remainingMatches = fixtures.filter((m) => m.status === "LIVE" || m.status === "UPCOMING");
+      if (remainingMatches.length <= 8 && (f.status === "LIVE" || f.status === "UPCOMING")) {
+        return true;
+      }
+
+      const isFinalOrThird = f.stageName === "Final" || f.stageName === "Third Place Playoff" || f.match_no === 103 || f.match_no === 104;
+      if (isFinalOrThird && (f.status === "LIVE" || f.status === "UPCOMING")) {
+        return true;
+      }
+
+      return false;
+    })
     .sort((a, b) => {
       const getMatchPriority = (match: any) => {
         if (match.status === "LIVE") return 0;

@@ -24,6 +24,7 @@ export default function InstagramSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [refreshingFeed, setRefreshingFeed] = useState(false);
   
   const [connected, setConnected] = useState(false);
   const [username, setUsername] = useState("");
@@ -114,6 +115,26 @@ export default function InstagramSettingsPage() {
     }
   }
 
+  async function handleRefreshFeed() {
+    setRefreshingFeed(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+    try {
+      const res = await fetch("/api/instagram/posts?force=true");
+      if (!res.ok) throw new Error("Failed to refresh instagram feed");
+      const data = await res.json();
+      if (data.posts) {
+        setSuccessMsg("Instagram feed gallery cache cleared and refreshed successfully!");
+      } else {
+        setErrorMsg("Failed to refresh feed posts from Instagram API.");
+      }
+    } catch (err) {
+      setErrorMsg("Failed to refresh feed posts. Please check if your access token is valid.");
+    } finally {
+      setRefreshingFeed(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
@@ -164,13 +185,23 @@ export default function InstagramSettingsPage() {
             </div>
             
             {connected && (
-              <button
-                onClick={handleDisconnect}
-                disabled={disconnecting}
-                className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-bold text-red-600 shadow-sm transition-all hover:bg-red-100 disabled:opacity-50"
-              >
-                {disconnecting ? "Disconnecting..." : "Disconnect"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRefreshFeed}
+                  disabled={refreshingFeed}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-100 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw className={`h-3 w-3 ${refreshingFeed ? "animate-spin" : ""}`} />
+                  {refreshingFeed ? "Refreshing..." : "Refresh Feed Gallery"}
+                </button>
+                <button
+                  onClick={handleDisconnect}
+                  disabled={disconnecting}
+                  className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-bold text-red-600 shadow-sm transition-all hover:bg-red-100 disabled:opacity-50 cursor-pointer"
+                >
+                  {disconnecting ? "Disconnecting..." : "Disconnect"}
+                </button>
+              </div>
             )}
           </div>
 

@@ -49,7 +49,16 @@ const MOCK_POSTS = [
   }
 ];
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Read force refresh parameter
+  let force = false;
+  try {
+    const { searchParams } = new URL(req.url);
+    force = searchParams.get("force") === "true";
+  } catch (e) {
+    console.error("Failed to parse request URL for force param:", e);
+  }
+
   // Read token from config file first, then fall back to environment variable
   let accessToken = process.env.INSTAGRAM_ACCESS_TOKEN || "";
   if (fs.existsSync(CONFIG_PATH)) {
@@ -68,15 +77,15 @@ export async function GET() {
     return NextResponse.json({ posts: MOCK_POSTS, username: "26WCPrediction", fromCache: false, source: "mock" });
   }
 
-  // Check if cache is still valid
+  // Check if cache is still valid (only if not forcing refresh)
   const now = Date.now();
-  if (cacheStore && now - cacheStore.timestamp < CACHE_DURATION_MS) {
+  if (!force && cacheStore && now - cacheStore.timestamp < CACHE_DURATION_MS) {
     return NextResponse.json({ posts: cacheStore.posts, username: cacheStore.username, fromCache: true, source: "api" });
   }
 
   try {
     const url = `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&access_token=${accessToken}&limit=8`;
-    const res = await fetch(url, { next: { revalidate: 3600 } });
+    const res = await fetch(url, force ? { cache: "no-store" } : { next: { revalidate: 3600 } });
 
     if (!res.ok) {
       console.warn(`Instagram API returned status: ${res.status}`);
