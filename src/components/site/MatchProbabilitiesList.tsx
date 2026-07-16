@@ -144,11 +144,6 @@ export function MatchProbabilitiesList() {
   }, [fixtures]);
 
   const handleWinnerVoteClick = (teamId: number, teamCode: string) => {
-    if (!session) {
-      setShowSignInModal(true);
-      return;
-    }
-
     const votedWinnerCode = userVotes["tournament-winner"];
     if (votedWinnerCode) {
       const list = tournamentWinnerPolls?.allTeams || tournamentWinnerPolls?.teams || [];
@@ -169,6 +164,48 @@ export function MatchProbabilitiesList() {
     if (!confirmWinnerTeam) return;
     const { id, code } = confirmWinnerTeam;
     setConfirmWinnerTeam(null);
+
+    if (!session) {
+      localStorage.setItem("guest-vote-tournament-winner", JSON.stringify({ id, code }));
+      useVotingStore.setState((state) => ({
+        userVotes: {
+          ...state.userVotes,
+          "tournament-winner": code
+        }
+      }));
+      if (tournamentWinnerPolls) {
+        const nextTotal = (tournamentWinnerPolls.totalVotes || 0) + 1;
+        const nextTeams = tournamentWinnerPolls.teams.map((t) => {
+          if (t.code === code) {
+            const votes = (t.finalVotes || 0) + 1;
+            const exactProbability = nextTotal > 0 ? (votes / nextTotal) * 100 : 0;
+            return {
+              ...t,
+              finalVotes: votes,
+              realVotes: votes,
+              prob: Math.round(exactProbability),
+              exactProbability: Number(exactProbability.toFixed(1))
+            };
+          } else {
+            const exactProbability = nextTotal > 0 ? ((t.finalVotes || 0) / nextTotal) * 100 : 0;
+            return {
+              ...t,
+              prob: Math.round(exactProbability),
+              exactProbability: Number(exactProbability.toFixed(1))
+            };
+          }
+        });
+        useVotingStore.setState({
+          tournamentWinnerPolls: {
+            ...tournamentWinnerPolls,
+            totalVotes: nextTotal,
+            teams: nextTeams
+          }
+        });
+      }
+      toast.success("Guest vote saved locally!");
+      return;
+    }
 
     try {
       await voteTournamentWinner(id, code);
@@ -360,7 +397,7 @@ export function MatchProbabilitiesList() {
 
                 {/* Standings List (Top teams only, sorted) */}
                 <div className="flex flex-col gap-3.5">
-                  {sortedStandings.filter((t) => !(t as any).eliminated).map((t) => (
+                  {sortedStandings.filter((t) => visibleTeams[t.name]).map((t) => (
                     <div key={t.code} className="flex items-center justify-between group">
                       <div className="flex items-center gap-3">
                         <div className="w-7 h-5 overflow-hidden rounded-[2px] border border-slate-200 dark:border-[#1f2937] bg-slate-100 dark:bg-slate-900 flex items-center justify-center shrink-0">

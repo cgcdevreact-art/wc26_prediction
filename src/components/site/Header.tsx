@@ -83,6 +83,63 @@ export function Header() {
     return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, [open]);
 
+  // Synchronize guest votes once authenticated
+  useEffect(() => {
+    if (session?.user) {
+      const syncVotes = async () => {
+        // 1. Sync tournament winner vote
+        const guestWinnerVote = localStorage.getItem("guest-vote-tournament-winner");
+        if (guestWinnerVote) {
+          try {
+            const { id } = JSON.parse(guestWinnerVote);
+            if (id) {
+              const res = await fetch("/api/votes/winner", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ teamId: id })
+              });
+              if (res.ok) {
+                localStorage.removeItem("guest-vote-tournament-winner");
+              }
+            }
+          } catch (e) {
+            console.error("Failed to sync guest winner vote", e);
+          }
+        }
+
+        // 2. Sync custom poll votes
+        const keysToSync: { key: string; pollId: string; optionId: string }[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("guest-vote-poll-")) {
+            const pollId = key.replace("guest-vote-poll-", "");
+            const optionId = localStorage.getItem(key);
+            if (optionId) {
+              keysToSync.push({ key, pollId, optionId });
+            }
+          }
+        }
+
+        for (const item of keysToSync) {
+          try {
+            const res = await fetch(`/api/custom-polls/${item.pollId}/vote`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ optionId: item.optionId })
+            });
+            if (res.ok) {
+              localStorage.removeItem(item.key);
+            }
+          } catch (e) {
+            console.error(`Failed to sync guest vote for poll ${item.pollId}`, e);
+          }
+        }
+      };
+
+      syncVotes();
+    }
+  }, [session]);
+
   useEffect(() => {
     const tier = session?.user?.subscriptionTier;
     if (!tier) return;
