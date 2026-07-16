@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { CheckCircle2, Loader2, Vote, ExternalLink, AlertTriangle, Users, TrendingUp, Flame, X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -54,6 +54,33 @@ export function CustomVotingCard({ poll }: CustomVotingCardProps) {
   const [confirmOption, setConfirmOption] = useState<CustomPollOption | null>(null);
   const [showSignInModal, setShowSignInModal] = useState(false);
 
+  useEffect(() => {
+    if (!session) {
+      const guestOptionId = localStorage.getItem(`guest-vote-poll-${poll.id}`);
+      if (guestOptionId) {
+        const nextOptions = poll.options.map(opt => {
+          const votes = opt.id === guestOptionId ? opt.votes + 1 : opt.votes;
+          return { ...opt, votes };
+        });
+        const nextTotal = poll.totalVotes + 1;
+        const updated = nextOptions.map(opt => ({
+          ...opt,
+          percentage: nextTotal > 0 ? Math.round((opt.votes / nextTotal) * 100) : 0
+        }));
+        setState({
+          ...poll,
+          totalVotes: nextTotal,
+          userOptionId: guestOptionId,
+          options: updated
+        });
+      } else {
+        setState(poll);
+      }
+    } else {
+      setState(poll);
+    }
+  }, [poll, session]);
+
   const isLocked = state.status !== "LIVE";
   const hasVoted = Boolean(state.userOptionId);
 
@@ -79,6 +106,30 @@ export function CustomVotingCard({ poll }: CustomVotingCardProps) {
   const submitVote = useCallback(async (optionId: string) => {
     setSubmittingId(optionId);
 
+    if (!session) {
+      localStorage.setItem(`guest-vote-poll-${state.id}`, optionId);
+      const nextOptions = state.options.map(opt => {
+        if (opt.id === optionId) {
+          return { ...opt, votes: opt.votes + 1 };
+        }
+        return opt;
+      });
+      const nextTotalVotes = state.totalVotes + 1;
+      const updatedOptions = nextOptions.map(opt => ({
+        ...opt,
+        percentage: nextTotalVotes > 0 ? Math.round((opt.votes / nextTotalVotes) * 100) : 0
+      }));
+      setState({
+        ...state,
+        totalVotes: nextTotalVotes,
+        userOptionId: optionId,
+        options: updatedOptions
+      });
+      setSubmittingId(null);
+      toast.success("Guest vote saved locally!");
+      return;
+    }
+
     try {
       const res = await fetch(`/api/custom-polls/${state.id}/vote`, {
         method: "POST",
@@ -99,13 +150,9 @@ export function CustomVotingCard({ poll }: CustomVotingCardProps) {
     } finally {
       setSubmittingId(null);
     }
-  }, [state.id]);
+  }, [state.id, state.options, state.totalVotes, session]);
 
   const handleVoteClick = (option: CustomPollOption) => {
-    if (!session) {
-      setShowSignInModal(true);
-      return;
-    }
     if (submittingId || hasVoted || isLocked) {
       return;
     }
