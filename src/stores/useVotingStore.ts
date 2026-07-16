@@ -167,13 +167,50 @@ export const useVotingStore = create<VotingState>((set, get) => ({
     }
     try {
       const data = await votingService.fetchTournamentWinnerVotes();
-      set({ tournamentWinnerPolls: data, isLoadingTournamentWinnerPolls: false });
-      const selection = data.userSelection;
-      if (selection) {
+      
+      let finalSelection = data.userSelection;
+      let finalData = data;
+      
+      if (typeof window !== "undefined" && !finalSelection) {
+        const guestVoteRaw = localStorage.getItem("guest-vote-tournament-winner");
+        if (guestVoteRaw) {
+          try {
+            const guestVote = JSON.parse(guestVoteRaw);
+            if (guestVote && guestVote.code) {
+              finalSelection = guestVote.code;
+              
+              const nextTotal = (data.totalVotes || 0) + 1;
+              const nextTeams = data.teams.map((t: any) => {
+                const votes = t.code === guestVote.code ? (t.finalVotes || 0) + 1 : (t.finalVotes || 0);
+                const exactProbability = nextTotal > 0 ? (votes / nextTotal) * 100 : 0;
+                return {
+                  ...t,
+                  finalVotes: votes,
+                  realVotes: votes,
+                  prob: Math.round(exactProbability),
+                  exactProbability: Number(exactProbability.toFixed(1))
+                };
+              });
+              
+              finalData = {
+                ...data,
+                totalVotes: nextTotal,
+                teams: nextTeams
+              };
+            }
+          } catch (e) {
+            console.error("Failed to parse guest vote", e);
+          }
+        }
+      }
+      
+      set({ tournamentWinnerPolls: finalData, isLoadingTournamentWinnerPolls: false });
+      
+      if (finalSelection) {
         set((state) => ({
           userVotes: {
             ...state.userVotes,
-            "tournament-winner": selection
+            "tournament-winner": finalSelection
           }
         }));
       } else {

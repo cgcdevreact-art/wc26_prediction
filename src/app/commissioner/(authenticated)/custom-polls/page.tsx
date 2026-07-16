@@ -409,7 +409,7 @@ export default function CommissionerCustomPollsPage() {
                     </select>
                   </div>
 
-                  <div className="grid gap-4 grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                     <div className="space-y-2.5">
                       <label className="text-xs font-black uppercase tracking-widest text-slate-500">
                         Opens
