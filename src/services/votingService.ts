@@ -19,6 +19,8 @@ export interface TournamentWinnerResponse {
     prob: number;
     color: string;
     exactProbability: number;
+    finalVotes?: number;
+    realVotes?: number;
   }>;
   allTeams?: Array<{
     name: string;
@@ -27,6 +29,8 @@ export interface TournamentWinnerResponse {
     prob: number;
     color: string;
     exactProbability: number;
+    finalVotes?: number;
+    realVotes?: number;
   }>;
   chartData: any[];
   totalVotes: number;
