@@ -206,7 +206,7 @@ export function Hero() {
           <div className="mt-8">
             <div className="mb-2 flex items-center justify-between">
               <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Countdown to Final</div>
-              <div className="text-xs text-muted-foreground">Jul 19, 2026 · New York New, Jersey Stadium</div>
+              <div className="text-xs text-muted-foreground">Jul 19, 2026 · New York, New Jersey Stadium</div>
             </div>
             <Countdown />
           </div>
@@ -215,6 +215,7 @@ export function Hero() {
         <div className="relative">
           <div className="absolute -inset-6 rounded-3xl bg-gradient-to-tr from-neon/20 via-transparent to-neon-2/20 blur-2xl" />
           <button
+            id="tour-hero-probabilities"
             type="button"
             onClick={handleBannerClick}
             className="relative block w-full text-left glass-strong rounded-3xl p-6 transition hover:scale-[1.01] hover:bg-white/10 cursor-pointer"
@@ -268,7 +269,7 @@ export function Hero() {
       </div>
 
       {/* Today's Matches Section */}
-      <div className="mx-auto container px-4 pb-12 md:px-6 relative z-10 mt-2">
+      <div id="tour-hero-matches" className="mx-auto container px-4 pb-12 md:px-6 relative z-10 mt-2">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 flex items-center gap-2">
             <Calendar className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />

@@ -13,7 +13,7 @@ export default function Page() {
     <div className="min-h-screen bg-hero">
       <Header />
       <main className="pt-6">
-        <section className="container mx-auto px-4 pb-6">
+        <section id="tour-model-guide" className="container mx-auto px-4 pb-6">
           <ModelGuideAccordion />
         </section>
         <GroupPredictor />
