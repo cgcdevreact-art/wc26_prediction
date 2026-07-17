@@ -24,6 +24,7 @@ import { GlobalAuthModal } from "@/components/site/GlobalAuthModal";
 import { CookieConsent } from "@/components/site/CookieConsent";
 import { GlobalAnnouncementModal } from "@/components/site/GlobalAnnouncementModal";
 import { getActiveAnnouncement } from "@/app/actions/announcements";
+import { SiteTourProvider } from "@/components/site/SiteTour";
 
 export const metadata: Metadata = {
   title: "26WC Prediction",
@@ -73,6 +74,11 @@ export default async function RootLayout({
           }}
         />
 
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/LikaloLLC/tourguide.js@0.2.0/tourguide.css"
+        />
+
         {process.env.NEXT_PUBLIC_APP_ENV === "production" && (
           <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4746258958164249" crossOrigin="anonymous"></script>
         )}
@@ -81,11 +87,13 @@ export default async function RootLayout({
         <SessionProvider session={session}>
           <ThemeProvider>
             <TeamsProvider teams={teams} groupsConfig={groupsConfig} results={cupResults}>
-              {children}
-              <GlobalAuthModal />
-              <CookieConsent />
-              <Toaster />
-              <GlobalAnnouncementModal announcement={activeAnnouncement} />
+              <SiteTourProvider>
+                {children}
+                <GlobalAuthModal />
+                <CookieConsent />
+                <Toaster />
+                <GlobalAnnouncementModal announcement={activeAnnouncement} />
+              </SiteTourProvider>
             </TeamsProvider>
           </ThemeProvider>
         </SessionProvider>

@@ -4069,6 +4069,7 @@ export function GroupPredictor({
             <div className="mb-8 flex flex-col gap-4 border-b border-border dark:border-white/10 md:flex-row md:items-end md:justify-between">
               <div className="flex -mb-[1px] shrink-0">
                 <button
+                  id="tour-tab-group"
                   onClick={() => setActiveTab("group")}
                   className={`px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "group"
                     ? "border-neon text-neon"
@@ -4079,6 +4080,7 @@ export function GroupPredictor({
                 </button>
                 {isGroupStageComplete && (
                   <button
+                    id="tour-tab-knockout"
                     onClick={() => setActiveTab("knockout")}
                     className={`flex items-center gap-2 px-6 py-3 font-display text-lg font-semibold border-b-2 transition ${activeTab === "knockout"
                       ? "border-neon text-neon"
@@ -4509,7 +4511,7 @@ export function GroupPredictor({
 
           {/* Knockout Bracket View */}
           {activeTab === "knockout" && (
-            <div id="knockout-bracket-view" className="space-y-6 md:space-y-8 animate-in slide-in-from-right-8 fade-in duration-500 pt-4">
+            <div id="tour-bracket-container" className="space-y-6 md:space-y-8 animate-in slide-in-from-right-8 fade-in duration-500 pt-4">
               {!isGroupStageComplete ? (
                 <div className="glass-strong rounded-3xl p-12 text-center max-w-xl mx-auto flex flex-col items-center gap-4 border border-white/10 my-8 shadow-glass bg-black/40">
                   <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground">
@@ -4519,7 +4521,7 @@ export function GroupPredictor({
                   <p className="text-sm text-muted-foreground">
                     The Knockout stage requires all 72 group stage matches to have predicted scores before teams can be seeded.
                   </p>
-                  <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                  <div id="tour-simulator-controls" className="flex flex-col sm:flex-row gap-3 mt-4">
                     <button
                       onClick={async () => {
                         const allowed = await consumeCredit();

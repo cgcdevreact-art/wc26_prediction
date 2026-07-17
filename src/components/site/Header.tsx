@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, LogOut, Sun, Moon, ChevronDown, Check, Sparkles, Brain, Cpu, LayoutGrid, FolderKanban, UserCircle2 } from "lucide-react";
+import { Menu, LogOut, Sun, Moon, ChevronDown, Check, Sparkles, Brain, Cpu, LayoutGrid, FolderKanban, UserCircle2, HelpCircle } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "@/components/ThemeProvider";
@@ -10,11 +10,12 @@ import { useSimulationStore } from "@/lib/store/simulationStore";
 import { UpgradeModal } from "./UpgradeModal";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { buildAuthModalHref } from "@/lib/auth-modal";
+import { useSiteTour } from "@/components/site/SiteTour";
 
 const NAV = [
   // { to: "/", label: "Home" },
-  { to: "/predictions/country", label: "Country Predict" },
-  { to: "/teams", label: "Teams" },
+  { to: "/predictions/country", label: "Country Predict", id: "tour-nav-country" },
+  { to: "/teams", label: "Teams", id: "tour-nav-teams" },
   { to: "/subscription", label: "Pricing" },
 ];
 
@@ -37,6 +38,7 @@ export function Header() {
   const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   const { selectedModel, setSelectedModel } = useSimulationStore();
+  const { startTour } = useSiteTour();
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -196,7 +198,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 glass">
       <div className="container mx-auto flex px-4 items-center justify-between py-2">
-        <Link href="/" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+        <Link id="tour-brand-logo" href="/" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
           <span className="flex h-9 items-center">
             <Image
               src="/26wc-logo.png"
@@ -221,6 +223,7 @@ export function Header() {
             onMouseLeave={() => setSimulatorMenuOpen(false)}
           >
             <button
+              id="tour-nav-prediction"
               onClick={() => setSimulatorMenuOpen((open) => !open)}
               className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm transition ${isPredictionSectionActive
                 ? "bg-black/6 dark:bg-white/6 text-foreground"
@@ -256,6 +259,7 @@ export function Header() {
           {NAV.map((n) => (
             <Link
               key={n.to}
+              id={n.id}
               href={n.to}
               className={`rounded-md px-2 py-1 xl:px-2.5 xl:py-1.5 text-xs xl:text-sm transition whitespace-nowrap ${isActiveRoute(n.to)
                 ? "bg-black/6 dark:bg-white/6 text-foreground font-medium"
@@ -274,6 +278,7 @@ export function Header() {
             onMouseLeave={() => setDropdownOpen(false)}
           >
             <button
+              id="tour-model-selector"
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="flex cursor-pointer items-center gap-1.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:bg-black/10 dark:hover:bg-white/10 text-[11px] font-medium rounded-lg px-2.5 py-1.5 text-foreground transition duration-200 select-none outline-none"
             >
@@ -348,6 +353,15 @@ export function Header() {
           </div>
 
           <button
+            onClick={startTour}
+            className="ml-1 rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition duration-200 cursor-pointer"
+            aria-label="Start site tour"
+            title="Take a tour of the application"
+          >
+            <HelpCircle className="h-4.5 w-4.5" />
+          </button>
+
+          <button
             onClick={toggleTheme}
             className="ml-1 rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition duration-200"
             aria-label="Toggle theme"
@@ -364,6 +378,7 @@ export function Header() {
               onMouseLeave={() => setProfileMenuOpen(false)}
             >
               <button
+                id="tour-auth-btn"
                 onClick={() => setProfileMenuOpen((open) => !open)}
                 className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 transition hover:bg-black/5 dark:hover:bg-white/5"
               >
@@ -425,6 +440,7 @@ export function Header() {
             </div>
           ) : (
             <button
+              id="tour-auth-btn"
               onClick={() => openAuthModal("signin")}
               className="ml-4 rounded-md bg-gradient-to-r from-neon to-neon-2 px-4 py-2 text-sm font-semibold text-background neon-border transition hover:opacity-90 animate-fade-in whitespace-nowrap"
             >
@@ -479,6 +495,17 @@ export function Header() {
               {n.label}
             </Link>
           ))}
+
+          <button
+            onClick={() => {
+              setOpen(false);
+              startTour();
+            }}
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground transition duration-200 w-full text-left"
+          >
+            <HelpCircle className="h-4.5 w-4.5" />
+            <span>Site Tour</span>
+          </button>
 
           <button
             onClick={() => {
