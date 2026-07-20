@@ -57,8 +57,40 @@ function getTeamIdFromCode(code: string): number {
 }
 
 async function getActiveTeams() {
-  const matches = await prisma.fixtureCache.findMany();
-  if (matches.length === 0) return [];
+  let matches: any[] = await prisma.fixtureCache.findMany();
+  
+  const match104InDb = matches.find((m) => m.matchNo === 104);
+  if (matches.length === 0 || !match104InDb || match104InDb.status !== "COMPLETED") {
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const { mapFixtures } = require("@/lib/fixtures/source");
+      const gamesFile = fs.readFileSync(path.join(process.cwd(), "public", "games_live.json"), "utf8");
+      const teamsFile = fs.readFileSync(path.join(process.cwd(), "public", "teams_live.json"), "utf8");
+      const stadiumsFile = fs.readFileSync(path.join(process.cwd(), "public", "stadiums_live.json"), "utf8");
+      const fixtures = mapFixtures({
+        gamesData: JSON.parse(gamesFile),
+        teamsData: JSON.parse(teamsFile),
+        stadiumsData: JSON.parse(stadiumsFile)
+      });
+      matches = fixtures.map((f: any) => ({
+        matchNo: f.match_no,
+        homeTeamCode: f.homeTeamObj.code,
+        homeTeamName: f.homeTeamObj.name,
+        homeTeamFlag: f.homeTeamObj.flag,
+        awayTeamCode: f.awayTeamObj.code,
+        awayTeamName: f.awayTeamObj.name,
+        awayTeamFlag: f.awayTeamObj.flag,
+        homeScore: f.homeScore,
+        awayScore: f.awayScore,
+        status: f.status,
+        isKnockout: f.isKnockout,
+        stageName: f.stageName
+      }));
+    } catch (e) {
+      console.error("Failed to load local fixtures fallback in getActiveTeams:", e);
+    }
+  }
 
   // 1. Gather all unique teams in the cache
   const allTeamsMap = new Map<string, { id: number; name: string; tla: string; crest: string }>();
@@ -139,11 +171,27 @@ async function getActiveTeams() {
     }
   });
 
+  // 5. Determine overall tournament champion (winner of final match 104)
+  let winnerCode = "";
+  const finalMatch = matches.find((m) => m.stageName === "Final" || m.matchNo === 104);
+  if (finalMatch && finalMatch.status === "COMPLETED") {
+    const hs = parseInt(finalMatch.homeScore, 10);
+    const as = parseInt(finalMatch.awayScore, 10);
+    if (!isNaN(hs) && !isNaN(as)) {
+      if (hs > as && finalMatch.homeTeamCode) {
+        winnerCode = finalMatch.homeTeamCode;
+      } else if (as > hs && finalMatch.awayTeamCode) {
+        winnerCode = finalMatch.awayTeamCode;
+      }
+    }
+  }
+
   const teams: any[] = [];
   allTeamsMap.forEach((team, code) => {
     teams.push({
       ...team,
-      eliminated: eliminated.has(code)
+      eliminated: eliminated.has(code) && code !== winnerCode,
+      isWinner: code === winnerCode
     });
   });
 
@@ -192,7 +240,7 @@ export async function GET() {
     };
 
     const rawStandings = activeTeams
-      .filter((team) => !team.eliminated || teamColors[team.tla] !== undefined)
+      .filter((team) => !team.eliminated || team.isWinner || teamColors[team.tla] !== undefined)
       .map((team) => {
         const finalVotes = dbTeamCounts[team.id] || 0;
         return {
@@ -202,7 +250,8 @@ export async function GET() {
           flag: team.crest,
           color: teamColors[team.tla] || "#cbd5e1",
           finalVotes,
-          eliminated: team.eliminated
+          eliminated: team.eliminated && !team.isWinner,
+          isWinner: !!team.isWinner
         };
       });
 

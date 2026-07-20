@@ -13,6 +13,10 @@ export const metadata = {
   description: "Predict every match, simulate the tournament, build your bracket and compete globally for World Cup 2026 glory.",
 };
 
+const showInstagramFeed =
+  process.env.NEXT_PUBLIC_APP_ENV === "local" ||
+  process.env.NEXT_PUBLIC_APP_ENV === "staging";
+
 export default function Page() {
   return (
     <div className="min-h-screen relative">
@@ -22,7 +26,7 @@ export default function Page() {
         <LiveStats />
         
         <HomeSectionsAccordion />
-        <InstagramFeed />
+        {showInstagramFeed && <InstagramFeed />}
       </main>
       <Footer />
       <ScrollToTop />
