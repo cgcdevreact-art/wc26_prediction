@@ -79,7 +79,7 @@ export function HomeSectionsAccordion() {
   }, []);
 
   return (
-    <div className="container mx-auto space-y-12 px-4 py-12">
+    <div id="tour-home-sections" className="container mx-auto space-y-12 px-4 py-12">
       <div id="markets">
         <MatchProbabilitiesList />
       </div>

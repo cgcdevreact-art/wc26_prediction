@@ -2238,6 +2238,7 @@ export default function CountryPredictionsClient({
             </div>
             {!sharedAuthor && (
               <button
+                id="tour-country-run-simulation"
                 onClick={handleRunSimulationClick}
                 disabled={isSimulating || !isInitialized}
                 className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 via-emerald-500 to-fuchsia-500 px-5 py-3 text-sm font-black text-white shadow-[0_16px_40px_rgba(14,165,233,0.2)] transition-all hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(14,165,233,0.28)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
@@ -2276,6 +2277,7 @@ export default function CountryPredictionsClient({
                   <div className="relative mb-5 group">
                     <Search className="absolute inset-y-0 left-3.5 h-4 w-4 my-auto text-muted-foreground group-focus-within:text-neon transition-colors" />
                     <Input
+                      id="tour-country-search"
                       placeholder="Search country..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -2389,7 +2391,7 @@ export default function CountryPredictionsClient({
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-5 pb-5 flex-1 flex flex-col [&>div]:flex [&>div]:flex-col [&>div]:flex-1 [&>div]:justify-between">
-                <div className="space-y-4 flex flex-col flex-1 justify-between">
+                <div id="tour-country-stats" className="space-y-4 flex flex-col flex-1 justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-white/5">
                       <span className="text-xs font-semibold text-slate-700 dark:text-white/70 flex items-center">

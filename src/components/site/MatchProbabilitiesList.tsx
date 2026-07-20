@@ -408,38 +408,45 @@ export function MatchProbabilitiesList() {
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2.5">
-                        <span className="font-mono text-base font-black text-slate-900 dark:text-white">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-base font-black text-slate-900 dark:text-white w-12 text-right shrink-0">
                           {t.prob}%
                         </span>
-                        {!(t as any).eliminated ? (
-                          <button
-                            onClick={() => handleWinnerVoteClick((t as any).id || 0, t.code)}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer group ${userVotes["tournament-winner"] === t.code
-                                ? "bg-[#fffbeb] dark:bg-[#f59e0b]/10 border-2 border-[#f59e0b] text-[#d97706] dark:text-[#f59e0b]"
-                                : "bg-[#f8fafc] dark:bg-[#1e2025]/50 border border-[#e2e8f0] dark:border-white/5 text-[#64748b] dark:text-slate-400 hover:bg-[#f1f5f9] hover:border-[#cbd5e1] hover:text-[#475569] dark:hover:bg-white/10 dark:hover:text-white"
-                              }`}
-                            title="Vote as tournament champion"
-                          >
-                            {userVotes["tournament-winner"] === t.code ? (
-                              <img
-                                src="/voting.svg"
-                                alt="Voted"
-                                className="block w-5.5 h-5.5 object-contain transition-all duration-200 scale-110 group-hover:scale-120 active:scale-95"
-                              />
-                            ) : (
-                              <img
-                                src="/voting.svg"
-                                alt="Vote"
-                                className="block w-5.5 h-5.5 object-contain opacity-55 dark:opacity-40 grayscale group-hover:opacity-100 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-200 active:scale-95"
-                              />
-                            )}
-                          </button>
-                        ) : (
-                          <span className="text-[10px] font-bold text-slate-450 dark:text-slate-500 bg-slate-100 dark:bg-white/5 px-2 py-1 rounded-md uppercase tracking-wider select-none">
-                            Out
-                          </span>
-                        )}
+                        <div className="w-24 flex items-center justify-end shrink-0">
+                          {(t as any).isWinner ? (
+                            <span className="text-[10px] font-extrabold text-[#d97706] dark:text-[#f59e0b] bg-[#fffbeb] dark:bg-[#f59e0b]/15 border border-[#f59e0b]/40 px-2 py-0.5 rounded-full uppercase tracking-wider select-none flex items-center gap-1 shadow-xs">
+                              <Trophy className="w-3 h-3 text-[#d97706] dark:text-[#f59e0b] shrink-0" />
+                              Winner
+                            </span>
+                          ) : !(t as any).eliminated ? (
+                            <button
+                              onClick={() => handleWinnerVoteClick((t as any).id || 0, t.code)}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer group ${userVotes["tournament-winner"] === t.code
+                                  ? "bg-[#fffbeb] dark:bg-[#f59e0b]/10 border-2 border-[#f59e0b] text-[#d97706] dark:text-[#f59e0b]"
+                                  : "bg-[#f8fafc] dark:bg-[#1e2025]/50 border border-[#e2e8f0] dark:border-white/5 text-[#64748b] dark:text-slate-400 hover:bg-[#f1f5f9] hover:border-[#cbd5e1] hover:text-[#475569] dark:hover:bg-white/10 dark:hover:text-white"
+                                }`}
+                              title="Vote as tournament champion"
+                            >
+                              {userVotes["tournament-winner"] === t.code ? (
+                                <img
+                                  src="/voting.svg"
+                                  alt="Voted"
+                                  className="block w-5.5 h-5.5 object-contain transition-all duration-200 scale-110 group-hover:scale-120 active:scale-95"
+                                />
+                              ) : (
+                                <img
+                                  src="/voting.svg"
+                                  alt="Vote"
+                                  className="block w-5.5 h-5.5 object-contain opacity-55 dark:opacity-40 grayscale group-hover:opacity-100 group-hover:grayscale-0 group-hover:scale-110 transition-all duration-200 active:scale-95"
+                                />
+                              )}
+                            </button>
+                          ) : (
+                            <span className="text-[10px] font-bold text-slate-450 dark:text-slate-500 bg-slate-100 dark:bg-white/5 border border-slate-200/50 dark:border-white/5 px-2 py-0.5 rounded-full uppercase tracking-wider select-none">
+                              Out
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}

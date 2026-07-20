@@ -101,7 +101,7 @@ export function Hero() {
       }
 
       const isFinalOrThird = f.stageName === "Final" || f.stageName === "Third Place Playoff" || f.match_no === 103 || f.match_no === 104;
-      if (isFinalOrThird && (f.status === "LIVE" || f.status === "UPCOMING")) {
+      if (isFinalOrThird) {
         return true;
       }
 
@@ -126,7 +126,8 @@ export function Hero() {
       return a.match_no - b.match_no;
     });
   const hasLiveMatch = todayMatches.some((match) => match.status === "LIVE");
-  const matchesHeadingLabel = hasLiveMatch ? "Today's" : "Upcoming";
+  const hasUpcomingMatch = todayMatches.some((match) => match.status === "UPCOMING");
+  const matchesHeadingLabel = hasLiveMatch ? "Today's" : hasUpcomingMatch ? "Upcoming" : "Final";
 
   const handleSimulationClick = () => {
     if (session) {
@@ -206,7 +207,7 @@ export function Hero() {
           <div className="mt-8">
             <div className="mb-2 flex items-center justify-between">
               <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Countdown to Final</div>
-              <div className="text-xs text-muted-foreground">Jul 19, 2026 · New York New, Jersey Stadium</div>
+              <div className="text-xs text-muted-foreground">Jul 19, 2026 · New York, New Jersey Stadium</div>
             </div>
             <Countdown />
           </div>
@@ -215,6 +216,7 @@ export function Hero() {
         <div className="relative">
           <div className="absolute -inset-6 rounded-3xl bg-gradient-to-tr from-neon/20 via-transparent to-neon-2/20 blur-2xl" />
           <button
+            id="tour-hero-probabilities"
             type="button"
             onClick={handleBannerClick}
             className="relative block w-full text-left glass-strong rounded-3xl p-6 transition hover:scale-[1.01] hover:bg-white/10 cursor-pointer"
@@ -268,7 +270,7 @@ export function Hero() {
       </div>
 
       {/* Today's Matches Section */}
-      <div className="mx-auto container px-4 pb-12 md:px-6 relative z-10 mt-2">
+      <div id="tour-hero-matches" className="mx-auto container px-4 pb-12 md:px-6 relative z-10 mt-2">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 flex items-center gap-2">
             <Calendar className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
@@ -405,6 +407,11 @@ function HeroMatchCard({
     pillClass += " bg-slate-200/40 dark:bg-black/40 border-slate-200/60 dark:border-white/5 text-slate-700 dark:text-slate-350";
   }
 
+  const homeScoreNum = parseInt(match.homeScore, 10);
+  const awayScoreNum = parseInt(match.awayScore, 10);
+  const homeWon = isCompleted && !isNaN(homeScoreNum) && !isNaN(awayScoreNum) && homeScoreNum > awayScoreNum;
+  const awayWon = isCompleted && !isNaN(homeScoreNum) && !isNaN(awayScoreNum) && awayScoreNum > homeScoreNum;
+
   return (
     <div onClick={onClick} className={cardClass}>
       {/* Shimmer effect on hover */}
@@ -431,9 +438,17 @@ function HeroMatchCard({
               emojiClassName="text-base leading-none"
             />
           </div>
-          <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
+          <span className={`font-bold text-xs truncate uppercase font-display ${
+            homeWon ? "text-amber-500 dark:text-amber-400 font-black" : "text-foreground dark:text-white"
+          }`}>
             {match.homeTeamObj.code || match.homeTeamObj.name.slice(0, 3)}
           </span>
+          {homeWon && (
+            <span className="text-[7.5px] font-black text-amber-600 dark:text-amber-400 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 flex items-center gap-0.5 shadow-2xs">
+              <Trophy className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+              WINNER
+            </span>
+          )}
         </div>
 
         {/* Score / VS / Countdown display */}
@@ -469,7 +484,15 @@ function HeroMatchCard({
 
         {/* Away Team */}
         <div className="flex items-center gap-1.5 justify-end min-w-0 flex-1 text-right">
-          <span className="font-bold text-xs truncate text-foreground dark:text-white uppercase font-display">
+          {awayWon && (
+            <span className="text-[7.5px] font-black text-amber-600 dark:text-amber-400 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 flex items-center gap-0.5 shadow-2xs">
+              <Trophy className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+              WINNER
+            </span>
+          )}
+          <span className={`font-bold text-xs truncate uppercase font-display ${
+            awayWon ? "text-amber-500 dark:text-amber-400 font-black" : "text-foreground dark:text-white"
+          }`}>
             {match.awayTeamObj.code || match.awayTeamObj.name.slice(0, 3)}
           </span>
           <div className="shrink-0 flex items-center justify-center bg-black/10 dark:bg-white/5 p-1 rounded-md border border-white/5">

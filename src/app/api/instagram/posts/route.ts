@@ -46,10 +46,52 @@ const MOCK_POSTS = [
     media_url: "https://images.unsplash.com/photo-1431324155629-1a6edd1d152b?w=600&auto=format&fit=crop&q=80",
     permalink: "https://instagram.com",
     timestamp: new Date(Date.now() - 3600000 * 72).toISOString()
+  },
+  {
+    id: "mock_5",
+    caption: "📈 Elo rating shifts! Post-qualifiers, Argentina leads the rankings with 1860 pts, closely followed by France and Brazil. Can the underdog nations climb the ranks in the group stage? Simulate and see! 🇧🇷🇦🇷🇫🇷 #Elo #Rankings #WorldCup2026 #Analytics",
+    media_type: "IMAGE",
+    media_url: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&auto=format&fit=crop&q=80",
+    permalink: "https://instagram.com",
+    timestamp: new Date(Date.now() - 3600000 * 96).toISOString()
+  },
+  {
+    id: "mock_6",
+    caption: "🏟️ 16 host cities, 104 matches, 1 champion. From the opening match in Mexico City to the grand final in New York/New Jersey, the stage is set for the biggest tournament ever! Which stadium are you most excited for? 🇺🇸🇲🇽🇨🇦 #HostCities #Stadiums #FIFA2026",
+    media_type: "IMAGE",
+    media_url: "https://images.unsplash.com/photo-1459865264687-595d652de67e?w=600&auto=format&fit=crop&q=80",
+    permalink: "https://instagram.com",
+    timestamp: new Date(Date.now() - 3600000 * 120).toISOString()
+  },
+  {
+    id: "mock_7",
+    caption: "💰 Squad values vs Win Probability! Is there a direct link between market value and tournament success? Our data engine cross-references transfer values with match outcomes. Check the Teams Directory for full squad evaluations. #SquadValue #MarketValue #FootballAnalytics",
+    media_type: "IMAGE",
+    media_url: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=600&auto=format&fit=crop&q=80",
+    permalink: "https://instagram.com",
+    timestamp: new Date(Date.now() - 3600000 * 144).toISOString()
+  },
+  {
+    id: "mock_8",
+    caption: "🔮 Predict the perfect bracket and win! Play against friends in private leagues or compete in the global champion ladder. Who will be this year's oracle? Start predicting today! #PerfectBracket #BracketChallenge #PredictionLeague",
+    media_type: "IMAGE",
+    media_url: "https://images.unsplash.com/photo-1540747737956-37872404a87a?w=600&auto=format&fit=crop&q=80",
+    permalink: "https://instagram.com",
+    timestamp: new Date(Date.now() - 3600000 * 168).toISOString()
   }
 ];
 
 export async function GET(req: Request) {
+  // Generate 16 mock posts for fallbacks
+  const mock16 = [
+    ...MOCK_POSTS,
+    ...MOCK_POSTS.map((p, index) => ({
+      ...p,
+      id: `${p.id}_dup_${index}`,
+      timestamp: new Date(new Date(p.timestamp).getTime() - 3600000 * 24 * 7).toISOString()
+    }))
+  ];
+
   // Read force refresh parameter
   let force = false;
   try {
@@ -74,7 +116,7 @@ export async function GET(req: Request) {
 
   if (!accessToken) {
     // If no access token is configured, return the mock data directly
-    return NextResponse.json({ posts: MOCK_POSTS, username: "26WCPrediction", fromCache: false, source: "mock" });
+    return NextResponse.json({ posts: mock16, username: "26WCPrediction", fromCache: false, source: "mock" });
   }
 
   // Check if cache is still valid (only if not forcing refresh)
@@ -84,7 +126,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const url = `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&access_token=${accessToken}&limit=8`;
+    const url = `https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,permalink,thumbnail_url,timestamp&access_token=${accessToken}&limit=16`;
     const res = await fetch(url, force ? { cache: "no-store" } : { next: { revalidate: 3600 } });
 
     if (!res.ok) {
@@ -93,7 +135,7 @@ export async function GET(req: Request) {
       if (cacheStore) {
         return NextResponse.json({ posts: cacheStore.posts, username: cacheStore.username, fromCache: true, source: "fallback-cache" });
       }
-      return NextResponse.json({ posts: MOCK_POSTS, username: "26WCPrediction", fromCache: false, source: "fallback-mock" });
+      return NextResponse.json({ posts: mock16, username: "26WCPrediction", fromCache: false, source: "fallback-mock" });
     }
 
     const data = await res.json();
@@ -125,6 +167,6 @@ export async function GET(req: Request) {
     if (cacheStore) {
       return NextResponse.json({ posts: cacheStore.posts, username: cacheStore.username, fromCache: true, source: "fallback-cache" });
     }
-    return NextResponse.json({ posts: MOCK_POSTS, username: "26WCPrediction", fromCache: false, source: "fallback-mock" });
+    return NextResponse.json({ posts: mock16, username: "26WCPrediction", fromCache: false, source: "fallback-mock" });
   }
 }

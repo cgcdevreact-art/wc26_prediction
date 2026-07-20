@@ -39,40 +39,58 @@ export function FixtureCard({ fixture }: FixtureCardProps) {
       </div>
 
       {/* Matchup Teams */}
-      <div className="flex items-center justify-between gap-4 py-2">
-        {/* Home Team */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <CountryFlag
-            code={fixture.homeTeamObj.code}
-            flag={fixture.homeTeamObj.flag}
-            name={fixture.homeTeamObj.name}
-            className="h-6 w-9 rounded object-cover shadow-sm shrink-0"
-            emojiClassName="text-xl"
-          />
-          <span className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
-            {fixture.homeTeamObj.name}
-          </span>
-        </div>
+      {(() => {
+        const hs = parseInt(fixture.homeScore, 10);
+        const as = parseInt(fixture.awayScore, 10);
+        const homeWon = isCompleted && !isNaN(hs) && !isNaN(as) && hs > as;
+        const awayWon = isCompleted && !isNaN(hs) && !isNaN(as) && as > hs;
+        return (
+          <div className="flex items-center justify-between gap-4 py-2">
+            {/* Home Team */}
+            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+              <CountryFlag
+                code={fixture.homeTeamObj.code}
+                flag={fixture.homeTeamObj.flag}
+                name={fixture.homeTeamObj.name}
+                className="h-6 w-9 rounded object-cover shadow-sm shrink-0"
+                emojiClassName="text-xl"
+              />
+              <span className={`text-sm font-bold truncate ${homeWon ? "text-amber-600 dark:text-amber-400 font-extrabold" : "text-slate-800 dark:text-slate-200"}`}>
+                {fixture.homeTeamObj.name}
+              </span>
+              {homeWon && (
+                <span className="text-[8px] font-black text-amber-600 dark:text-amber-400 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 flex items-center gap-0.5 shadow-2xs">
+                  🏆 WINNER
+                </span>
+              )}
+            </div>
 
-        {/* Score */}
-        <div className="text-base font-black shrink-0 font-mono px-3 py-1 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 text-slate-700 dark:text-slate-300">
-          {isCompleted || isLive ? `${fixture.homeScore} - ${fixture.awayScore}` : "vs"}
-        </div>
+            {/* Score */}
+            <div className="text-base font-black shrink-0 font-mono px-3 py-1 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 text-slate-700 dark:text-slate-300">
+              {isCompleted || isLive ? `${fixture.homeScore} - ${fixture.awayScore}` : "vs"}
+            </div>
 
-        {/* Away Team */}
-        <div className="flex items-center gap-3 flex-1 min-w-0 justify-end text-right">
-          <span className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
-            {fixture.awayTeamObj.name}
-          </span>
-          <CountryFlag
-            code={fixture.awayTeamObj.code}
-            flag={fixture.awayTeamObj.flag}
-            name={fixture.awayTeamObj.name}
-            className="h-6 w-9 rounded object-cover shadow-sm shrink-0"
-            emojiClassName="text-xl"
-          />
-        </div>
-      </div>
+            {/* Away Team */}
+            <div className="flex items-center gap-2.5 flex-1 min-w-0 justify-end text-right">
+              {awayWon && (
+                <span className="text-[8px] font-black text-amber-600 dark:text-amber-400 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 flex items-center gap-0.5 shadow-2xs">
+                  🏆 WINNER
+                </span>
+              )}
+              <span className={`text-sm font-bold truncate ${awayWon ? "text-amber-600 dark:text-amber-400 font-extrabold" : "text-slate-800 dark:text-slate-200"}`}>
+                {fixture.awayTeamObj.name}
+              </span>
+              <CountryFlag
+                code={fixture.awayTeamObj.code}
+                flag={fixture.awayTeamObj.flag}
+                name={fixture.awayTeamObj.name}
+                className="h-6 w-9 rounded object-cover shadow-sm shrink-0"
+                emojiClassName="text-xl"
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Stadium / Kickoff date details */}
       <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-white/5 grid grid-cols-2 gap-2 text-[10px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider">
